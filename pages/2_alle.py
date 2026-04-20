@@ -176,18 +176,27 @@ gtm_actual_mtgs = {
 }
 
 # Auto-detect meetings from Active presales sheet by first_conv date
+# Only count 2026 meetings — older ones go into a pre-2026 bucket
 MONTH_ABBR = {1: "Jan", 2: "Feb", 3: "Mar", 4: "Apr", 5: "May", 6: "Jun",
               7: "Jul", 8: "Aug", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dec"}
 
+_pre2026_meetings = []
 if 'first_conv' in df.columns:
     for _, row in df.iterrows():
         if pd.notna(row.get('first_conv')):
-            m_abbr = MONTH_ABBR.get(row['first_conv'].month)
+            conv_date = row['first_conv']
+            lead = str(row.get('lead_name', '')).strip()
+            if not lead:
+                continue
+            if conv_date.year < 2026:
+                if lead not in _pre2026_meetings:
+                    _pre2026_meetings.append(lead)
+                continue
+            m_abbr = MONTH_ABBR.get(conv_date.month)
             if m_abbr and m_abbr not in gtm_actual_mtgs:
                 gtm_actual_mtgs[m_abbr] = {"meetings": [], "proposals": []}
             if m_abbr:
-                lead = str(row.get('lead_name', '')).strip()
-                if lead and lead not in gtm_actual_mtgs[m_abbr]["meetings"]:
+                if lead not in gtm_actual_mtgs[m_abbr]["meetings"]:
                     gtm_actual_mtgs[m_abbr]["meetings"].append(lead)
                 status = str(row.get('status', '')).lower()
                 if 'proposal' in status and lead not in gtm_actual_mtgs[m_abbr]["proposals"]:
@@ -246,25 +255,33 @@ with tab_gtm:
     with c4:
         st.metric("Pilot Revenue (Target)", f"${gtm_target.loc[current_month_idx, 'T_Pilot_Revenue']:,}")
 
-    # ── Meetings: Target vs Actual Chart ──────────────────────────────────────
+    # ── Meetings: Target vs Actual Chart (Jan–current month only) ──────────────
     st.markdown("### New Meetings — Target vs Actual")
+
+    _chart_months = months[:current_month_idx + 1]  # Jan through current month
+    _chart_targets = gtm_target["T_New_Mtgs"].iloc[:current_month_idx + 1]
+    _chart_actuals = actual_new_mtgs[:current_month_idx + 1]
+
+    # Optional: show pre-2026 meetings count
+    if _pre2026_meetings:
+        st.caption(f"ℹ️ {len(_pre2026_meetings)} leads from pre-2026 not shown: {', '.join(_pre2026_meetings[:8])}{'…' if len(_pre2026_meetings) > 8 else ''}")
 
     fig_mtgs = go.Figure()
     fig_mtgs.add_trace(go.Bar(
-        x=months, y=gtm_target["T_New_Mtgs"],
+        x=_chart_months, y=_chart_targets,
         name="Target", marker_color="#374151",
     ))
-    actual_bars = [v if v is not None else 0 for v in actual_new_mtgs]
+    actual_bars = [v if v is not None else 0 for v in _chart_actuals]
     colors = []
-    for i, (a, t) in enumerate(zip(actual_bars, gtm_target["T_New_Mtgs"])):
-        if actual_new_mtgs[i] is None:
-            colors.append("#1a1a2e")  # future months — dim
+    for i, (a, t) in enumerate(zip(actual_bars, _chart_targets)):
+        if _chart_actuals[i] is None:
+            colors.append("#1a1a2e")
         elif a >= t:
             colors.append("#10B981")  # met target
         else:
             colors.append("#EF4444")  # missed
     fig_mtgs.add_trace(go.Bar(
-        x=months, y=actual_bars,
+        x=_chart_months, y=actual_bars,
         name="Actual", marker_color=colors,
     ))
     fig_mtgs.update_layout(
@@ -273,18 +290,18 @@ with tab_gtm:
     )
     st.plotly_chart(fig_mtgs, use_container_width=True)
 
-    # ── Cumulative Meetings Chart ─────────────────────────────────────────────
+    # ── Cumulative Meetings Chart (Jan–current month only) ─────────────────────
     st.markdown("### Cumulative Meetings — Target vs Actual")
     fig_cumul = go.Figure()
     fig_cumul.add_trace(go.Scatter(
-        x=months, y=gtm_target["T_Cumul_Mtgs"],
+        x=_chart_months, y=gtm_target["T_Cumul_Mtgs"].iloc[:current_month_idx+1],
         mode="lines+markers", name="Target",
         line=dict(color="#6B7280", dash="dash", width=2),
     ))
-    actual_cumul_plot = [v if v is not None else None for v in actual_cumul_mtgs]
+    actual_cumul_plot = [v for v in actual_cumul_mtgs[:current_month_idx+1] if v is not None]
     fig_cumul.add_trace(go.Scatter(
-        x=months[:current_month_idx+1],
-        y=[v for v in actual_cumul_plot[:current_month_idx+1] if v is not None],
+        x=_chart_months[:len(actual_cumul_plot)],
+        y=actual_cumul_plot,
         mode="lines+markers", name="Actual",
         line=dict(color="#4F46E5", width=3),
         marker=dict(size=10),
