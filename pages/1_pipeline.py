@@ -675,10 +675,14 @@ st.markdown("""
 .kanban-client {
     font-weight: 600;
     font-size: 0.85rem;
+    color: #E2E8F0;
 }
 .kanban-meta {
     font-size: 0.75rem;
     color: #9CA3AF;
+    background: rgba(255,255,255,0.08);
+    border-radius: 4px;
+    padding: 2px 6px;
 }
 .kanban-row2 {
     font-size: 0.8rem;
