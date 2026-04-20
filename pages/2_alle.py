@@ -537,11 +537,14 @@ with tab_pipeline:
     with c5:
         st.metric("Top of Funnel", tof)
 
-    # ── Month View — Actual vs Target ─────────────────────────────────────────
+    # ── Month View — Actual vs Target (only through current month) ────────────
     st.markdown("### Monthly Progress vs Target")
 
+    _current_month_idx = datetime.now().month - 1  # 0-based (Jan=0, Apr=3)
+    _show_months = months[:_current_month_idx + 1]  # Jan through current month
+
     month_rows = []
-    for m in months:
+    for m in _show_months:
         idx = months.index(m)
         t_mtgs = gtm_target.loc[idx, "T_New_Mtgs"]
         t_cumul = gtm_target.loc[idx, "T_Cumul_Mtgs"]
