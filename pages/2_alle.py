@@ -320,25 +320,6 @@ with tab_gtm:
 
     st.caption("Assumption: 13 Paid Pilots → 10 Customers in Production = $195K + $148K = **$343K invoiced revenue in 2026**")
 
-    # ── Monthly Detail ────────────────────────────────────────────────────────
-    st.markdown("### Monthly Detail — Meetings & Proposals")
-
-    for month_name, data in gtm_actual_mtgs.items():
-        target_idx = months.index(month_name)
-        target_val = gtm_target.loc[target_idx, "T_New_Mtgs"]
-        actual_val = len(data["meetings"])
-        hit = "✅" if actual_val >= target_val else "⚠️"
-
-        with st.expander(f"{hit} **{month_name}** — {actual_val} meetings (target: {target_val}) | {len(data['proposals'])} proposals"):
-            mcol1, mcol2 = st.columns(2)
-            with mcol1:
-                st.markdown("**Meetings:**")
-                for i, name in enumerate(data["meetings"], 1):
-                    st.markdown(f"{i}. {name}")
-            with mcol2:
-                st.markdown("**Proposals Sent:**")
-                for i, name in enumerate(data["proposals"], 1):
-                    st.markdown(f"{i}. {name}")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
