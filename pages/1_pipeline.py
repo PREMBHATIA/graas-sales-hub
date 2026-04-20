@@ -697,58 +697,6 @@ st.plotly_chart(fig_pg, use_container_width=True)
 
 st.markdown("---")
 
-st.markdown("### Monthly Detail — 2026")
-
-# Only show Jan onwards (current year) — older months are noise
-_fy_months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
-              "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-_current_month_idx = datetime.now().month - 1
-_relevant_months = [m for m in _fy_months[:_current_month_idx + 1] if m in months]
-
-for m in _relevant_months:
-    md = df[df["Month"] == m]
-    won_m = md[md["Status"] == "Won"]
-    lost_m = md[md["Status"] == "Lost"]
-    open_m = md[md["Status"] == "Open"]
-    new_m = md[md["Type"] == "New"]
-    ex_m = md[md["Type"] == "Existing"]
-
-    with st.expander(
-        f"**{m}**  —  {len(md)} proposals  |  "
-        f"✅ {len(won_m)} won  |  ❌ {len(lost_m)} lost  |  ⏳ {len(open_m)} open",
-        expanded=(m == months[-1]),
-    ):
-        if not new_m.empty:
-            won_names = [r["Client"] for _, r in new_m.iterrows() if r["Status"] == "Won"]
-            lost_names = [r["Client"] for _, r in new_m.iterrows() if r["Status"] == "Lost"]
-            open_names = [r["Client"] for _, r in new_m.iterrows() if r["Status"] == "Open"]
-            parts = [f"**New** ({len(new_m)}):"]
-            if won_names: parts.append(f"✅ {', '.join(won_names)}")
-            if lost_names: parts.append(f"❌ {', '.join(lost_names)}")
-            if open_names: parts.append(f"⏳ {', '.join(open_names)}")
-            st.markdown("  \n".join(parts))
-
-        if not ex_m.empty:
-            won_names = [r["Client"] for _, r in ex_m.iterrows() if r["Status"] == "Won"]
-            open_names = [r["Client"] for _, r in ex_m.iterrows() if r["Status"] == "Open"]
-            parts = [f"**Existing** ({len(ex_m)}):"]
-            if won_names: parts.append(f"✅ {', '.join(won_names)}")
-            if open_names: parts.append(f"⏳ {', '.join(open_names)}")
-            st.markdown("  \n".join(parts))
-
-        detail = md[["Type", "Client", "Product Group", "GP", "Status", "PIC"]].copy()
-        detail["GP"] = detail["GP"].apply(lambda v: fmt(v) if v > 0 else "TBD")
-
-        def sc(val):
-            if val == "Won": return "color: #10B981; font-weight: bold"
-            if val == "Lost": return "color: #EF4444"
-            return "color: #F59E0B"
-
-        st.dataframe(detail.style.map(sc, subset=["Status"]),
-                      use_container_width=True, hide_index=True)
-
-st.markdown("---")
-
 # ═══════════════════════════════════════════════════════════════════════════════
 # 4. LIVE PIPELINE — CURRENT MONTH (operational view)
 # ═══════════════════════════════════════════════════════════════════════════════
