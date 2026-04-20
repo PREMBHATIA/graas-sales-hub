@@ -1,0 +1,25 @@
+{
+  "_comment": "Local CRM overlay — contacts added by Prem outside the team All-e sheet. Merged into CRM view at load time. All-e sheet is NOT modified.",
+  "contacts": [
+    {
+      "company": "Havells India Limited",
+      "vertical": "FMEG",
+      "entity_type": "OEM",
+      "lead_status": "2-POC",
+      "segment": "Active",
+      "agents": "All-e — 4 workstreams (Search, Catalog Taxonomy, Knowledge Graph API, eCom pipelines + MCP)",
+      "source": "Outbound (Amruta) → F2F meeting",
+      "outreach_owner": "Amruta",
+      "first_contact": "2026-03-11",
+      "last_contact": "2026-04-15",
+      "conv_details": "F2F at Havells HQ (QRG Towers, NOIDA) on 15 Apr 2026. Discussed 4 workstreams: (1) Search on website — Magento/Adobe integration, (2) Catalog taxonomy & enrichment, (3) Knowledge Graph as API — pilot proposed with real historic data (consumer or distributor/retailer), (4) eCom data pipelines + MCP with pre-built connectors (Magento, Flipkart, Amazon, Meta, Google, Zepto, Instamart). Agreed to split into 2 workstreams (1/2/3 clubbed) and set up subsequent meeting. Amruta leading from Graas side. Pilot discussed.",
+      "comments": "Pilot discussed. Follow-up: send video on catalog taxonomy process by tomorrow. Avdhesh Babu mobile: +91-8171432432.",
+      "people": [
+        {"name": "Pramod Mundra", "email": "Pramod.Mundra@havells.com", "designation": "Primary sponsor"},
+        {"name": "Utkarsh Kharayat", "email": "Utkarsh.Kharayat@havells.com", "designation": ""},
+        {"name": "Avdhesh Babu", "email": "Avdhesh.Babu@havells.com", "designation": ""},
+        {"name": "Prateek Agarwal", "email": "Prateek1.Agarwal@havells.com", "designation": ""}
+      ]
+    }
+  ]
+}

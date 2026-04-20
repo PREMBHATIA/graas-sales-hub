@@ -1,0 +1,61 @@
+"""Graas Sales Hub — Pipeline, All-e & CRM."""
+
+import streamlit as st
+
+st.set_page_config(
+    page_title="Graas Sales Hub",
+    page_icon="🚀",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+st.markdown("""
+<style>
+    .main-header {
+        font-size: 2.2rem;
+        font-weight: 700;
+        background: linear-gradient(90deg, #4F46E5, #7C3AED);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 0;
+    }
+    .sub-header {
+        font-size: 1rem;
+        color: #9CA3AF;
+        margin-top: -10px;
+        margin-bottom: 20px;
+    }
+    .block-container { padding-top: 2rem; }
+</style>
+""", unsafe_allow_html=True)
+
+with st.sidebar:
+    st.markdown("### 🚀 Graas Sales Hub")
+    st.markdown("---")
+    st.markdown("**Dashboards**")
+    st.markdown("- 📋 Pipeline — Meetings & Proposals")
+    st.markdown("- 🤖 All-e — Presales Pipeline")
+    st.markdown("- 📧 CRM — Contacts & Outreach")
+
+st.markdown('<p class="main-header">Graas Sales Hub</p>', unsafe_allow_html=True)
+st.markdown('<p class="sub-header">Pipeline, Presales & CRM — shared team view</p>', unsafe_allow_html=True)
+
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    st.markdown("### 📋 Pipeline")
+    st.markdown("Meetings & Proposals tracker across all products")
+    st.page_link("pages/1_pipeline.py", label="Open Pipeline →")
+
+with col2:
+    st.markdown("### 🤖 All-e")
+    st.markdown("Foundry presales pipeline & deal tracking")
+    st.page_link("pages/2_alle.py", label="Open All-e →")
+
+with col3:
+    st.markdown("### 📧 CRM")
+    st.markdown("Unified contacts, outreach & email composer")
+    st.page_link("pages/3_crm.py", label="Open CRM →")
+
+st.markdown("---")
+st.markdown("💡 **Tip:** Use the sidebar to navigate between dashboards.")
