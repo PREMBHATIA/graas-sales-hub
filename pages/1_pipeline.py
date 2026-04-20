@@ -348,119 +348,7 @@ else:
 st.markdown("---")
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 2. CURRENT MONTH PIPELINE STATUS (Kanban — from "All-e Pipeline (IN) - {month}" tab)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-st.markdown(f"### 🗓️ {CURRENT_MONTH} Pipeline Status")
-st.caption("Live pipeline status — meetings being set, MOF, BOF | Source: All-e Pipeline tab")
-
-# ── CSS for pipeline cards ──
-st.markdown("""
-<style>
-.pipeline-item {
-    background: #1E1E2E;
-    border-radius: 6px;
-    padding: 6px 10px;
-    margin-bottom: 4px;
-    border-left: 3px solid;
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-}
-.pipeline-name { font-weight: 600; font-size: 0.85rem; color: #E2E8F0; }
-.pipeline-detail { font-size: 0.75rem; color: #9CA3AF; background: rgba(255,255,255,0.08); border-radius: 4px; padding: 2px 6px; }
-.pipeline-notes { font-size: 0.78rem; margin-top: 1px; }
-</style>
-""", unsafe_allow_html=True)
-
-# ── All-e India pipeline from sheet ──
-alle_sections = {}
-if not pipeline_raw.empty:
-    SECTION_KEYS = {
-        "meetings already set": ("Meetings Set", "#10B981", "✅"),
-        "meetings in the process": ("Meetings Being Set", "#3B82F6", "🔵"),
-        "mof": ("MOF — Met, No Proposal Yet", "#F59E0B", "🟡"),
-        "bof": ("BOF — Proposal Sent, In Play", "#A855F7", "🟣"),
-    }
-
-    current_section = None
-    for i in range(len(pipeline_raw)):
-        row = pipeline_raw.iloc[i]
-        first_cell = str(row.iloc[0]).strip().lower() if len(row) > 0 else ""
-
-        matched = False
-        for key, val in SECTION_KEYS.items():
-            if key in first_cell:
-                current_section = val[0]
-                alle_sections[current_section] = {"color": val[1], "icon": val[2], "items": []}
-                matched = True
-                break
-
-        if matched or current_section is None:
-            continue
-
-        name = str(row.iloc[0]).strip() if len(row) > 0 else ""
-        if not name or name.lower() in ("name", ""):
-            continue
-        source = str(row.iloc[1]).strip() if len(row) > 1 else ""
-        notes = str(row.iloc[2]).strip() if len(row) > 2 else ""
-        if notes == "nan":
-            notes = ""
-        alle_sections[current_section]["items"].append({"name": name, "source": source, "notes": notes})
-
-# ── Hoppr / Extract pipeline (manual for now) ──
-hoppr_extract_sections = {
-    "MOF — Meeting Done": {
-        "color": "#F59E0B", "icon": "🟡",
-        "items": [
-            {"name": "Hitachi Thailand", "source": "Hoppr", "notes": ""},
-            {"name": "Rinse", "source": "Hoppr", "notes": ""},
-            {"name": "Estée Lauder", "source": "Extract", "notes": ""},
-            {"name": "Beacon Mart", "source": "Hoppr", "notes": ""},
-            {"name": "Bata", "source": "Hoppr", "notes": ""},
-        ],
-    },
-}
-
-# ── Helper to render a Kanban row ──
-def render_kanban_row(label, sections_dict):
-    sec_list = [(k, v) for k, v in sections_dict.items() if v["items"]]
-    if not sec_list:
-        return
-    st.markdown(f"#### {label}")
-    kcols = st.columns(len(sec_list))
-    for col, (sec_name, sec_data) in zip(kcols, sec_list):
-        with col:
-            color = sec_data["color"]
-            icon = sec_data["icon"]
-            count = len(sec_data["items"])
-            st.markdown(
-                f'<div style="font-weight:700; font-size:0.95rem; color:{color}; '
-                f'border-bottom:2px solid {color}; padding-bottom:4px; margin-bottom:6px;">'
-                f'{icon} {sec_name} ({count})</div>',
-                unsafe_allow_html=True,
-            )
-            for item in sec_data["items"]:
-                notes_html = f'<div class="pipeline-notes" style="color:{color};">{item["notes"]}</div>' if item["notes"] else ""
-                st.markdown(
-                    f'<div class="pipeline-item" style="border-color:{color};">'
-                    f'<div>'
-                    f'<span class="pipeline-name">{item["name"]}</span>'
-                    f'{notes_html}'
-                    f'</div>'
-                    f'<span class="pipeline-detail">{item["source"]}</span>'
-                    f'</div>',
-                    unsafe_allow_html=True,
-                )
-
-render_kanban_row("All-e India", alle_sections)
-st.markdown("")
-render_kanban_row("Hoppr / Extract", hoppr_extract_sections)
-
-st.markdown("---")
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# 3. PROPOSALS (by product — from "Proposals" tab in Weekly Revenue Call Sheet)
+# 2. PROPOSALS (by product — from "Proposals" tab in Weekly Revenue Call Sheet)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 if raw.empty:
@@ -858,3 +746,115 @@ for m in _relevant_months:
 
         st.dataframe(detail.style.map(sc, subset=["Status"]),
                       use_container_width=True, hide_index=True)
+
+st.markdown("---")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 4. LIVE PIPELINE — CURRENT MONTH (operational view)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+st.markdown(f"### 🗓️ {CURRENT_MONTH} Live Pipeline")
+st.caption("What's in play right now — meetings being set, MOF, BOF | Source: All-e Pipeline tab")
+
+# ── CSS for pipeline cards ──
+st.markdown("""
+<style>
+.pipeline-item {
+    background: #1E1E2E;
+    border-radius: 6px;
+    padding: 6px 10px;
+    margin-bottom: 4px;
+    border-left: 3px solid;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+}
+.pipeline-name { font-weight: 600; font-size: 0.85rem; color: #E2E8F0; }
+.pipeline-detail { font-size: 0.75rem; color: #9CA3AF; background: rgba(255,255,255,0.08); border-radius: 4px; padding: 2px 6px; }
+.pipeline-notes { font-size: 0.78rem; margin-top: 1px; }
+</style>
+""", unsafe_allow_html=True)
+
+# ── All-e India pipeline from sheet ──
+alle_sections = {}
+if not pipeline_raw.empty:
+    SECTION_KEYS = {
+        "meetings already set": ("Meetings Set", "#10B981", "✅"),
+        "meetings in the process": ("Meetings Being Set", "#3B82F6", "🔵"),
+        "mof": ("MOF — Met, No Proposal Yet", "#F59E0B", "🟡"),
+        "bof": ("BOF — Proposal Sent, In Play", "#A855F7", "🟣"),
+    }
+
+    current_section = None
+    for i in range(len(pipeline_raw)):
+        row = pipeline_raw.iloc[i]
+        first_cell = str(row.iloc[0]).strip().lower() if len(row) > 0 else ""
+
+        matched = False
+        for key, val in SECTION_KEYS.items():
+            if key in first_cell:
+                current_section = val[0]
+                alle_sections[current_section] = {"color": val[1], "icon": val[2], "items": []}
+                matched = True
+                break
+
+        if matched or current_section is None:
+            continue
+
+        name = str(row.iloc[0]).strip() if len(row) > 0 else ""
+        if not name or name.lower() in ("name", ""):
+            continue
+        source = str(row.iloc[1]).strip() if len(row) > 1 else ""
+        notes = str(row.iloc[2]).strip() if len(row) > 2 else ""
+        if notes == "nan":
+            notes = ""
+        alle_sections[current_section]["items"].append({"name": name, "source": source, "notes": notes})
+
+# ── Hoppr / Extract pipeline (manual for now) ──
+hoppr_extract_sections = {
+    "MOF — Meeting Done": {
+        "color": "#F59E0B", "icon": "🟡",
+        "items": [
+            {"name": "Hitachi Thailand", "source": "Hoppr", "notes": ""},
+            {"name": "Rinse", "source": "Hoppr", "notes": ""},
+            {"name": "Estée Lauder", "source": "Extract", "notes": ""},
+            {"name": "Beacon Mart", "source": "Hoppr", "notes": ""},
+            {"name": "Bata", "source": "Hoppr", "notes": ""},
+        ],
+    },
+}
+
+# ── Helper to render a Kanban row ──
+def render_kanban_row(label, sections_dict):
+    sec_list = [(k, v) for k, v in sections_dict.items() if v["items"]]
+    if not sec_list:
+        return
+    st.markdown(f"#### {label}")
+    kcols = st.columns(len(sec_list))
+    for col, (sec_name, sec_data) in zip(kcols, sec_list):
+        with col:
+            color = sec_data["color"]
+            icon = sec_data["icon"]
+            count = len(sec_data["items"])
+            st.markdown(
+                f'<div style="font-weight:700; font-size:0.95rem; color:{color}; '
+                f'border-bottom:2px solid {color}; padding-bottom:4px; margin-bottom:6px;">'
+                f'{icon} {sec_name} ({count})</div>',
+                unsafe_allow_html=True,
+            )
+            for item in sec_data["items"]:
+                notes_html = f'<div class="pipeline-notes" style="color:{color};">{item["notes"]}</div>' if item["notes"] else ""
+                st.markdown(
+                    f'<div class="pipeline-item" style="border-color:{color};">'
+                    f'<div>'
+                    f'<span class="pipeline-name">{item["name"]}</span>'
+                    f'{notes_html}'
+                    f'</div>'
+                    f'<span class="pipeline-detail">{item["source"]}</span>'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+
+render_kanban_row("All-e India", alle_sections)
+st.markdown("")
+render_kanban_row("Hoppr / Extract", hoppr_extract_sections)
