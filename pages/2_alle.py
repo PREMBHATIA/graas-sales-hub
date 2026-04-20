@@ -706,9 +706,9 @@ with tab_deals:
 
     style = display.style
     if 'Status' in display.columns:
-        style = style.applymap(status_color, subset=['Status'])
+        style = style.map(status_color, subset=['Status'])
     if 'Days Silent' in display.columns:
-        style = style.applymap(days_color, subset=['Days Silent'])
+        style = style.map(days_color, subset=['Days Silent'])
 
     st.dataframe(style, use_container_width=True, height=600, hide_index=True)
 

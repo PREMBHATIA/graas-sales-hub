@@ -780,8 +780,8 @@ def red_cell(val):
     return ""
 
 styled_prod = (prod_df.style
-    .applymap(green_cell, subset=["Won", "Won GP"])
-    .applymap(red_cell, subset=["Lost"])
+    .map(green_cell, subset=["Won", "Won GP"])
+    .map(red_cell, subset=["Lost"])
 )
 st.dataframe(styled_prod, use_container_width=True, hide_index=True, height=220)
 
@@ -846,5 +846,5 @@ for m in months:
             if val == "Lost": return "color: #EF4444"
             return "color: #F59E0B"
 
-        st.dataframe(detail.style.applymap(sc, subset=["Status"]),
+        st.dataframe(detail.style.map(sc, subset=["Status"]),
                       use_container_width=True, hide_index=True)
