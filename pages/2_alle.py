@@ -29,8 +29,10 @@ def load_alle_data():
         df = fetch_alle_active_presales()
         if not df.empty:
             return df
-    except Exception:
-        pass
+        else:
+            st.info("All-e API returned empty DataFrame")
+    except Exception as e:
+        st.warning(f"All-e load error: {e}")
     # CSV fallback
     candidates = [
         "All-e - Foundry Presales Tracker - Active presales (1).csv",

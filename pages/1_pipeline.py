@@ -52,7 +52,9 @@ def load_meetings_summary():
         return {}
     try:
         df = fetch_sheet_tab(sheet_id, "Revised - Summary of Meetings")
-    except Exception:
+    except Exception as e:
+        import streamlit as _st
+        _st.warning(f"Meetings load error: {e}")
         return {}
     if df.empty:
         return {}
