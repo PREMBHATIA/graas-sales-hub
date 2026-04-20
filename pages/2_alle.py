@@ -831,15 +831,28 @@ with tab_analytics:
             st.plotly_chart(fig_src, use_container_width=True)
 
     # By Status × Vertical heatmap
-    st.markdown("#### Pipeline Heatmap — Status x Vertical")
+    st.markdown("#### Pipeline Heatmap — Stage × Vertical")
     if 'status' in df.columns and 'vertical' in df.columns:
         cross = pd.crosstab(df['vertical'], df['status'])
+        # Reorder columns: funnel flow (TOF → Proposal → POC → Pilot)
+        stage_order = ['4-TOF', '3-Proposal sent', '2-POC', '1-Pilot']
+        ordered_cols = [c for c in stage_order if c in cross.columns]
+        remaining = [c for c in cross.columns if c not in ordered_cols]
+        cross = cross[ordered_cols + remaining]
+        # Friendly labels
+        label_map = {'4-TOF': 'Top of Funnel', '3-Proposal sent': 'Proposal Sent',
+                     '2-POC': 'POC', '1-Pilot': 'Pilot'}
+        cross.columns = [label_map.get(c, c) for c in cross.columns]
         fig_heat = px.imshow(
             cross, text_auto=True,
             color_continuous_scale=['#1a1a2e', '#4F46E5', '#10B981'],
             labels=dict(x="Stage", y="Vertical", color="Count"),
         )
-        fig_heat.update_layout(height=400, template="plotly_dark")
+        fig_heat.update_layout(
+            height=450, template="plotly_dark",
+            xaxis=dict(tickangle=0, side="bottom"),
+            margin=dict(l=20, r=20, t=20, b=20),
+        )
         st.plotly_chart(fig_heat, use_container_width=True)
 
     # Timeline — deals by first contact month
