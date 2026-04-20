@@ -805,9 +805,15 @@ st.plotly_chart(fig_pg, use_container_width=True)
 
 st.markdown("---")
 
-st.markdown("### Monthly Detail")
+st.markdown("### Monthly Detail — 2026")
 
-for m in months:
+# Only show Jan onwards (current year) — older months are noise
+_fy_months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+              "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+_current_month_idx = datetime.now().month - 1
+_relevant_months = [m for m in _fy_months[:_current_month_idx + 1] if m in months]
+
+for m in _relevant_months:
     md = df[df["Month"] == m]
     won_m = md[md["Status"] == "Won"]
     lost_m = md[md["Status"] == "Lost"]
