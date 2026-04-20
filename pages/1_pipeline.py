@@ -367,8 +367,8 @@ st.markdown("""
     justify-content: space-between;
     align-items: baseline;
 }
-.pipeline-name { font-weight: 600; font-size: 0.85rem; }
-.pipeline-detail { font-size: 0.75rem; color: #9CA3AF; }
+.pipeline-name { font-weight: 600; font-size: 0.85rem; color: #E2E8F0; }
+.pipeline-detail { font-size: 0.75rem; color: #9CA3AF; background: rgba(255,255,255,0.08); border-radius: 4px; padding: 2px 6px; }
 .pipeline-notes { font-size: 0.78rem; margin-top: 1px; }
 </style>
 """, unsafe_allow_html=True)
