@@ -149,6 +149,51 @@ def load_sales_data():
     except Exception as e:
         summaries["crm_overlay"] = f"Error: {e}"
 
+    # ── Meeting Notes (from Slack / Granola) ─────────────────────
+    try:
+        from services.notes_store import get_all_notes
+        notes = get_all_notes()
+        if notes:
+            summaries["meeting_notes"] = [
+                {
+                    "client": n.get("client", ""),
+                    "date": n.get("date", ""),
+                    "author": n.get("author", ""),
+                    "channel": n.get("channel", ""),
+                    "summary": n.get("summary", ""),
+                    "takeaways": n.get("takeaways", []),
+                    "has_granola": bool(n.get("granola")),
+                    "missing_granola": n.get("missing_granola", False),
+                    "source": n.get("source", ""),
+                }
+                for n in notes[:30]
+            ]
+    except Exception:
+        pass
+
+    # ── Slack live notes (if no stored notes) ────────────────────
+    if "meeting_notes" not in summaries:
+        try:
+            from services.slack_notes import fetch_meeting_notes
+            slack_notes = fetch_meeting_notes(lookback_days=30)
+            if slack_notes:
+                summaries["meeting_notes"] = [
+                    {
+                        "client": n.get("client", ""),
+                        "date": n.get("date", ""),
+                        "author": n.get("author", ""),
+                        "channel": n.get("channel", ""),
+                        "summary": n.get("summary", ""),
+                        "takeaways": n.get("takeaways", []),
+                        "has_granola": bool(n.get("granola")),
+                        "missing_granola": n.get("missing_granola", False),
+                        "source": "slack",
+                    }
+                    for n in slack_notes[:30]
+                ]
+        except Exception:
+            pass
+
     return summaries
 
 
@@ -160,7 +205,7 @@ def build_system_prompt(data):
 
     if "proposals" in data and isinstance(data["proposals"], dict):
         p = data["proposals"]
-        context_parts.append("=== PROPOSALS ===")
+        context_parts.append("=== PROPOSALS === [Source: Revenue Call Sheet — Proposals tab]")
         context_parts.append(f"Total proposals: {p['total']}")
         if "status_breakdown" in p:
             context_parts.append(f"Status: {json.dumps(p['status_breakdown'])}")
@@ -171,32 +216,43 @@ def build_system_prompt(data):
 
     if "meetings_summary" in data and isinstance(data["meetings_summary"], dict):
         ms = data["meetings_summary"]
-        context_parts.append("\n=== MEETINGS SUMMARY ===")
+        context_parts.append("\n=== MEETINGS SUMMARY === [Source: All-e Sheet — Revised Summary of Meetings tab]")
         context_parts.append(ms["note"])
         context_parts.append(f"Raw data: {json.dumps(ms['raw_data'], default=str)}")
 
     if "alle_active" in data and isinstance(data["alle_active"], dict):
         a = data["alle_active"]
-        context_parts.append(f"\n=== ALL-E ACTIVE PRESALES ({a['total_leads']} leads) ===")
+        context_parts.append(f"\n=== ALL-E ACTIVE PRESALES ({a['total_leads']} leads) === [Source: Presales Tracker Sheet]")
         context_parts.append(f"Columns: {a['columns']}")
         context_parts.append(f"Data: {json.dumps(a['all_rows'][:25], default=str)}")
 
     if "alle_dropped" in data and isinstance(data["alle_dropped"], dict):
         d = data["alle_dropped"]
-        context_parts.append(f"\n=== ALL-E DROPPED LEADS ({d['total']}) ===")
+        context_parts.append(f"\n=== ALL-E DROPPED LEADS ({d['total']}) === [Source: Presales Tracker Sheet — Dropped Leads tab]")
         context_parts.append(f"Columns: {d['columns']}")
         context_parts.append(f"Sample: {json.dumps(d['sample'][:10], default=str)}")
 
     if "current_pipeline" in data and isinstance(data["current_pipeline"], dict):
         cp = data["current_pipeline"]
-        context_parts.append(f"\n=== {cp['month'].upper()} PIPELINE (KANBAN) ===")
+        context_parts.append(f"\n=== {cp['month'].upper()} PIPELINE (KANBAN) === [Source: All-e Sheet — {cp['month']} Pipeline tab]")
         context_parts.append(cp["note"])
         context_parts.append(f"Data: {json.dumps(cp['raw_data'][:25], default=str)}")
 
     if "crm_overlay" in data and isinstance(data["crm_overlay"], dict):
         co = data["crm_overlay"]
-        context_parts.append(f"\n=== CRM OVERLAY ({co['contacts']} contacts) ===")
+        context_parts.append(f"\n=== CRM OVERLAY ({co['contacts']} contacts) === [Source: Local CRM file]")
         context_parts.append(f"Data: {json.dumps(co['data'][:15], default=str)}")
+
+    if "meeting_notes" in data and isinstance(data["meeting_notes"], list):
+        context_parts.append(f"\n=== MEETING NOTES ({len(data['meeting_notes'])} recent) === [Source: Slack GTM channels / Granola]")
+        for note in data["meeting_notes"]:
+            source_tag = "Granola notes via Slack" if note.get("has_granola") else "Slack message only (no Granola notes)"
+            parts = [f"  Client: {note['client']} | Date: {note['date']} | By: {note['author']} | Channel: {note['channel']} | Source: {source_tag}"]
+            if note.get("summary"):
+                parts.append(f"    Summary: {note['summary'][:300]}")
+            if note.get("takeaways"):
+                parts.append(f"    Takeaways: {'; '.join(note['takeaways'][:5])}")
+            context_parts.append("\n".join(parts))
 
     data_context = "\n".join(context_parts)
 
@@ -217,6 +273,8 @@ RULES:
 - If asked for a "pipeline summary" or "sales brief", structure as: Meetings (Q1+current month, actual vs target), Pipeline Funnel (MOF/BOF counts), Proposals (by product, won/lost/open), Key accounts to watch.
 - If data is missing for a question, say so clearly.
 - GP is more important than Revenue.
+- **ALWAYS cite your source** for every claim. Use the [Source: ...] tags from the data sections above. For example: "Nerolac is at TOF stage *(Presales Tracker Sheet)* with a deep-dive meeting scheduled April 22-29 *(Slack GTM, 14 Apr, Gaurav Girotra)*". This lets the reader verify the information.
+- When referencing meeting notes, mention the date, who posted them, and whether Granola notes exist or are missing.
 """
 
 

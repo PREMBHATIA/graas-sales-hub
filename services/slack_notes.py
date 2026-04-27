@@ -75,6 +75,31 @@ def _extract_client_name(text: str) -> str:
     return cleaned
 
 
+def _extract_summary(text: str) -> str:
+    """Extract the prose summary from a Slack message (non-bullet, non-link lines)."""
+    lines = text.strip().split('\n')
+    summary_lines = []
+    for line in lines:
+        stripped = line.strip()
+        # Skip empty lines, bullets, links-only lines, and the first line (usually the title)
+        if not stripped:
+            continue
+        if re.match(r'^[•\-\*]\s+', stripped) or re.match(r'^\d+[\.\)]\s+', stripped):
+            continue
+        # Skip lines that are just URLs
+        if re.match(r'^<?https?://', stripped):
+            continue
+        # Remove Slack link markup for readability
+        cleaned = re.sub(r'<(https?://[^|>]+)\|([^>]+)>', r'\2', stripped)
+        cleaned = re.sub(r'<(https?://[^>]+)>', r'\1', cleaned)
+        # Remove Slack user mentions
+        cleaned = re.sub(r'<@[A-Z0-9]+(\|[^>]+)?>', lambda m: m.group(1)[1:] if m.group(1) else '', cleaned)
+        cleaned = cleaned.strip()
+        if cleaned and len(cleaned) > 5:
+            summary_lines.append(cleaned)
+    return "\n".join(summary_lines)
+
+
 def _extract_takeaways(text: str, max_items: int = 8) -> List[str]:
     """Extract top-level bullet-point takeaways from message text."""
     takeaways = []
@@ -103,7 +128,7 @@ def fetch_meeting_notes(lookback_days: int = DEFAULT_LOOKBACK_DAYS) -> List[Dict
     Fetch recent meeting notes from Slack GTM channels.
 
     Returns list of dicts with keys:
-        client, date, date_ts, channel, author, granola, takeaways
+        client, date, date_ts, channel, author, granola, takeaways, missing_granola
     """
     client = _get_client()
     if client is None:
@@ -127,7 +152,21 @@ def fetch_meeting_notes(lookback_days: int = DEFAULT_LOOKBACK_DAYS) -> List[Dict
             for msg in messages:
                 text = msg.get("text", "")
                 granola_links = _extract_granola_links(text)
-                if not granola_links:
+
+                # If no Granola link, check if this still looks like a meeting recap
+                is_meeting_msg = bool(granola_links)
+                if not is_meeting_msg:
+                    lower = text.lower()
+                    has_meeting_keywords = any(kw in lower for kw in [
+                        'meeting', 'call notes', 'call with', 'met with',
+                        'discussion with', 'sync with', 'catch up with',
+                        'notes from', 'notes -', 'takeaway', 'action item',
+                        'follow up', 'follow-up', 'poc', 'pilot', 'demo',
+                    ])
+                    has_bullets = bool(re.search(r'^[•\-\*]\s+', text, re.MULTILINE))
+                    is_meeting_msg = has_meeting_keywords and (has_bullets or len(text) > 100)
+
+                if not is_meeting_msg:
                     continue
 
                 # Get author name
@@ -148,6 +187,7 @@ def fetch_meeting_notes(lookback_days: int = DEFAULT_LOOKBACK_DAYS) -> List[Dict
 
                 # Extract content
                 client_name = _extract_client_name(text)
+                summary = _extract_summary(text)
                 takeaways = _extract_takeaways(text)
 
                 # Also check thread replies for additional takeaways
@@ -170,15 +210,19 @@ def fetch_meeting_notes(lookback_days: int = DEFAULT_LOOKBACK_DAYS) -> List[Dict
                         pass
                 takeaways = takeaways[:8]
 
+                missing_granola = not bool(granola_links)
+
                 notes.append({
                     "client": client_name,
                     "date": date_str,
                     "date_ts": ts,
                     "channel": ch_name,
                     "author": author,
-                    "granola": granola_links[0],
+                    "granola": granola_links[0] if granola_links else "",
                     "all_links": granola_links,
+                    "summary": summary,
                     "takeaways": takeaways,
+                    "missing_granola": missing_granola,
                 })
 
         except Exception as e:
