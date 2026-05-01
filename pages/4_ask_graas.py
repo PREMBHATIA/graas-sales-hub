@@ -292,6 +292,15 @@ def load_sales_data():
             },
         ]
 
+    # ── Knowledge Base (All-e Sales Doc) ─────────────────────────
+    try:
+        from services.sheets_client import fetch_google_doc_text
+        kb_text = fetch_google_doc_text("11-lE1Pfwf4XR_hWNwORuJund25wbKWxhOOFlZz7uX7c")
+        if kb_text and len(kb_text.strip()) > 100:
+            summaries["knowledge_base"] = kb_text.strip()
+    except Exception:
+        pass
+
     return summaries
 
 
@@ -352,12 +361,23 @@ def build_system_prompt(data):
                 parts.append(f"    Takeaways: {'; '.join(note['takeaways'][:5])}")
             context_parts.append("\n".join(parts))
 
+    # KB injected in full — it's the primary sales reference material
+    if "knowledge_base" in data and isinstance(data["knowledge_base"], str):
+        context_parts.append(
+            f"\n=== ALL-E SALES KNOWLEDGE BASE === [Source: Graas KB Doc]\n"
+            f"This is the official product orientation, customer archetypes, discovery guidance, "
+            f"use cases, proposals, and discovery questionnaires for All-e pre-sales.\n\n"
+            f"{data['knowledge_base']}"
+        )
+
     data_context = "\n".join(context_parts)
 
     return f"""You are the Graas Sales Hub AI assistant. Today is {today}.
-You help the sales team understand pipeline health, meetings progress, and CRM status.
+You help the sales team with two things:
+1. Pipeline intelligence — meetings vs target, deal stages, follow-up priorities, proposals won/lost
+2. Sales preparation — discovery questions, All-e use cases, customer archetypes, objection handling, what NOT to say
 
-You have access to live data from the Graas Sales Hub:
+You have access to live pipeline data AND the All-e Sales Knowledge Base (proposals, discovery questionnaires, product orientation):
 
 {data_context}
 
@@ -371,8 +391,15 @@ RULES:
 - If asked for a "pipeline summary" or "sales brief", structure as: Meetings (Q1+current month, actual vs target), Pipeline Funnel (MOF/BOF counts), Proposals (by product, won/lost/open), Key accounts to watch.
 - If data is missing for a question, say so clearly.
 - GP is more important than Revenue.
-- **ALWAYS cite your source** for every claim. Use the [Source: ...] tags from the data sections above. For example: "Nerolac is at TOF stage *(Presales Tracker Sheet)* with a deep-dive meeting scheduled April 22-29 *(Slack GTM, 14 Apr, Gaurav Girotra)*". This lets the reader verify the information.
+- **ALWAYS cite your source** for every claim. Use the [Source: ...] tags from the data sections above.
 - When referencing meeting notes, mention the date, who posted them, and whether Granola notes exist or are missing.
+
+FOR SALES PREP QUESTIONS:
+- Draw on the All-e Sales Knowledge Base for product descriptions, customer archetypes, and positioning.
+- When asked for discovery questions, tailor them to the specific industry/vertical and geography mentioned.
+- When asked about use cases, cite actual customers (Schneider, Canon, Nippon Paint, PI Industries, Tata 1mg, Orient Bell) where relevant.
+- Flag what NOT to say (e.g. don't lead with GAF/knowledge graphs in early conversations).
+- If asked to prep for a specific company, cross-reference the Presales Tracker for their current status and last conversation notes.
 """
 
 
@@ -383,8 +410,10 @@ all_data = load_sales_data()
 # Data status
 with st.expander("Data Sources", expanded=False):
     for source, data in all_data.items():
-        if isinstance(data, str) and "Error" in data:
+        if isinstance(data, str) and data.startswith("Error"):
             st.error(f"**{source}**: {data}")
+        elif source == "knowledge_base" and isinstance(data, str):
+            st.success(f"**{source}** ({len(data):,} chars): Loaded")
         elif isinstance(data, dict):
             detail = ""
             if "total" in data:
@@ -396,6 +425,8 @@ with st.expander("Data Sources", expanded=False):
             elif "rows" in data:
                 detail = f" ({data['rows']} rows)"
             st.success(f"**{source}**{detail}: Loaded")
+        elif isinstance(data, list):
+            st.success(f"**{source}** ({len(data)} notes): Loaded")
         else:
             st.warning(f"**{source}**: No data")
 

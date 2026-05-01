@@ -10,6 +10,7 @@ from typing import Optional
 import gspread
 import pandas as pd
 from google.oauth2.service_account import Credentials
+from google.auth.transport import requests as greq
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -53,6 +54,60 @@ def _get_client() -> Optional[gspread.Client]:
         return None
     creds = Credentials.from_service_account_file(str(full_path), scopes=SCOPES)
     return gspread.authorize(creds)
+
+
+def _get_credentials() -> Optional[Credentials]:
+    """Get raw service account credentials (for Drive API / doc export)."""
+    try:
+        import streamlit as st
+        if hasattr(st, 'secrets') and 'gcp_service_account' in st.secrets:
+            return Credentials.from_service_account_info(
+                dict(st.secrets["gcp_service_account"]), scopes=SCOPES
+            )
+    except Exception:
+        pass
+    creds_path = os.getenv("GOOGLE_CREDENTIALS_PATH", "credentials/service_account.json")
+    full_path = Path(__file__).parent.parent / creds_path
+    if not full_path.exists():
+        return None
+    return Credentials.from_service_account_file(str(full_path), scopes=SCOPES)
+
+
+def fetch_google_doc_text(doc_id: str, force_refresh: bool = False) -> str:
+    """Fetch a Google Doc as plain text via the Drive export API, with caching."""
+    cache_key = f"gdoc_{doc_id}"
+    cache_file = CACHE_DIR / f"{cache_key}.parquet"
+    meta_file  = CACHE_DIR / f"{cache_key}.meta.json"
+
+    if not force_refresh and cache_file.exists() and meta_file.exists():
+        with open(meta_file) as f:
+            meta = json.load(f)
+        cached_at = datetime.fromisoformat(meta["cached_at"])
+        if datetime.now() - cached_at < timedelta(hours=4):
+            df = pd.read_parquet(cache_file)
+            return df.iloc[0, 0] if not df.empty else ""
+
+    creds = _get_credentials()
+    if creds is None:
+        return ""
+
+    try:
+        session = greq.AuthorizedSession(creds)
+        url = (
+            f"https://docs.google.com/feeds/download/documents/export/Export"
+            f"?id={doc_id}&exportFormat=txt"
+        )
+        resp = session.get(url, timeout=15)
+        if resp.status_code != 200:
+            return ""
+        text = resp.text
+        df = pd.DataFrame({"text": [text]})
+        df.to_parquet(cache_file, index=False)
+        with open(meta_file, "w") as f:
+            json.dump({"cached_at": datetime.now().isoformat()}, f)
+        return text
+    except Exception:
+        return ""
 
 
 def _cache_key(sheet_id: str, tab_name: str) -> str:
