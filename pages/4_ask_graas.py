@@ -37,9 +37,14 @@ st.caption("Ask anything about Pipeline, All-e Presales, or CRM contacts")
 
 # ── Check API Key ────────────────────────────────────────────────────────────
 
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+# Prefer Streamlit secrets (works on Streamlit Cloud + local secrets.toml)
+try:
+    ANTHROPIC_API_KEY = st.secrets["ANTHROPIC_API_KEY"]
+except Exception:
+    ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+
 if not ANTHROPIC_API_KEY:
-    st.warning("Add `ANTHROPIC_API_KEY` to your Streamlit secrets to enable AI chat.")
+    st.warning("Add `ANTHROPIC_API_KEY` to `.streamlit/secrets.toml` or `.env` to enable AI chat.")
     st.stop()
 
 # ── Data Loaders ─────────────────────────────────────────────────────────────
@@ -210,6 +215,82 @@ def load_sales_data():
                 ]
         except Exception:
             pass
+
+    # ── Hardcoded snapshot fallback (last pulled ~10 Apr 2026) ───────
+    if "meeting_notes" not in summaries:
+        summaries["meeting_notes"] = [
+            {
+                "client": "Orient Bell", "date": "10 Apr", "author": "Gaurav Girotra",
+                "channel": "#ebu-offerings-gtm", "has_granola": True, "missing_granola": False,
+                "source": "snapshot", "summary": "",
+                "takeaways": [
+                    "POC kicked off for floor tiles as a category",
+                    "To be delivered by end of next week (assuming catalogue & details received)",
+                    "GG to set up f2f meeting for POC walkthrough and Pilot next steps",
+                ],
+            },
+            {
+                "client": "Unicharm", "date": "10 Apr", "author": "Ashwin Puri",
+                "channel": "#ebu-offerings-gtm", "has_granola": True, "missing_granola": False,
+                "source": "snapshot", "summary": "",
+                "takeaways": [
+                    "Existing MP customer expanding markets — SGD $45M MYR/month MY business",
+                    "Enablement: extend SG DKSH model to MY for Lazada/Shopee",
+                    "All-e: discovery call to be set up in KL with IT team (Ashwin to arrange)",
+                    "Offline AI agent for 126 merchandising + 170 sales team — $10M USD/month MY business",
+                ],
+            },
+            {
+                "client": "RSPL Group", "date": "9 Apr", "author": "Gaurav Girotra",
+                "channel": "#ebu-offerings-gtm", "has_granola": True, "missing_granola": False,
+                "source": "snapshot", "summary": "",
+                "takeaways": [
+                    "Sales use case not a need — dealer ordering is not an issue for them",
+                    "Possible use case: factory OCR (30 factories) for handwritten/typed info routing",
+                    "They will come back after discussing internally",
+                ],
+            },
+            {
+                "client": "Tata 1mg", "date": "9 Apr", "author": "Gaurav Girotra",
+                "channel": "#ebu-offerings-gtm", "has_granola": True, "missing_granola": False,
+                "source": "snapshot", "summary": "",
+                "takeaways": [
+                    "Prem to work with Nikhil on closing out commercials",
+                    "Amruta to test accuracy improvements with new cleanly labelled prescriptions",
+                ],
+            },
+            {
+                "client": "Dalmia Cement", "date": "8 Apr", "author": "Gaurav Girotra",
+                "channel": "#ebu-offerings-gtm", "has_granola": True, "missing_granola": False,
+                "source": "snapshot", "summary": "",
+                "takeaways": [
+                    "Very low SKUs (5 active), weekly ordering, 50K dealers — no opportunity",
+                    "They already have an AI agent deployed for dealer ordering",
+                    "Cement may not be a good fit — low SKU density, infrequent orders",
+                ],
+            },
+            {
+                "client": "Sunway", "date": "6 Apr", "author": "Sahil Tyagi",
+                "channel": "#my-gtm-alle", "has_granola": True, "missing_granola": False,
+                "source": "snapshot", "summary": "", "takeaways": [],
+            },
+            {
+                "client": "Decathlon", "date": "2 Apr", "author": "Prem Bhatia",
+                "channel": "#my-gtm-alle", "has_granola": True, "missing_granola": False,
+                "source": "snapshot", "summary": "", "takeaways": [],
+            },
+            {
+                "client": "Beacon Mart", "date": "1 Apr", "author": "Sahil Tyagi",
+                "channel": "#my-gtm-alle", "has_granola": True, "missing_granola": False,
+                "source": "snapshot", "summary": "",
+                "takeaways": [
+                    "Cindy to send Thomas Hoppr login for e-commerce team (5 users)",
+                    "Send Thomas videos on offline agent (Ollie) for IT team",
+                    "Follow up with proposal for f2f meeting in KL once IT is looped in",
+                    "Thomas to share Graas videos with Beacon Mart IT team",
+                ],
+            },
+        ]
 
     return summaries
 
