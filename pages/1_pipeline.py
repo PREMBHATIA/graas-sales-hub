@@ -31,7 +31,10 @@ def load_proposals():
     sheet_id = os.getenv("REVENUE_SHEET_ID", "")
     if not sheet_id:
         return pd.DataFrame()
-    return fetch_sheet_tab(sheet_id, "Proposals")
+    try:
+        return fetch_sheet_tab(sheet_id, "Proposals")
+    except Exception:
+        return pd.DataFrame()
 
 @st.cache_data(ttl=1800)
 def load_current_pipeline():
@@ -41,7 +44,10 @@ def load_current_pipeline():
     if not sheet_id:
         return pd.DataFrame()
     tab_name = f"All-e Pipeline (IN) - {CURRENT_MONTH}"
-    return fetch_sheet_tab(sheet_id, tab_name)
+    try:
+        return fetch_sheet_tab(sheet_id, tab_name)
+    except Exception:
+        return pd.DataFrame()
 
 @st.cache_data(ttl=1800)
 def load_meetings_summary():

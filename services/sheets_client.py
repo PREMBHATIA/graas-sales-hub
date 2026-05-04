@@ -160,8 +160,13 @@ def fetch_sheet_tab(sheet_id: str, tab_name: str, force_refresh: bool = False) -
             return cached
         return pd.DataFrame()
 
-    spreadsheet = client.open_by_key(sheet_id)
-    worksheet = spreadsheet.worksheet(tab_name)
+    try:
+        spreadsheet = client.open_by_key(sheet_id)
+        worksheet = spreadsheet.worksheet(tab_name)
+    except Exception:
+        # Tab doesn't exist (e.g. new month tab not yet created) — return empty
+        return pd.DataFrame()
+
     data = worksheet.get_all_values()
 
     if not data:
