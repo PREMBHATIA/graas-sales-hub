@@ -38,11 +38,12 @@ with st.sidebar:
     st.markdown("- 📧 CRM — Contacts & Outreach")
     st.markdown("- 💬 Ask Graas — AI Sales Assistant")
     st.markdown("- 📚 Resources — Decks & Docs")
+    st.markdown("- 📝 Build Proposal — Pre-sales proposal builder")
 
 st.markdown('<p class="main-header">Graas Sales Hub</p>', unsafe_allow_html=True)
 st.markdown('<p class="sub-header">Pipeline, Presales & CRM — shared team view</p>', unsafe_allow_html=True)
 
-col1, col2, col3, col4, col5 = st.columns(5)
+col1, col2, col3, col4, col5, col6 = st.columns(6)
 
 with col1:
     st.markdown("### 📋 Pipeline")
@@ -68,6 +69,11 @@ with col5:
     st.markdown("### 📚 Resources")
     st.markdown("Key decks & docs")
     st.page_link("pages/5_resources.py", label="Open Resources →")
+
+with col6:
+    st.markdown("### 📝 Proposal")
+    st.markdown("Build a customer proposal")
+    st.page_link("pages/6_proposal.py", label="Build Proposal →")
 
 st.markdown("---")
 st.markdown("💡 **Tip:** Use the sidebar to navigate between dashboards.")
