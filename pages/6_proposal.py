@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 _env_path = str(Path(__file__).resolve().parent.parent / ".env")
 load_dotenv(_env_path, override=True)
 
-st.set_page_config(page_title="Build Proposal | Graas", page_icon="📝", layout="wide")
+st.set_page_config(page_title="All-e Proposal Builder | Graas", page_icon="📝", layout="wide")
 
 # ── API key ───────────────────────────────────────────────────────────────────
 try:
@@ -250,8 +250,8 @@ YOUR BEHAVIOUR:
 
 # ── Page UI ───────────────────────────────────────────────────────────────────
 
-st.markdown("## 📝 Build a Proposal")
-st.caption("Pre-sales proposal builder — from discovery inputs to a customer-ready commercial document")
+st.markdown("## 📝 All-e Proposal Builder")
+st.caption("From discovery inputs to a customer-ready commercial proposal — solution first, risk second")
 
 # Two-column layout: inputs on the left, chat on the right
 left, right = st.columns([1, 1.8], gap="large")
