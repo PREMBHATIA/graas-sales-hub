@@ -134,54 +134,64 @@ def process_hoppr_daily_from_eval(df: pd.DataFrame) -> pd.DataFrame:
 
 @st.cache_data(ttl=3600)
 def load_hoppr_daily():
+    from services.sheets_client import fetch_sheet_tab
     try:
-        from services.sheets_client import fetch_sheet_tab
         df = fetch_sheet_tab(HOPPR_SHEET_ID, "Hoppr__Anaysis")
-        if not df.empty:
-            return df
-    except Exception:
-        pass
-    return pd.DataFrame()
+        return df if not df.empty else pd.DataFrame(), None
+    except Exception as e:
+        return pd.DataFrame(), str(e)
 
 @st.cache_data(ttl=1800)
 def load_evaluation_sheet():
+    from services.sheets_client import fetch_sheet_tab
     try:
-        from services.sheets_client import fetch_sheet_tab
         df = fetch_sheet_tab(HOPPR_SHEET_ID, "Evaluation_sheet")
-        if not df.empty:
-            return df
-    except Exception:
-        pass
-    return pd.DataFrame()
+        return df if not df.empty else pd.DataFrame(), None
+    except Exception as e:
+        return pd.DataFrame(), str(e)
 
 @st.cache_data(ttl=1800)
 def load_user_state():
+    from services.sheets_client import fetch_sheet_tab
     try:
-        from services.sheets_client import fetch_sheet_tab
         df = fetch_sheet_tab(HOPPR_SHEET_ID, "User_State")
-        if not df.empty:
-            return df
-    except Exception:
-        pass
-    return pd.DataFrame()
+        return df if not df.empty else pd.DataFrame(), None
+    except Exception as e:
+        return pd.DataFrame(), str(e)
 
 @st.cache_data(ttl=3600)
 def load_funnel():
+    from services.sheets_client import fetch_sheet_tab
     try:
-        from services.sheets_client import fetch_sheet_tab
         df = fetch_sheet_tab(HOPPR_SHEET_ID, "Final Funnel")
-        if not df.empty:
-            return df
-    except Exception:
-        pass
-    return pd.DataFrame()
+        return df if not df.empty else pd.DataFrame(), None
+    except Exception as e:
+        return pd.DataFrame(), str(e)
 
 # ── Fetch ─────────────────────────────────────────────────────────────────────
 
-raw_daily      = load_hoppr_daily()
-raw_eval       = load_evaluation_sheet()
-raw_user_state = load_user_state()
-raw_funnel     = load_funnel()
+raw_daily,      _err_daily      = load_hoppr_daily()
+raw_eval,       _err_eval       = load_evaluation_sheet()
+raw_user_state, _err_user_state = load_user_state()
+raw_funnel,     _err_funnel     = load_funnel()
+
+# ── Data status ───────────────────────────────────────────────────────────────
+with st.expander("🔍 Data Status", expanded=False):
+    def _status(label, df, err, extra=""):
+        if err:
+            st.error(f"❌ **{label}**: {err}")
+        elif df.empty:
+            st.warning(f"⚠️ **{label}**: loaded but empty")
+        else:
+            st.success(f"✅ **{label}**: {len(df)} rows, {len(df.columns)} cols{extra}")
+    _status("Hoppr__Anaysis (daily)",  raw_daily,      _err_daily)
+    _status("Evaluation_sheet (Q&A)",  raw_eval,       _err_eval,
+            f" | cols: {list(raw_eval.columns[:10])}" if not raw_eval.empty else "")
+    _status("User_State (accounts)",   raw_user_state, _err_user_state)
+    _status("Final Funnel",            raw_funnel,     _err_funnel)
+    st.caption(f"Sheet ID: `{HOPPR_SHEET_ID}`")
+    if "eval_col_debug" in st.session_state:
+        st.code(st.session_state["eval_col_debug"], language=None)
 
 col_r, _ = st.columns([1, 9])
 with col_r:
@@ -250,11 +260,26 @@ if not raw_eval.empty:
     edf = raw_eval.copy()
     ecols = [str(c).strip() for c in edf.columns]
     edf.columns = ecols
-    sid_col_e   = next((c for c in ecols if "seller" in c.lower() and "id" in c.lower()), None)
+    # Flexible column matching — handles DATE, Date, Query Date, Timestamp, etc.
+    sid_col_e   = (next((c for c in ecols if "seller" in c.lower() and "id" in c.lower()), None)
+                   or next((c for c in ecols if c.lower() in ("seller", "seller_id", "account")), None))
     email_col_e = next((c for c in ecols if "email" in c.lower()), None)
-    date_col_e  = next((c for c in ecols if c.lower() == "date"), None)
-    q_col_e     = next((c for c in ecols if "question" in c.lower()), None)
-    a_col_e     = next((c for c in ecols if "answer" in c.lower()), None)
+    date_col_e  = (next((c for c in ecols if c.strip().lower() == "date"), None)
+                   or next((c for c in ecols if "date" in c.lower() or "time" in c.lower()), None))
+    q_col_e     = (next((c for c in ecols if "question" in c.lower()), None)
+                   or next((c for c in ecols if "query" in c.lower() and "count" not in c.lower()), None)
+                   or next((c for c in ecols if "user_input" in c.lower() or "input" in c.lower()), None))
+    a_col_e     = (next((c for c in ecols if "answer" in c.lower()), None)
+                   or next((c for c in ecols if "response" in c.lower() or "reply" in c.lower()), None)
+                   or next((c for c in ecols if "output" in c.lower()), None))
+
+    # Show detected columns in data status expander (already rendered above — append to session)
+    if "eval_col_debug" not in st.session_state:
+        st.session_state["eval_col_debug"] = (
+            f"Eval cols detected → seller={sid_col_e}, email={email_col_e}, "
+            f"date={date_col_e}, question={q_col_e}, answer={a_col_e} | "
+            f"All cols: {ecols[:15]}"
+        )
 
     if sid_col_e and date_col_e and q_col_e:
         edf["_date"]     = pd.to_datetime(edf[date_col_e], errors="coerce")
@@ -722,10 +747,13 @@ with tab_ask:
                              f"Sales-Ready: {len(sdf[sdf['classification'] == 'Sales-Ready'])} | "
                              f"Going Quiet: {len(sdf[sdf['trend'] == 'Going Quiet'])} | "
                              f"Churned: {len(sdf[sdf['trend'] == 'Churned'])}")
-                lines.append(f"\nALL SELLERS (seller_id | email | total_queries | queries_7d | classification | trend | days_silent):")
+                lines.append(f"\nALL SELLERS (seller_id | email | total_queries | queries_7d | classification | trend | days_silent | topic_summary):")
                 for _, r in sdf.sort_values("q_total", ascending=False).iterrows():
+                    qs = str(r.get("q_summary", "")).strip()
+                    summary_part = f" | Topics: {qs[:150]}" if qs and qs != "nan" else ""
                     lines.append(f"  {r['seller_id']} | {r['email']} | {r['q_total']}Q | "
-                                 f"{r['q_recent']}Q(7d) | {r['classification']} | {r['trend']} | {r['days_silent']}d")
+                                 f"{r['q_recent']}Q(7d) | {r['classification']} | {r['trend']} | "
+                                 f"{r['days_silent']}d{summary_part}")
             if not _eval_df.empty and "_buckets" in _eval_df.columns:
                 all_b = [b for bl in _eval_df["_buckets"] for b in bl]
                 lines.append(f"\nQUESTION TYPES (all time):")
