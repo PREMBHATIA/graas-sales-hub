@@ -25,7 +25,8 @@ pg = st.navigation(
             st.Page("pages/4_ask_graas.py", title="💬 Ask All-e",       url_path="ask-alle"),
         ],
         "Hoppr": [
-            st.Page("pages/7_hoppr.py", title="📊 Hoppr", url_path="hoppr"),
+            st.Page("pages/7_hoppr.py",      title="📊 Hoppr",      url_path="hoppr"),
+            st.Page("pages/8_ask_hoppr.py",  title="💬 Ask Hoppr",  url_path="ask-hoppr"),
         ],
     },
     position="sidebar",
