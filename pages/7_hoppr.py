@@ -579,6 +579,56 @@ with tab_home:
                                     showlegend=False, yaxis=dict(autorange="reversed"))
                 st.plotly_chart(fig_b, use_container_width=True)
 
+            # ── Diagnostic: what's hiding inside "General"? ───────────────────
+            general_qs = ev_f[ev_f["_buckets"].apply(
+                lambda bs: bs == ["General"]
+            )]["_question"].dropna().astype(str)
+            general_qs = general_qs[general_qs.str.strip().str.lower()
+                                    .ne("loading...")]
+            general_qs = general_qs[general_qs.str.strip().ne("")]
+
+            if len(general_qs) > 0:
+                with st.expander(f"🔍 What's in 'General'? ({len(general_qs)} uncategorised queries)"):
+                    # Top recurring n-grams (2-3 words) — finds repeated phrases
+                    import re as _re
+                    from collections import Counter as _Counter
+                    STOP = {
+                        "the","a","an","of","to","in","on","for","is","are","was","were",
+                        "i","you","we","my","me","our","this","that","it","be","do","does",
+                        "and","or","but","if","what","how","why","when","where","which",
+                        "show","give","tell","please","can","could","would","should","get",
+                        "with","by","at","from","as","have","has","had","not","no","yes",
+                    }
+                    def _tokens(s):
+                        return [w for w in _re.findall(r"[a-zA-Z]+", s.lower())
+                                if w not in STOP and len(w) > 2]
+                    bigrams, trigrams, words = _Counter(), _Counter(), _Counter()
+                    for q in general_qs:
+                        toks = _tokens(q)
+                        words.update(toks)
+                        bigrams.update(zip(toks, toks[1:]))
+                        trigrams.update(zip(toks, toks[1:], toks[2:]))
+
+                    cA, cB, cC = st.columns(3)
+                    with cA:
+                        st.markdown("**Top words**")
+                        for w, c in words.most_common(15):
+                            st.text(f"{c:>3}  {w}")
+                    with cB:
+                        st.markdown("**Top 2-word phrases**")
+                        for (w1, w2), c in bigrams.most_common(15):
+                            if c < 2: break
+                            st.text(f"{c:>3}  {w1} {w2}")
+                    with cC:
+                        st.markdown("**Top 3-word phrases**")
+                        for (w1, w2, w3), c in trigrams.most_common(15):
+                            if c < 2: break
+                            st.text(f"{c:>3}  {w1} {w2} {w3}")
+
+                    st.markdown("**Sample questions (first 25)**")
+                    for q in general_qs.head(25):
+                        st.text(f"• {q[:180]}")
+
     # ── Data accuracy ─────────────────────────────────────────────────────────
     if not eval_processed.empty:
         st.markdown("---")
