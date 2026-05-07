@@ -199,6 +199,30 @@ with st.expander("🔍 Data Status (click to hide)", expanded=True):
     if "eval_col_debug" in st.session_state:
         st.code(st.session_state["eval_col_debug"], language=None)
 
+    # Verify column mapping by showing how many rows have non-empty answers
+    if not eval_processed.empty and "_answer" in eval_processed.columns:
+        _ans_clean = eval_processed["_answer"].astype(str).str.strip()
+        _ans_real = _ans_clean[~_ans_clean.str.lower().isin(
+            ["", "nan", "loading...", "loading"]
+        )]
+        _pct_real = len(_ans_real) / len(eval_processed) * 100 if len(eval_processed) else 0
+        msg = (
+            f"📊 **Answer column health:** {len(_ans_real)} of {len(eval_processed)} "
+            f"rows have a real answer ({_pct_real:.0f}%). "
+            f"Reading from column `{a_col_e}`."
+        )
+        if _pct_real < 70:
+            st.warning(msg)
+        else:
+            st.caption(msg)
+        # Quick sanity sample — show first 3 Q+A pairs to verify column mapping
+        with st.expander("🔬 Verify column mapping (sample first 3 rows)"):
+            sample = eval_processed[["_seller", "_email", "_date", "_question", "_answer"]].head(3)
+            for i, row in sample.iterrows():
+                st.markdown(f"**Row {i}** — `{row['_seller']}` · `{row['_email']}` · `{str(row['_date'])[:10]}`")
+                st.markdown(f"  - **Q:** `{str(row['_question'])[:150]}`")
+                st.markdown(f"  - **A:** `{str(row['_answer'])[:150]}`")
+
 col_r, _ = st.columns([1, 9])
 with col_r:
     if st.button("🔄 Refresh"):
@@ -1055,7 +1079,14 @@ with tab_accounts:
                                        showlegend=False)
                 st.plotly_chart(fig_tier, use_container_width=True)
 
-                # Examples — best + worst prompts
+                # Examples — best + worst prompts (theme-adaptive colors)
+                def _score_md(score):
+                    s = int(score)
+                    if s >= 70: return f":green[**{s}**]"
+                    if s >= 45: return f":blue[**{s}**]"
+                    if s >= 20: return f":orange[**{s}**]"
+                    return f":red[**{s}**]"
+
                 col_best, col_worst = st.columns(2)
                 with col_best:
                     st.markdown("**🟢 Strongest prompts**")
@@ -1066,12 +1097,7 @@ with tab_accounts:
                     else:
                         for _, r in best.iterrows():
                             q = str(r["_question"]).strip()
-                            st.markdown(
-                                f"<div style='font-size:0.85rem;margin-bottom:6px'>"
-                                f"<span style='color:#10B981;font-weight:600'>{int(r['_prompt_score'])}</span> "
-                                f"<span style='color:#D1D5DB'>{q[:200]}</span></div>",
-                                unsafe_allow_html=True,
-                            )
+                            st.markdown(f"{_score_md(r['_prompt_score'])} &nbsp; {q[:200]}")
                 with col_worst:
                     st.markdown("**🔴 Vaguest prompts**")
                     worst = (scored_acct.sort_values("_prompt_score", ascending=True)
@@ -1081,12 +1107,7 @@ with tab_accounts:
                     else:
                         for _, r in worst.iterrows():
                             q = str(r["_question"]).strip()
-                            st.markdown(
-                                f"<div style='font-size:0.85rem;margin-bottom:6px'>"
-                                f"<span style='color:#EF4444;font-weight:600'>{int(r['_prompt_score'])}</span> "
-                                f"<span style='color:#D1D5DB'>{q[:200]}</span></div>",
-                                unsafe_allow_html=True,
-                            )
+                            st.markdown(f"{_score_md(r['_prompt_score'])} &nbsp; {q[:200]}")
                 st.caption("Score is based on: metric (revenue/ROAS/units), "
                            "timeframe (March, last week, YoY), entity (SKU/channel/country), "
                            "comparison (vs/growth). Pure follow-ups and very short prompts are capped.")
@@ -1128,8 +1149,21 @@ with tab_accounts:
                     st.markdown(f"**Q:** {question}")
                     st.markdown("**A:**")
                     if is_loading_ans:
-                        st.caption(f"No answer in column `{a_col_e or '?'}` for this row — "
-                                   f"check the Data Status panel if answers are missing broadly.")
+                        # Diagnostic — show what's actually in the cell
+                        raw_repr = repr(answer)[:120]
+                        why = (
+                            "still loading when logged"      if answer.strip().lower() in ("loading...", "loading")
+                            else "cell is empty"             if answer.strip() == ""
+                            else "cell is NaN / null"        if answer.strip().lower() == "nan"
+                            else "no usable content"
+                        )
+                        st.warning(
+                            f"⚠️ Answer column `{a_col_e or '?'}` for this row: **{why}**.\n\n"
+                            f"Raw value: `{raw_repr}`\n\n"
+                            f"If you expected an answer here, try the 🔄 Refresh button at "
+                            f"the top — the sheet is cached for 30 mins, so very recent "
+                            f"queries may not show their answer yet."
+                        )
                     else:
                         # Show up to 800 chars; offer expander for full text
                         ans_display = answer if answer and answer != "nan" else ""
