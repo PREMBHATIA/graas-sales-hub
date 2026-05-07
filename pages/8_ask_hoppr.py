@@ -317,6 +317,11 @@ if not raw_eval.empty:
         edf["_question"] = edf[q_col_e].astype(str)
         edf["_answer"]   = edf[a_col_e].astype(str) if a_col_e else ""
         edf = edf.dropna(subset=["_date"])
+
+        # Filter "Loading..." log noise — see 7_hoppr.py for rationale
+        _q_clean = edf["_question"].astype(str).str.strip().str.lower()
+        edf = edf[~_q_clean.isin(["loading...", "loading", "", "nan"])]
+
         edf["_is_accuracy"] = edf["_question"].apply(is_accuracy)
         edf["_buckets"]     = edf["_question"].apply(classify_question)
         _scores = edf["_question"].apply(score_prompt)

@@ -190,6 +190,12 @@ with st.expander("🔍 Data Status (click to hide)", expanded=True):
     _status("User_State (accounts)",   raw_user_state, _err_user_state)
     _status("Final Funnel",            raw_funnel,     _err_funnel)
     st.caption(f"Sheet ID: `{HOPPR_SHEET_ID}`")
+    if "_loading_rows_filtered" in st.session_state:
+        n_load = st.session_state["_loading_rows_filtered"]
+        if n_load > 0:
+            st.caption(f"🚫 Filtered out **{n_load}** 'Loading…' rows "
+                       f"(Hoppr logged before response completed — noise, "
+                       f"excluded from analytics & charts)")
     if "eval_col_debug" in st.session_state:
         st.code(st.session_state["eval_col_debug"], language=None)
 
@@ -498,6 +504,15 @@ if not raw_eval.empty:
         edf["_question"] = edf[q_col_e].astype(str)
         edf["_answer"]   = edf[a_col_e].astype(str) if a_col_e else ""
         edf = edf.dropna(subset=["_date"])
+
+        # ── Filter "Loading..." log noise out of all analytics ─────────────
+        # These rows are Hoppr's incomplete-response logs, not real prompts.
+        # Counting them was inflating the "General" bucket and skewing the chart.
+        _q_clean = edf["_question"].astype(str).str.strip().str.lower()
+        _n_loading = int(_q_clean.isin(["loading...", "loading", "", "nan"]).sum())
+        edf = edf[~_q_clean.isin(["loading...", "loading", "", "nan"])]
+        st.session_state["_loading_rows_filtered"] = _n_loading
+
         edf["_is_accuracy"] = edf["_question"].apply(is_accuracy)
         edf["_buckets"]     = edf["_question"].apply(classify_question)
         _scores = edf["_question"].apply(score_prompt)
