@@ -913,6 +913,16 @@ Answer questions by referencing the data below. Be specific — use seller IDs, 
                             found.add(sid); break
             return list(found)
 
+        def _detect_sellers_from_history(current_msg: str, history: list) -> list:
+            """Scan current message AND recent conversation history for seller mentions.
+            This ensures follow-up questions ('show me their queries') work after the
+            seller was established earlier in the conversation."""
+            # Combine current message with last 10 messages of history
+            all_text = current_msg + " " + " ".join(
+                m["content"] for m in history[-10:]
+            )
+            return _detect_sellers(all_text)
+
         if "hoppr_chat" not in st.session_state:
             st.session_state.hoppr_chat = []
 
@@ -945,7 +955,9 @@ Answer questions by referencing the data below. Be specific — use seller IDs, 
                 with st.spinner("Thinking…"):
                     try:
                         import anthropic as _anthropic
-                        mentioned = _detect_sellers(user_q)
+                        mentioned = _detect_sellers_from_history(
+                            user_q, st.session_state.hoppr_chat
+                        )
                         extra = ""
                         if mentioned:
                             for sid in mentioned[:3]:
