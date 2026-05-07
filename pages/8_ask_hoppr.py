@@ -272,43 +272,20 @@ if not raw_eval.empty:
         next((c for c in ecols if c.strip().lower() == "date"), None)
         or next((c for c in ecols if "date" in c.lower() or "timestamp" in c.lower()), None)
     )
-    q_col_e = (
-        next((c for c in ecols if "question" in c.lower()), None)
-        or next((c for c in ecols if "query" in c.lower() and "count" not in c.lower()), None)
-        or next((c for c in ecols if "user_input" in c.lower() or "user_message" in c.lower()), None)
-        or next((c for c in ecols if c.lower() in ("input", "message", "prompt")), None)
-    )
-    a_col_e = (
-        next((c for c in ecols if "answer" in c.lower()), None)
-        or next((c for c in ecols if "response" in c.lower() or "reply" in c.lower()), None)
-        or next((c for c in ecols if "output" in c.lower() or "bot_message" in c.lower()), None)
-    )
-    # ── Positional / content fallback — if named detection failed ─────────────
-    # Use MAX length (not avg) — many "Loading..." rows drag avg down for response col.
-    # The Hoppr response is always multi-KB markdown, so its max is always highest.
-    if q_col_e is None or a_col_e is None:
-        known = {c for c in [sid_col_e, email_col_e, date_col_e, q_col_e] if c}
-        str_cols = []
-        for c in ecols:
-            if c in known:
-                continue
-            try:
-                max_len = edf[c].astype(str).str.len().max()
-                if max_len > 30:  # skip truly short / numeric cols
-                    str_cols.append((c, max_len))
-            except Exception:
-                pass
-        str_cols.sort(key=lambda x: x[1])  # ascending max length
-        if len(str_cols) >= 2 and q_col_e is None:
-            q_col_e = str_cols[-2][0]   # 2nd-longest max = query
-        if len(str_cols) >= 1 and a_col_e is None:
-            a_col_e = str_cols[-1][0]   # longest max = Hoppr response
-
-    # ── Index fallback — user confirmed: col F (idx 5) = question, col G (idx 6) = answer
-    if q_col_e is None and len(ecols) > 5:
+    # USER CONFIRMED: col F (idx 5) = question, col G (idx 6) = answer.
+    # Index FIRST — named detection was finding wrong "Answer" column.
+    if len(ecols) > 6:
         q_col_e = ecols[5]
-    if a_col_e is None and len(ecols) > 6:
         a_col_e = ecols[6]
+    else:
+        q_col_e = (
+            next((c for c in ecols if "question" in c.lower()), None)
+            or next((c for c in ecols if "query" in c.lower() and "count" not in c.lower()), None)
+        )
+        a_col_e = (
+            next((c for c in ecols if "answer" in c.lower()), None)
+            or next((c for c in ecols if "response" in c.lower() or "reply" in c.lower()), None)
+        )
 
     if sid_col_e and date_col_e and q_col_e:
         edf["_date"]     = pd.to_datetime(edf[date_col_e], errors="coerce")

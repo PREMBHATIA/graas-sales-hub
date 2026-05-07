@@ -215,13 +215,37 @@ with st.expander("🔍 Data Status (click to hide)", expanded=True):
             st.warning(msg)
         else:
             st.caption(msg)
-        # Quick sanity sample — show first 3 Q+A pairs to verify column mapping
-        with st.expander("🔬 Verify column mapping (sample first 3 rows)"):
-            sample = eval_processed[["_seller", "_email", "_date", "_question", "_answer"]].head(3)
-            for i, row in sample.iterrows():
-                st.markdown(f"**Row {i}** — `{row['_seller']}` · `{row['_email']}` · `{str(row['_date'])[:10]}`")
-                st.markdown(f"  - **Q:** `{str(row['_question'])[:150]}`")
-                st.markdown(f"  - **A:** `{str(row['_answer'])[:150]}`")
+        # ── Full column browser — diagnose where the actual answer lives ─────
+        with st.expander("🔬 Browse ALL eval-sheet columns (find where answers really are)"):
+            st.caption("For one row with a real question, shows what every column contains. "
+                       "Use this to identify the column with the actual Hoppr response.")
+            # Pick a row whose question has substance
+            real_row = None
+            if not raw_eval.empty:
+                for i in range(min(50, len(raw_eval))):
+                    rr = raw_eval.iloc[i]
+                    qv = str(rr.iloc[5]).strip() if len(rr) > 5 else ""
+                    if (len(qv) > 20
+                        and qv.lower() not in ("loading...", "loading", "nan", "")):
+                        real_row = (i, rr)
+                        break
+            if real_row is None:
+                st.info("No row with a substantive question found in the first 50 rows.")
+            else:
+                idx, rr = real_row
+                st.markdown(f"**Inspecting row {idx}** (chosen because col F has real content):")
+                for col_idx, (col_name, val) in enumerate(zip(raw_eval.columns, rr.values)):
+                    val_str = str(val) if val is not None else ""
+                    val_len = len(val_str.strip())
+                    letter = chr(ord("A") + col_idx) if col_idx < 26 else f"col{col_idx}"
+                    snippet = val_str[:200].replace("\n", " ")
+                    st.markdown(
+                        f"- **Col {letter}** (`{col_name}`) — len={val_len}: "
+                        f"`{snippet}{'…' if val_len > 200 else ''}`"
+                    )
+                st.caption(f"Currently reading question from `{q_col_e}` and answer from `{a_col_e}`. "
+                           f"If the actual Hoppr response is in a different column above, "
+                           f"tell me the column letter and I'll point at it directly.")
 
 col_r, _ = st.columns([1, 9])
 with col_r:
@@ -462,7 +486,7 @@ if not raw_eval.empty:
     ecols = [str(c).strip() for c in edf.columns]
     edf.columns = ecols
 
-    # ── Named column detection (broad) ────────────────────────────────────────
+    # ── Detect helper / index columns by name (these are stable) ─────────────
     sid_col_e = (
         next((c for c in ecols if "seller" in c.lower() and "id" in c.lower()), None)
         or next((c for c in ecols if c.lower() in ("seller", "seller_id", "account")), None)
@@ -472,46 +496,25 @@ if not raw_eval.empty:
         next((c for c in ecols if c.strip().lower() == "date"), None)
         or next((c for c in ecols if "date" in c.lower() or "timestamp" in c.lower()), None)
     )
-    q_col_e = (
-        next((c for c in ecols if "question" in c.lower()), None)
-        or next((c for c in ecols if "query" in c.lower() and "count" not in c.lower()), None)
-        or next((c for c in ecols if "user_input" in c.lower() or "user_message" in c.lower()), None)
-        or next((c for c in ecols if c.lower() in ("input", "message", "prompt")), None)
-    )
-    a_col_e = (
-        next((c for c in ecols if "answer" in c.lower()), None)
-        or next((c for c in ecols if "response" in c.lower() or "reply" in c.lower()), None)
-        or next((c for c in ecols if "output" in c.lower() or "bot_message" in c.lower()), None)
-        or next((c for c in ecols if "ai" in c.lower() and "response" not in c.lower()
-                 and c.lower() not in ("ai",)), None)
-    )
 
-    # ── Positional / content fallback — if named detection failed ─────────────
-    # Use MAX length (not avg) — many "Loading..." rows drag avg down for response col.
-    # The Hoppr response is always multi-KB markdown, so its max is always highest.
-    if q_col_e is None or a_col_e is None:
-        known = {c for c in [sid_col_e, email_col_e, date_col_e, q_col_e] if c}
-        str_cols = []
-        for c in ecols:
-            if c in known:
-                continue
-            try:
-                max_len = edf[c].astype(str).str.len().max()
-                if max_len > 30:  # skip truly short / numeric cols
-                    str_cols.append((c, max_len))
-            except Exception:
-                pass
-        str_cols.sort(key=lambda x: x[1])  # ascending max length
-        if len(str_cols) >= 2 and q_col_e is None:
-            q_col_e = str_cols[-2][0]   # 2nd-longest max = query
-        if len(str_cols) >= 1 and a_col_e is None:
-            a_col_e = str_cols[-1][0]   # longest max = Hoppr response
-
-    # ── Index fallback — user confirmed: col F (idx 5) = question, col G (idx 6) = answer
-    if q_col_e is None and len(ecols) > 5:
+    # ── Question/answer: USER CONFIRMED col F (idx 5) = question, col G (idx 6) = answer.
+    # Use index FIRST. Named detection was finding the wrong "Answer" column.
+    if len(ecols) > 6:
         q_col_e = ecols[5]
-    if a_col_e is None and len(ecols) > 6:
         a_col_e = ecols[6]
+    else:
+        # Sheet has fewer than 7 columns → fall back to named detection
+        q_col_e = (
+            next((c for c in ecols if "question" in c.lower()), None)
+            or next((c for c in ecols if "query" in c.lower() and "count" not in c.lower()), None)
+            or next((c for c in ecols if "user_input" in c.lower() or "user_message" in c.lower()), None)
+            or next((c for c in ecols if c.lower() in ("input", "message", "prompt")), None)
+        )
+        a_col_e = (
+            next((c for c in ecols if "answer" in c.lower()), None)
+            or next((c for c in ecols if "response" in c.lower() or "reply" in c.lower()), None)
+            or next((c for c in ecols if "output" in c.lower() or "bot_message" in c.lower()), None)
+        )
 
     # ── Always store debug info ───────────────────────────────────────────────
     st.session_state["eval_col_debug"] = (
