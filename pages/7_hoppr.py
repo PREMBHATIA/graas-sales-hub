@@ -716,23 +716,16 @@ with tab_ask:
                              f"{int(wk['unique_sellers'].sum())} sellers, {int(wk['unique_users'].sum())} users")
             if _sellers_list:
                 sdf = pd.DataFrame(_sellers_list)
-                lines.append(f"\nSELLERS: {len(sdf)} total")
-                lines.append(f"  Active ≤7d:  {len(sdf[sdf['days_silent'] <= 7])}")
-                lines.append(f"  Power Users: {len(sdf[sdf['classification'] == 'Power User'])}")
-                lines.append(f"  Sales-Ready: {len(sdf[sdf['classification'] == 'Sales-Ready'])}")
-                lines.append(f"  Going Quiet: {len(sdf[sdf['trend'] == 'Going Quiet'])}")
-                lines.append(f"  Churned:     {len(sdf[sdf['trend'] == 'Churned'])}")
-                top5 = sdf.nlargest(5, "q_total")
-                lines.append(f"\nTOP 5 SELLERS:")
-                for _, r in top5.iterrows():
-                    lines.append(f"  {r['seller_id']} ({r['email']}): {r['q_total']}Q total, "
-                                 f"{r['classification']}, {r['trend']}, {r['days_silent']}d silent")
-                at_risk = sdf[sdf["trend"].isin(["Going Quiet", "Churned"])].nlargest(5, "q_total")
-                if not at_risk.empty:
-                    lines.append(f"\nAT-RISK SELLERS:")
-                    for _, r in at_risk.iterrows():
-                        lines.append(f"  {r['seller_id']} ({r['email']}): {r['days_silent']}d silent, "
-                                     f"{r['q_total']}Q total")
+                lines.append(f"\nSELLERS: {len(sdf)} total | "
+                             f"Active ≤7d: {len(sdf[sdf['days_silent'] <= 7])} | "
+                             f"Power Users: {len(sdf[sdf['classification'] == 'Power User'])} | "
+                             f"Sales-Ready: {len(sdf[sdf['classification'] == 'Sales-Ready'])} | "
+                             f"Going Quiet: {len(sdf[sdf['trend'] == 'Going Quiet'])} | "
+                             f"Churned: {len(sdf[sdf['trend'] == 'Churned'])}")
+                lines.append(f"\nALL SELLERS (seller_id | email | total_queries | queries_7d | classification | trend | days_silent):")
+                for _, r in sdf.sort_values("q_total", ascending=False).iterrows():
+                    lines.append(f"  {r['seller_id']} | {r['email']} | {r['q_total']}Q | "
+                                 f"{r['q_recent']}Q(7d) | {r['classification']} | {r['trend']} | {r['days_silent']}d")
             if not _eval_df.empty and "_buckets" in _eval_df.columns:
                 all_b = [b for bl in _eval_df["_buckets"] for b in bl]
                 lines.append(f"\nQUESTION TYPES (all time):")
@@ -756,7 +749,12 @@ with tab_ask:
         )
 
         HOPPR_SYSTEM = f"""You are Ask Hoppr — an AI analyst for the Graas Sales Hub.
-You have access to live Hoppr usage data. Answer questions about seller usage, query trends, data quality, and account health. Be concise and specific — use numbers, cite seller IDs when relevant.
+
+IMPORTANT: All Hoppr data is already pre-loaded into your context below — you have full access to every seller, their query history, and Hoppr's responses. You do NOT need to access any external URLs, Google Sheets, or ask the user to paste data. When asked about any seller or account, look it up in the data you already have.
+
+To find a seller by company name: match against their email domain (e.g. "paulaschoice" → seller with @paulaschoice.vn email). The ALL SELLERS list below maps every seller_id to their email address.
+
+Be concise and specific — use numbers, quote exact questions/answers, cite seller IDs and emails when relevant.
 
 Current data snapshot:
 ---
@@ -769,25 +767,55 @@ Current data snapshot:
             rows = eval_df[eval_df["_seller"] == seller_id].sort_values("_date")
             if rows.empty:
                 return ""
-            lines = [f"\n===== FULL QUERY LOG: {seller_id} ({len(rows)} queries) ====="]
+            lines = [f"\n===== FULL QUERY + RESPONSE LOG: {seller_id} ({len(rows)} queries) ====="]
             if "_email" in rows.columns:
                 for email, grp in rows.groupby("_email", sort=False):
                     em = str(email)
                     if not em or em == "nan":
                         continue
-                    lines.append(f"\n  --- {em} ({len(grp)} queries) ---")
+                    lines.append(f"\n  --- USER: {em} ({len(grp)} queries) ---")
                     for _, r in grp.sort_values("_date").iterrows():
-                        dt = str(r["_date"])[:10]
-                        q  = str(r["_question"])[:400]
+                        dt  = str(r["_date"])[:10]
+                        q   = str(r["_question"])
+                        a   = str(r.get("_answer", "")) if "_answer" in r.index else ""
                         acc_flag = " [ACCURACY ISSUE]" if is_accuracy(q) else ""
-                        lines.append(f"    [{dt}]{acc_flag} {q}")
-            lines.append("===== END =====")
+                        lines.append(f"")
+                        lines.append(f"    [{dt}]{acc_flag}")
+                        lines.append(f"    Q: {q}")
+                        if a and a.strip() and a != "nan":
+                            lines.append(f"    A: {a[:1000]}")
+                        else:
+                            lines.append(f"    A: (no response recorded)")
+            lines.append("\n===== END =====")
             return "\n".join(lines)
 
         def _detect_sellers(text: str) -> list:
             text_upper = text.upper()
-            return list({s["seller_id"] for s in sellers
-                         if len(s["seller_id"]) >= 3 and s["seller_id"] in text_upper})
+            # Normalise: strip punctuation/spaces for fuzzy domain matching
+            text_norm  = re.sub(r"[^a-z0-9]", "", text.lower())
+            found = set()
+            for s in sellers:
+                sid = s["seller_id"]
+                # 1. Direct seller_id match (e.g. "AAIDF")
+                if len(sid) >= 3 and sid in text_upper:
+                    found.add(sid)
+                    continue
+                # 2. Email domain match (e.g. "paula's choice" → "paulaschoice" → @paulaschoice.vn)
+                email = s.get("email", "")
+                if email and "@" in email:
+                    domain_part = re.sub(r"[^a-z0-9]", "",
+                                         email.split("@")[1].split(".")[0].lower())
+                    if len(domain_part) >= 4 and domain_part in text_norm:
+                        found.add(sid)
+                        continue
+                # 3. All emails for this seller (catches other users at same domain)
+                for em in s.get("all_emails", []):
+                    if em and "@" in em:
+                        dp = re.sub(r"[^a-z0-9]", "", em.split("@")[1].split(".")[0].lower())
+                        if len(dp) >= 4 and dp in text_norm:
+                            found.add(sid)
+                            break
+            return list(found)
 
         if "hoppr_chat" not in st.session_state:
             st.session_state.hoppr_chat = []
