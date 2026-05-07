@@ -888,6 +888,13 @@ with tab_accounts:
             filt["prompt_quality"] = None
         disp = filt[disp_cols].copy()
         disp = disp.sort_values("days_silent")
+        def _pq_fmt(v):
+            try:
+                if v is None or pd.isna(v): return "—"
+                return f"{int(v)}"
+            except Exception:
+                return "—"
+
         st.dataframe(
             disp.rename(columns={
                 "seller_id": "Seller", "email": "Email", "user_count": "Users",
@@ -897,7 +904,8 @@ with tab_accounts:
                 "trend": "Trend", "classification": "Class",
             }).style.map(cls_color, subset=["Class"])
               .map(tr_color, subset=["Trend"])
-              .map(pq_color, subset=["Prompt Q"]),
+              .map(pq_color, subset=["Prompt Q"])
+              .format({"Prompt Q": _pq_fmt}),
             use_container_width=True, height=380, hide_index=True,
         )
         st.caption("**Prompt Q** is a 0–100 score per seller — Strong ≥70 (green) · Decent 45–69 · Weak 20–44 · Vague <20 (red). Based on whether prompts include a metric, timeframe, entity, and comparison.")
