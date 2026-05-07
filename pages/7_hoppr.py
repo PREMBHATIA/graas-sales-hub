@@ -327,6 +327,100 @@ def is_accuracy(q: str) -> bool:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# PROMPT QUALITY SCORING
+# ══════════════════════════════════════════════════════════════════════════════
+# Score 0-100 on 4 signals: metric, timeframe, entity, comparison.
+# Strong prompts (≥70) have most/all 4. Vague prompts (<20) have none + are short.
+
+SCORE_METRIC_WORDS = [
+    "gmv", "nmv", "revenue", "sales", "orders", "roas", "ctr", "cpc", "cpa",
+    "aov", "conversion", "traffic", "visitor", "impression", "click",
+    "units", "sold", "quantity", "stock", "inventory", "ad spend",
+    "income", "profit", "margin", "performance",
+    "cancellation", "refund", "return rate",
+    "spend", "cost", "ads", "campaign",
+]
+SCORE_TIME_WORDS = [
+    "yesterday", "today", "this week", "last week",
+    "this month", "last month", "this year", "last year",
+    "last 7", "last 30", "last 90", "past week", "past month",
+    "wow", "mom", "yoy", "year on year", "month on month", "week on week",
+    "year-on-year", "month-on-month", "week-on-week",
+    "jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec",
+    "january", "february", "march", "april", "june",
+    "july", "august", "september", "october", "november", "december",
+    "2024", "2025", "2026", "q1", "q2", "q3", "q4",
+]
+SCORE_ENTITY_WORDS = [
+    "sku", "product", "brand", "category", "shopee", "lazada", "tiktok",
+    "tokopedia", "amazon", "qoo10", "blibli", "channel", "marketplace",
+    "campaign", "country", "indonesia", "malaysia", "philippines",
+    "thailand", "vietnam", "singapore", "india",
+    "customer", "buyer", "creator", "affiliate", "kol", "influencer",
+]
+SCORE_COMPARISON_WORDS = [
+    " vs ", "versus", "compared", "compare", "comparison",
+    "growth", "increase", "decrease", "drop", "rise", "fell",
+    "trend", "trending", "better", "worse", "higher", "lower",
+    "delta", "change", "vs.", "v/s",
+]
+SCORE_FOLLOWUP_PHRASES = [
+    "give me the same", "same for", "include", "also show", "also give",
+    "what about", "more", "another", "next", "again", "and that",
+    "do that", "yes", "ok", "okay", "fine", "go ahead",
+]
+
+def score_prompt(q) -> dict:
+    """Return {'score': 0-100, 'tier': str, 'reasons': list}."""
+    if q is None or (isinstance(q, float) and pd.isna(q)):
+        return {"score": 0, "tier": "Empty", "reasons": []}
+    text = str(q).strip()
+    ql = text.lower()
+    if ql in ("", "loading...", "loading", "nan"):
+        return {"score": 0, "tier": "Empty", "reasons": []}
+
+    word_count = len(text.split())
+    has_metric  = any(kw in ql for kw in SCORE_METRIC_WORDS)
+    has_time    = any(kw in ql for kw in SCORE_TIME_WORDS)
+    has_entity  = any(kw in ql for kw in SCORE_ENTITY_WORDS)
+    has_compare = any(kw in ql for kw in SCORE_COMPARISON_WORDS)
+    is_followup = (word_count <= 5
+                   and any(p in ql for p in SCORE_FOLLOWUP_PHRASES))
+    is_too_short = word_count < 4
+
+    score = 0
+    reasons = []
+    if word_count >= 6:
+        score += 15; reasons.append("✓ length")
+    elif word_count >= 4:
+        score += 5
+    if has_metric:
+        score += 30; reasons.append("✓ metric")
+    else:
+        reasons.append("✗ no metric")
+    if has_time:
+        score += 25; reasons.append("✓ timeframe")
+    else:
+        reasons.append("✗ no timeframe")
+    if has_entity:
+        score += 20; reasons.append("✓ entity")
+    if has_compare:
+        score += 10; reasons.append("✓ comparison")
+
+    if is_followup:
+        score = min(score, 25); reasons.append("✗ pure followup")
+    if is_too_short:
+        score = min(score, 25); reasons.append("✗ too short")
+
+    score = max(0, min(score, 100))
+    if   score >= 70: tier = "Strong"
+    elif score >= 45: tier = "Decent"
+    elif score >= 20: tier = "Weak"
+    else:             tier = "Vague"
+    return {"score": score, "tier": tier, "reasons": reasons}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # PRE-PROCESS EVAL SHEET
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -406,6 +500,9 @@ if not raw_eval.empty:
         edf = edf.dropna(subset=["_date"])
         edf["_is_accuracy"] = edf["_question"].apply(is_accuracy)
         edf["_buckets"]     = edf["_question"].apply(classify_question)
+        _scores = edf["_question"].apply(score_prompt)
+        edf["_prompt_score"] = _scores.apply(lambda d: d["score"])
+        edf["_prompt_tier"]  = _scores.apply(lambda d: d["tier"])
         eval_processed = edf
 
 
@@ -464,6 +561,12 @@ if not eval_processed.empty and sellers and "_email" in eval_processed.columns:
         for em, eg in grp.groupby("_email", sort=False):
             dates = eg["_date"].dropna().dt.strftime("%Y-%m-%d").tolist()
             seller_users_map[sid][em] = {"count": len(eg), "dates": dates}
+
+    # Per-seller avg prompt quality (excluding Empty rows)
+    _scored_only = eval_processed[eval_processed["_prompt_tier"] != "Empty"]
+    _seller_avg = (_scored_only.groupby("_seller")["_prompt_score"]
+                   .mean().round(0).astype(int).to_dict()) if not _scored_only.empty else {}
+
     for s in sellers:
         sid = s["seller_id"]
         if sid in seller_users_map:
@@ -473,10 +576,12 @@ if not eval_processed.empty and sellers and "_email" in eval_processed.columns:
         else:
             s["user_count"] = 1
             s["all_emails"] = [s["email"]]
+        s["prompt_quality"] = _seller_avg.get(sid, None)
 else:
     for s in sellers:
         s.setdefault("user_count", 1)
         s.setdefault("all_emails", [s.get("email", "")])
+        s.setdefault("prompt_quality", None)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -752,18 +857,35 @@ with tab_accounts:
             return {"Highly Active": "color:#10B981", "Active": "color:#06B6D4",
                     "Going Quiet":   "color:#F59E0B", "Churned": "color:#EF4444"}.get(v, "")
 
-        disp = filt[["seller_id", "email", "user_count", "q_total", "q_recent",
-                      "last_active", "days_silent", "trend", "classification"]].copy()
+        def pq_color(v):
+            try:    n = int(v)
+            except: return ""
+            if n >= 70: return "color:#10B981;font-weight:600"   # Strong
+            if n >= 45: return "color:#06B6D4"                    # Decent
+            if n >= 20: return "color:#F59E0B"                    # Weak
+            return "color:#EF4444;font-weight:600"                # Vague
+
+        disp_cols = ["seller_id", "email", "user_count", "q_total", "q_recent",
+                     "prompt_quality",
+                     "last_active", "days_silent", "trend", "classification"]
+        if "prompt_quality" not in filt.columns:
+            filt = filt.copy()
+            filt["prompt_quality"] = None
+        disp = filt[disp_cols].copy()
         disp = disp.sort_values("days_silent")
         st.dataframe(
             disp.rename(columns={
                 "seller_id": "Seller", "email": "Email", "user_count": "Users",
                 "q_total": "Total Q", "q_recent": "Q (7d)",
+                "prompt_quality": "Prompt Q",
                 "last_active": "Last Active", "days_silent": "Days Silent",
                 "trend": "Trend", "classification": "Class",
-            }).style.map(cls_color, subset=["Class"]).map(tr_color, subset=["Trend"]),
+            }).style.map(cls_color, subset=["Class"])
+              .map(tr_color, subset=["Trend"])
+              .map(pq_color, subset=["Prompt Q"]),
             use_container_width=True, height=380, hide_index=True,
         )
+        st.caption("**Prompt Q** is a 0–100 score per seller — Strong ≥70 (green) · Decent 45–69 · Weak 20–44 · Vague <20 (red). Based on whether prompts include a metric, timeframe, entity, and comparison.")
 
         st.markdown("---")
         st.markdown("### 🔍 Account Detail")
@@ -857,6 +979,94 @@ with tab_accounts:
                 with col_a:
                     st.markdown("**Answer quality:**")
                     st.markdown(us.get("reason", "—")[:2000])
+
+            # ── Prompt Quality Scorecard ──────────────────────────────────────
+            st.markdown("#### 🎯 Prompt Quality Scorecard")
+            scored_acct = acct_f[acct_f["_prompt_tier"] != "Empty"] \
+                          if "_prompt_tier" in acct_f.columns else pd.DataFrame()
+            if scored_acct.empty:
+                st.info("Not enough scoreable prompts in this period.")
+            else:
+                avg_score = scored_acct["_prompt_score"].mean()
+                tier_counts = scored_acct["_prompt_tier"].value_counts()
+                n_strong = int(tier_counts.get("Strong", 0))
+                n_decent = int(tier_counts.get("Decent", 0))
+                n_weak   = int(tier_counts.get("Weak", 0))
+                n_vague  = int(tier_counts.get("Vague", 0))
+                n_total  = len(scored_acct)
+
+                if   avg_score >= 70: overall = ("Strong", "#10B981")
+                elif avg_score >= 45: overall = ("Decent", "#06B6D4")
+                elif avg_score >= 20: overall = ("Weak",   "#F59E0B")
+                else:                 overall = ("Vague",  "#EF4444")
+
+                ps1, ps2, ps3, ps4, ps5 = st.columns(5)
+                with ps1:
+                    st.markdown(
+                        f"<div style='font-size:0.85rem;color:#9CA3AF;margin-bottom:4px'>Avg Quality</div>"
+                        f"<div style='font-size:2.4rem;font-weight:700;color:{overall[1]};line-height:1'>"
+                        f"{avg_score:.0f}<span style='font-size:1rem;color:#6B7280'>/100</span></div>"
+                        f"<div style='font-size:0.9rem;color:{overall[1]};font-weight:600'>{overall[0]}</div>",
+                        unsafe_allow_html=True,
+                    )
+                with ps2: st.metric("Strong (≥70)", n_strong, f"{n_strong/n_total*100:.0f}%" if n_total else "—")
+                with ps3: st.metric("Decent (45-69)", n_decent, f"{n_decent/n_total*100:.0f}%" if n_total else "—")
+                with ps4: st.metric("Weak (20-44)", n_weak, f"{n_weak/n_total*100:.0f}%" if n_total else "—")
+                with ps5: st.metric("Vague (<20)", n_vague, f"{n_vague/n_total*100:.0f}%" if n_total else "—",
+                                    delta_color="inverse")
+
+                # Distribution bar
+                tier_df = pd.DataFrame({
+                    "Tier": ["Vague", "Weak", "Decent", "Strong"],
+                    "Count": [n_vague, n_weak, n_decent, n_strong],
+                })
+                fig_tier = px.bar(
+                    tier_df, x="Count", y="Tier", orientation="h",
+                    color="Tier",
+                    color_discrete_map={"Strong": "#10B981", "Decent": "#06B6D4",
+                                        "Weak": "#F59E0B", "Vague": "#EF4444"},
+                    labels={"Count": "Queries", "Tier": ""},
+                )
+                fig_tier.update_layout(height=180, template="plotly_dark",
+                                       margin=dict(l=20, r=20, t=10, b=20),
+                                       showlegend=False)
+                st.plotly_chart(fig_tier, use_container_width=True)
+
+                # Examples — best + worst prompts
+                col_best, col_worst = st.columns(2)
+                with col_best:
+                    st.markdown("**🟢 Strongest prompts**")
+                    best = (scored_acct.sort_values("_prompt_score", ascending=False)
+                            .drop_duplicates(subset=["_question"]).head(5))
+                    if best.empty:
+                        st.caption("—")
+                    else:
+                        for _, r in best.iterrows():
+                            q = str(r["_question"]).strip()
+                            st.markdown(
+                                f"<div style='font-size:0.85rem;margin-bottom:6px'>"
+                                f"<span style='color:#10B981;font-weight:600'>{int(r['_prompt_score'])}</span> "
+                                f"<span style='color:#D1D5DB'>{q[:200]}</span></div>",
+                                unsafe_allow_html=True,
+                            )
+                with col_worst:
+                    st.markdown("**🔴 Vaguest prompts**")
+                    worst = (scored_acct.sort_values("_prompt_score", ascending=True)
+                             .drop_duplicates(subset=["_question"]).head(5))
+                    if worst.empty:
+                        st.caption("—")
+                    else:
+                        for _, r in worst.iterrows():
+                            q = str(r["_question"]).strip()
+                            st.markdown(
+                                f"<div style='font-size:0.85rem;margin-bottom:6px'>"
+                                f"<span style='color:#EF4444;font-weight:600'>{int(r['_prompt_score'])}</span> "
+                                f"<span style='color:#D1D5DB'>{q[:200]}</span></div>",
+                                unsafe_allow_html=True,
+                            )
+                st.caption("Score is based on: metric (revenue/ROAS/units), "
+                           "timeframe (March, last week, YoY), entity (SKU/channel/country), "
+                           "comparison (vs/growth). Pure follow-ups and very short prompts are capped.")
 
             st.markdown("#### 📋 Query Timeline")
             # Filter out rows where question or answer is just "Loading..." (Hoppr log noise)
@@ -982,9 +1192,12 @@ with tab_ask:
                     qs  = str(r.get("q_summary", "")).strip()
                     act = str(r.get("action", "")).strip()
                     aq  = str(r.get("a_summary", "")).strip()
+                    pq  = r.get("prompt_quality", None)
+                    pq_str = (f" | PromptQ {int(pq)}/100"
+                              if pq is not None and not pd.isna(pq) else "")
                     parts = [f"  {r['seller_id']} | {r['email']} | {r['q_total']}Q total | "
                              f"{r['q_recent']}Q(7d) | {r['classification']} | "
-                             f"{r['trend']} | {r['days_silent']}d silent"]
+                             f"{r['trend']} | {r['days_silent']}d silent{pq_str}"]
                     if qs and qs != "nan":
                         parts.append(f"    What they ask: {qs[:250]}")
                     if aq and aq != "nan":
