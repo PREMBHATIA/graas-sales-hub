@@ -308,26 +308,31 @@ if not raw_eval.empty:
     )
 
     # ── Positional / content fallback — if named detection failed ─────────────
-    # Structure from sheet: seller_id | email | date | session_id | turn | QUERY | RESPONSE
-    # Skip known cols; the 2nd-to-last long-text col = query, last col = response
+    # Use MAX length (not avg) — many "Loading..." rows drag avg down for response col.
+    # The Hoppr response is always multi-KB markdown, so its max is always highest.
     if q_col_e is None or a_col_e is None:
-        known = {c for c in [sid_col_e, email_col_e, date_col_e] if c}
-        # Identify string cols with non-trivial length (exclude IDs / short fields)
+        known = {c for c in [sid_col_e, email_col_e, date_col_e, q_col_e] if c}
         str_cols = []
         for c in ecols:
             if c in known:
                 continue
             try:
-                avg_len = edf[c].astype(str).str.len().mean()
-                if avg_len > 10:  # skip short codes / numbers
-                    str_cols.append((c, avg_len))
+                max_len = edf[c].astype(str).str.len().max()
+                if max_len > 30:  # skip truly short / numeric cols
+                    str_cols.append((c, max_len))
             except Exception:
                 pass
-        str_cols.sort(key=lambda x: x[1])  # ascending avg length
+        str_cols.sort(key=lambda x: x[1])  # ascending max length
         if len(str_cols) >= 2 and q_col_e is None:
-            q_col_e = str_cols[-2][0]   # second-longest = query
+            q_col_e = str_cols[-2][0]   # 2nd-longest max = query
         if len(str_cols) >= 1 and a_col_e is None:
-            a_col_e = str_cols[-1][0]   # longest = response
+            a_col_e = str_cols[-1][0]   # longest max = Hoppr response
+
+    # ── Index fallback — user confirmed: col F (idx 5) = question, col G (idx 6) = answer
+    if q_col_e is None and len(ecols) > 5:
+        q_col_e = ecols[5]
+    if a_col_e is None and len(ecols) > 6:
+        a_col_e = ecols[6]
 
     # ── Always store debug info ───────────────────────────────────────────────
     st.session_state["eval_col_debug"] = (
@@ -785,10 +790,19 @@ with tab_accounts:
                     st.markdown(f"**Q:** {question}")
                     st.markdown("**A:**")
                     if is_loading_ans:
-                        st.caption("Answer not captured (Hoppr was still loading when this was logged)")
+                        st.caption(f"No answer in column `{a_col_e or '?'}` for this row — "
+                                   f"check the Data Status panel if answers are missing broadly.")
                     else:
-                        # Show full answer — no truncation
-                        st.markdown(answer if answer and answer != "nan" else "No answer recorded")
+                        # Show up to 800 chars; offer expander for full text
+                        ans_display = answer if answer and answer != "nan" else ""
+                        if not ans_display:
+                            st.caption("No answer recorded in this row.")
+                        elif len(ans_display) > 800:
+                            st.markdown(ans_display[:800] + "…")
+                            with st.expander("Show full answer"):
+                                st.markdown(ans_display)
+                        else:
+                            st.markdown(ans_display)
             if len(timeline) == 100 and len(timeline_all[~loading_mask]) > 100:
                 st.caption(f"Showing most recent 100 of {len(timeline_all[~loading_mask])} queries.")
 

@@ -83,17 +83,38 @@ ACCURACY_KEYWORDS = [
 ]
 
 QUESTION_BUCKETS = {
-    "Revenue / Sales":  ["revenue", "gmv", "sales", "selling", "growth", "income", "orders"],
-    "Ads / ROAS":       ["roas", "campaign", "paid", "advertisement", "spend", " ad ", " ads "],
-    "Traffic":          ["traffic", "visitor", "visit", "session", "pageview", "click"],
-    "Product / SKU":    ["sku", "product", "listing", "catalogue", "catalog", "item"],
-    "Affiliates":       ["affiliate", "creator", "commission", "partner", "influencer"],
-    "Root Cause":       ["decline", "drop", "reason", "root cause", "why", "fell", "decreased"],
-    "Comparison / KPI": ["kpi", "compare", "comparison", " vs ", "versus", "benchmark"],
-    "Optimisation":     ["optimis", "optimiz", "recommend", "should i", "how to", "improve"],
-    "YoY / Trends":     ["year on year", "yoy", "last year", "month on month", "trend"],
-    "Market / Geo":     ["country", "market", "malaysia", "philippines", "thailand",
-                         "indonesia", "india"],
+    # ── 4 meta-categories the team tracks ─────────────────────────────────────
+    "Revenue & GMV/NMV": [
+        "gmv", "nmv", "revenue", "sales", "orders", "gross merchandise",
+        "net merchandise", "nett merchandise", "gross revenue", "net revenue",
+        "gross sales", "net sales", "aov", "average order value", "conversion",
+        "checkout", "purchase", "transaction", "top line", "topline",
+        "income", "earning", "profit", "margin", "growth", "selling",
+        "total sales", "total revenue", "monthly sales", "daily sales",
+        "weekly sales", "sale performance", "sales performance",
+    ],
+    "Ads, Traffic & ROAS": [
+        "roas", "return on ad", "campaign", "paid", "advertisement",
+        " ad ", " ads ", "cpc", "cpa", "ctr", "click-through",
+        "traffic", "visitor", "visit", "session", "pageview", "page view",
+        "impression", "reach", "ad spend", "budget", "marketing spend",
+        "facebook ads", "google ads", "tiktok ads", "meta ads", "shopee ads",
+        "lazada ads", "sponsored", "search ads", "display ads",
+    ],
+    "SKU & Products": [
+        "sku", "product", "listing", "catalogue", "catalog", "item",
+        "variant", "inventory", "stock", "category", "brand",
+        "bestseller", "best seller", "best selling", "top product",
+        "top selling", "top sku", "hero product", "slow moving",
+        "new product", "out of stock",
+    ],
+    "Downloads & Exports": [
+        "download", "export", "excel", "csv", "spreadsheet", "sheet",
+        "file", "data export", "extract", "pull data", "get data",
+        "raw data", "data download", "generate report", "download report",
+        "export data", "download data",
+    ],
+    # ── Additional signal ──────────────────────────────────────────────────────
     "Data Accuracy":    ACCURACY_KEYWORDS,
 }
 
@@ -137,24 +158,32 @@ if not raw_eval.empty:
         or next((c for c in ecols if "response" in c.lower() or "reply" in c.lower()), None)
         or next((c for c in ecols if "output" in c.lower() or "bot_message" in c.lower()), None)
     )
-    # Positional fallback
+    # ── Positional / content fallback — if named detection failed ─────────────
+    # Use MAX length (not avg) — many "Loading..." rows drag avg down for response col.
+    # The Hoppr response is always multi-KB markdown, so its max is always highest.
     if q_col_e is None or a_col_e is None:
-        known = {c for c in [sid_col_e, email_col_e, date_col_e] if c}
+        known = {c for c in [sid_col_e, email_col_e, date_col_e, q_col_e] if c}
         str_cols = []
         for c in ecols:
             if c in known:
                 continue
             try:
-                avg = edf[c].astype(str).str.len().mean()
-                if avg > 10:
-                    str_cols.append((c, avg))
+                max_len = edf[c].astype(str).str.len().max()
+                if max_len > 30:  # skip truly short / numeric cols
+                    str_cols.append((c, max_len))
             except Exception:
                 pass
-        str_cols.sort(key=lambda x: x[1])
+        str_cols.sort(key=lambda x: x[1])  # ascending max length
         if len(str_cols) >= 2 and q_col_e is None:
-            q_col_e = str_cols[-2][0]
+            q_col_e = str_cols[-2][0]   # 2nd-longest max = query
         if len(str_cols) >= 1 and a_col_e is None:
-            a_col_e = str_cols[-1][0]
+            a_col_e = str_cols[-1][0]   # longest max = Hoppr response
+
+    # ── Index fallback — user confirmed: col F (idx 5) = question, col G (idx 6) = answer
+    if q_col_e is None and len(ecols) > 5:
+        q_col_e = ecols[5]
+    if a_col_e is None and len(ecols) > 6:
+        a_col_e = ecols[6]
 
     if sid_col_e and date_col_e and q_col_e:
         edf["_date"]     = pd.to_datetime(edf[date_col_e], errors="coerce")
