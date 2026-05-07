@@ -65,7 +65,7 @@ def load_meetings_summary():
     if df.empty:
         return {}
 
-    months = ["Jan", "Feb", "Mar", "Apr"]
+    months = ["Jan", "Feb", "Mar", "Apr", "May"]
 
     def _safe_int(v):
         try:
@@ -175,11 +175,11 @@ if st.button("🔄 Refresh"):
 # ══════════════════════════════════════════════════════════════════════════════
 # 1. MEETINGS — Q1+ VIEW (from "Revised - Summary of Meetings" tab)
 # ══════════════════════════════════════════════════════════════════════════════
-st.markdown("### 🤝 Meetings — Q1 2026 + Apr")
+st.markdown("### 🤝 Meetings — YTD 2026")
 st.caption("All products — source: All-e 'Revised - Summary of Meetings' tab")
 
 if meetings_data:
-    _MONTHS = ["Jan", "Feb", "Mar", "Apr"]
+    _MONTHS = ["Jan", "Feb", "Mar", "Apr", "May"]
     ov_in = meetings_data.get("overall_india", {})
     ov_sea = meetings_data.get("overall_sea", {})
     ov_funnel = meetings_data.get("overall_funnel", {})
