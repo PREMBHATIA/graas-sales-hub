@@ -208,17 +208,25 @@ actual_new_mtgs = []
 actual_cumul_mtgs = []
 actual_proposals = []
 cumul = 0
-for m in months:
+_current_month_idx_for_cumul = datetime.now().month - 1  # 0-based
+for i, m in enumerate(months):
     if m in gtm_actual_mtgs:
         n = len(gtm_actual_mtgs[m]["meetings"])
         p = len(gtm_actual_mtgs[m]["proposals"])
         cumul += n
     else:
-        n = None
-        p = None
-    actual_new_mtgs.append(n)
-    actual_cumul_mtgs.append(cumul if n is not None else None)
-    actual_proposals.append(p)
+        n = 0
+        p = 0
+    # Past + current month: carry the running cumul forward (even if 0 new mtgs).
+    # Future months: None so the chart doesn't draw them.
+    if i <= _current_month_idx_for_cumul:
+        actual_new_mtgs.append(n)
+        actual_cumul_mtgs.append(cumul)
+        actual_proposals.append(p)
+    else:
+        actual_new_mtgs.append(None)
+        actual_cumul_mtgs.append(None)
+        actual_proposals.append(None)
 
 gtm_target["A_New_Mtgs"] = actual_new_mtgs
 gtm_target["A_Cumul_Mtgs"] = actual_cumul_mtgs
@@ -238,8 +246,13 @@ with tab_gtm:
 
     # ── KPI Cards — YTD ───────────────────────────────────────────────────────
     ytd_target_mtgs = gtm_target.loc[current_month_idx, "T_Cumul_Mtgs"]
-    ytd_actual_mtgs = gtm_target.loc[current_month_idx, "A_Cumul_Mtgs"] or 0
-    ytd_ach_mtgs = f"{ytd_actual_mtgs/ytd_target_mtgs*100:.0f}%" if ytd_target_mtgs else "—"
+    _raw_actual = gtm_target.loc[current_month_idx, "A_Cumul_Mtgs"]
+    ytd_actual_mtgs = int(_raw_actual) if pd.notna(_raw_actual) else 0
+    ytd_ach_mtgs = (
+        f"{ytd_actual_mtgs/ytd_target_mtgs*100:.0f}%"
+        if ytd_target_mtgs and pd.notna(ytd_target_mtgs)
+        else "—"
+    )
 
     ytd_target_pocs = gtm_target.loc[current_month_idx, "T_Free_POCs"]
     # Count proposals as proxy for POC pipeline
