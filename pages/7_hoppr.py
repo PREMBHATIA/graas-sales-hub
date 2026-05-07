@@ -199,54 +199,6 @@ with st.expander("🔍 Data Status (click to hide)", expanded=True):
     if "eval_col_debug" in st.session_state:
         st.code(st.session_state["eval_col_debug"], language=None)
 
-    # Verify column mapping by showing how many rows have non-empty answers
-    if not eval_processed.empty and "_answer" in eval_processed.columns:
-        _ans_clean = eval_processed["_answer"].astype(str).str.strip()
-        _ans_real = _ans_clean[~_ans_clean.str.lower().isin(
-            ["", "nan", "loading...", "loading"]
-        )]
-        _pct_real = len(_ans_real) / len(eval_processed) * 100 if len(eval_processed) else 0
-        msg = (
-            f"📊 **Answer column health:** {len(_ans_real)} of {len(eval_processed)} "
-            f"rows have a real answer ({_pct_real:.0f}%). "
-            f"Reading from column `{a_col_e}`."
-        )
-        if _pct_real < 70:
-            st.warning(msg)
-        else:
-            st.caption(msg)
-        # ── Full column browser — diagnose where the actual answer lives ─────
-        with st.expander("🔬 Browse ALL eval-sheet columns (find where answers really are)"):
-            st.caption("For one row with a real question, shows what every column contains. "
-                       "Use this to identify the column with the actual Hoppr response.")
-            # Pick a row whose question has substance
-            real_row = None
-            if not raw_eval.empty:
-                for i in range(min(50, len(raw_eval))):
-                    rr = raw_eval.iloc[i]
-                    qv = str(rr.iloc[5]).strip() if len(rr) > 5 else ""
-                    if (len(qv) > 20
-                        and qv.lower() not in ("loading...", "loading", "nan", "")):
-                        real_row = (i, rr)
-                        break
-            if real_row is None:
-                st.info("No row with a substantive question found in the first 50 rows.")
-            else:
-                idx, rr = real_row
-                st.markdown(f"**Inspecting row {idx}** (chosen because col F has real content):")
-                for col_idx, (col_name, val) in enumerate(zip(raw_eval.columns, rr.values)):
-                    val_str = str(val) if val is not None else ""
-                    val_len = len(val_str.strip())
-                    letter = chr(ord("A") + col_idx) if col_idx < 26 else f"col{col_idx}"
-                    snippet = val_str[:200].replace("\n", " ")
-                    st.markdown(
-                        f"- **Col {letter}** (`{col_name}`) — len={val_len}: "
-                        f"`{snippet}{'…' if val_len > 200 else ''}`"
-                    )
-                st.caption(f"Currently reading question from `{q_col_e}` and answer from `{a_col_e}`. "
-                           f"If the actual Hoppr response is in a different column above, "
-                           f"tell me the column letter and I'll point at it directly.")
-
 col_r, _ = st.columns([1, 9])
 with col_r:
     if st.button("🔄 Refresh"):
@@ -546,6 +498,57 @@ if not raw_eval.empty:
         edf["_prompt_score"] = _scores.apply(lambda d: d["score"])
         edf["_prompt_tier"]  = _scores.apply(lambda d: d["tier"])
         eval_processed = edf
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# COLUMN-MAPPING DIAGNOSTICS (after eval_processed is built)
+# ══════════════════════════════════════════════════════════════════════════════
+
+if not eval_processed.empty and "_answer" in eval_processed.columns:
+    _ans_clean = eval_processed["_answer"].astype(str).str.strip()
+    _ans_real = _ans_clean[~_ans_clean.str.lower().isin(
+        ["", "nan", "loading...", "loading"]
+    )]
+    _pct_real = len(_ans_real) / len(eval_processed) * 100 if len(eval_processed) else 0
+    _msg = (
+        f"📊 **Answer column health:** {len(_ans_real)} of {len(eval_processed)} "
+        f"rows have a real answer ({_pct_real:.0f}%). "
+        f"Reading question from `{q_col_e}`, answer from `{a_col_e}`."
+    )
+    if _pct_real < 70:
+        st.warning(_msg)
+    else:
+        st.success(_msg)
+
+    with st.expander("🔬 Browse ALL eval-sheet columns (verify column mapping)"):
+        st.caption("Picks one row with a real question, shows what every column "
+                   "contains so you can verify which column has Hoppr's answer.")
+        real_row = None
+        if not raw_eval.empty:
+            for i in range(min(50, len(raw_eval))):
+                rr = raw_eval.iloc[i]
+                qv = str(rr.iloc[5]).strip() if len(rr) > 5 else ""
+                if (len(qv) > 20
+                    and qv.lower() not in ("loading...", "loading", "nan", "")):
+                    real_row = (i, rr)
+                    break
+        if real_row is None:
+            st.info("No row with a substantive question found in the first 50 rows.")
+        else:
+            idx, rr = real_row
+            st.markdown(f"**Inspecting row {idx}** (col F has real content here):")
+            for col_idx, (col_name, val) in enumerate(zip(raw_eval.columns, rr.values)):
+                val_str = str(val) if val is not None else ""
+                val_len = len(val_str.strip())
+                letter = chr(ord("A") + col_idx) if col_idx < 26 else f"col{col_idx}"
+                snippet = val_str[:200].replace("\n", " ")
+                st.markdown(
+                    f"- **Col {letter}** (`{col_name}`) — len={val_len}: "
+                    f"`{snippet}{'…' if val_len > 200 else ''}`"
+                )
+            st.caption(f"Currently reading question from `{q_col_e}` and answer from `{a_col_e}`. "
+                       f"If the actual Hoppr response is in a different column above, "
+                       f"tell me the column letter and I'll point at it directly.")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
