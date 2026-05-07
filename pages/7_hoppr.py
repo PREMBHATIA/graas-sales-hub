@@ -755,10 +755,41 @@ with tab_ask:
     st.markdown("### 💬 Ask Hoppr")
     st.caption("Ask anything about Hoppr usage, seller health, query trends, or data quality.")
 
+    # ── Live data status (always visible) ────────────────────────────────────
+    _has_sellers = len(sellers) > 0
+    _has_eval    = not eval_processed.empty
+    _eval_rows   = len(eval_processed) if _has_eval else 0
+
+    _diag_cols = st.columns(4)
+    with _diag_cols[0]:
+        st.metric("Sellers loaded", len(sellers), help="From User_State tab")
+    with _diag_cols[1]:
+        st.metric("Q&A rows loaded", _eval_rows, help="From Evaluation_sheet tab")
+    with _diag_cols[2]:
+        _eq = "✅ question col" if q_col_e else "❌ no question col"
+        _ea = "✅ answer col" if a_col_e else "❌ no answer col"
+        st.metric("Eval columns", "OK" if q_col_e and a_col_e else "MISSING")
+    with _diag_cols[3]:
+        if _err_eval:
+            st.error(f"Eval error: {_err_eval[:80]}")
+        elif not _has_eval and not _err_eval:
+            st.warning("Eval sheet: empty or col mismatch")
+        else:
+            st.success("Eval sheet: OK")
+
+    if q_col_e or a_col_e:
+        st.caption(f"Column mapping: question=`{q_col_e}` | answer=`{a_col_e}` | "
+                   f"seller=`{sid_col_e}` | date=`{date_col_e}` | email=`{email_col_e}`")
+    elif not raw_eval.empty:
+        st.warning(f"⚠️ Evaluation_sheet loaded ({len(raw_eval)} rows) but couldn't identify "
+                   f"question/answer columns. Columns found: `{list(raw_eval.columns)}`")
+
+    st.markdown("---")
+
     if not ANTHROPIC_API_KEY:
         st.warning("Add `ANTHROPIC_API_KEY` to `.streamlit/secrets.toml` to enable Ask Hoppr.")
     else:
-        @st.cache_data(ttl=1800)
+        # ── Context builder ───────────────────────────────────────────────────
         def _build_hoppr_context(_daily, _sellers_list, _eval_df):
             lines = []
             if not _daily.empty:
@@ -771,7 +802,8 @@ with tab_ask:
                 wq, pq = int(wk["total_queries"].sum()), int(pwk["total_queries"].sum())
                 wow = f"{(wq-pq)/pq*100:+.0f}%" if pq else "N/A"
                 lines.append(f"LAST 7 DAYS: {wq} queries ({wow} WoW), "
-                             f"{int(wk['unique_sellers'].sum())} sellers, {int(wk['unique_users'].sum())} users")
+                             f"{int(wk['unique_sellers'].sum())} sellers, "
+                             f"{int(wk['unique_users'].sum())} users")
             if _sellers_list:
                 sdf = pd.DataFrame(_sellers_list)
                 lines.append(f"\nSELLERS: {len(sdf)} total | "
@@ -780,13 +812,21 @@ with tab_ask:
                              f"Sales-Ready: {len(sdf[sdf['classification'] == 'Sales-Ready'])} | "
                              f"Going Quiet: {len(sdf[sdf['trend'] == 'Going Quiet'])} | "
                              f"Churned: {len(sdf[sdf['trend'] == 'Churned'])}")
-                lines.append(f"\nALL SELLERS (seller_id | email | total_queries | queries_7d | classification | trend | days_silent | topic_summary):")
+                lines.append("\nALL SELLERS:")
                 for _, r in sdf.sort_values("q_total", ascending=False).iterrows():
-                    qs = str(r.get("q_summary", "")).strip()
-                    summary_part = f" | Topics: {qs[:150]}" if qs and qs != "nan" else ""
-                    lines.append(f"  {r['seller_id']} | {r['email']} | {r['q_total']}Q | "
-                                 f"{r['q_recent']}Q(7d) | {r['classification']} | {r['trend']} | "
-                                 f"{r['days_silent']}d{summary_part}")
+                    qs  = str(r.get("q_summary", "")).strip()
+                    act = str(r.get("action", "")).strip()
+                    aq  = str(r.get("a_summary", "")).strip()
+                    parts = [f"  {r['seller_id']} | {r['email']} | {r['q_total']}Q total | "
+                             f"{r['q_recent']}Q(7d) | {r['classification']} | "
+                             f"{r['trend']} | {r['days_silent']}d silent"]
+                    if qs and qs != "nan":
+                        parts.append(f"    What they ask: {qs[:250]}")
+                    if aq and aq != "nan":
+                        parts.append(f"    Answer quality: {aq[:200]}")
+                    if act and act != "nan":
+                        parts.append(f"    Recommended action: {act[:150]}")
+                    lines.extend(parts)
             if not _eval_df.empty and "_buckets" in _eval_df.columns:
                 all_b = [b for bl in _eval_df["_buckets"] for b in bl]
                 lines.append(f"\nQUESTION TYPES (all time):")
@@ -795,10 +835,12 @@ with tab_ask:
             if not _eval_df.empty and "_is_accuracy" in _eval_df.columns:
                 acc = int(_eval_df["_is_accuracy"].sum())
                 tot = len(_eval_df)
-                lines.append(f"\nDATA ACCURACY ISSUES: {acc} queries ({acc/tot*100:.1f}% of total)")
+                lines.append(f"\nDATA ACCURACY ISSUES: {acc} of {tot} queries "
+                             f"({acc/tot*100:.1f}%)")
                 if acc:
-                    top_acc = _eval_df[_eval_df["_is_accuracy"]]["_seller"].value_counts().head(5)
-                    lines.append("  Top sellers with accuracy queries:")
+                    top_acc = (_eval_df[_eval_df["_is_accuracy"]]
+                               ["_seller"].value_counts().head(10))
+                    lines.append("  Top sellers flagging accuracy issues:")
                     for sid, cnt in top_acc.items():
                         lines.append(f"    {sid}: {cnt}")
             return "\n".join(lines)
@@ -806,76 +848,69 @@ with tab_ask:
         ctx = _build_hoppr_context(
             daily if not daily.empty else pd.DataFrame(),
             sellers,
-            eval_processed if not eval_processed.empty else pd.DataFrame(),
+            eval_processed,
         )
+
+        eval_status = (f"✅ {_eval_rows} Q&A rows loaded from Evaluation_sheet"
+                       if _has_eval else
+                       "⚠️ Evaluation_sheet did not load — individual query/response "
+                       "data is unavailable. Seller summaries from User_State are available.")
 
         HOPPR_SYSTEM = f"""You are Ask Hoppr — an AI analyst for the Graas Sales Hub.
 
-IMPORTANT: All Hoppr data is already pre-loaded into your context below — you have full access to every seller, their query history, and Hoppr's responses. You do NOT need to access any external URLs, Google Sheets, or ask the user to paste data. When asked about any seller or account, look it up in the data you already have.
+CRITICAL: All Hoppr data is pre-loaded into this system prompt. You ALREADY have the data.
+- DO NOT say you cannot access Google Sheets or URLs — you don't need to, the data is here.
+- DO NOT ask the user to paste data — it is already in your context below.
+- If a user pastes a Google Sheets URL, tell them you already have the data and answer directly.
+- To find a seller by company name, match their email domain (e.g. "paula's choice" → paulaschoice → @paulaschoice.vn → seller AAIDF).
 
-To find a seller by company name: match against their email domain (e.g. "paulaschoice" → seller with @paulaschoice.vn email). The ALL SELLERS list below maps every seller_id to their email address.
+Data availability: {eval_status}
 
-Be concise and specific — use numbers, quote exact questions/answers, cite seller IDs and emails when relevant.
+Answer questions by referencing the data below. Be specific — use seller IDs, emails, dates, and exact query text where available.
 
-Current data snapshot:
----
+=== CURRENT DATA SNAPSHOT ===
 {ctx}
----"""
+=== END SNAPSHOT ==="""
 
         def _get_seller_detail(seller_id: str, eval_df: pd.DataFrame) -> str:
+            """Return full Q+A log for a seller."""
             if eval_df.empty or "_seller" not in eval_df.columns:
                 return ""
             rows = eval_df[eval_df["_seller"] == seller_id].sort_values("_date")
             if rows.empty:
                 return ""
-            lines = [f"\n===== FULL QUERY + RESPONSE LOG: {seller_id} ({len(rows)} queries) ====="]
-            if "_email" in rows.columns:
-                for email, grp in rows.groupby("_email", sort=False):
-                    em = str(email)
-                    if not em or em == "nan":
-                        continue
-                    lines.append(f"\n  --- USER: {em} ({len(grp)} queries) ---")
-                    for _, r in grp.sort_values("_date").iterrows():
-                        dt  = str(r["_date"])[:10]
-                        q   = str(r["_question"])
-                        a   = str(r.get("_answer", "")) if "_answer" in r.index else ""
-                        acc_flag = " [ACCURACY ISSUE]" if is_accuracy(q) else ""
-                        lines.append(f"")
-                        lines.append(f"    [{dt}]{acc_flag}")
-                        lines.append(f"    Q: {q}")
-                        if a and a.strip() and a != "nan":
-                            lines.append(f"    A: {a[:1000]}")
-                        else:
-                            lines.append(f"    A: (no response recorded)")
-            lines.append("\n===== END =====")
-            return "\n".join(lines)
+            out = [f"\n===== FULL Q&A LOG: {seller_id} ({len(rows)} queries) ====="]
+            for email, grp in rows.groupby("_email", sort=False):
+                em = str(email)
+                if not em or em == "nan":
+                    continue
+                out.append(f"\n  USER: {em} ({len(grp)} queries)")
+                for _, r in grp.sort_values("_date").iterrows():
+                    dt  = str(r["_date"])[:10]
+                    q   = str(r["_question"])
+                    a   = str(r.get("_answer", "")) if "_answer" in r.index else ""
+                    acc = " [DATA ACCURACY ISSUE]" if is_accuracy(q) else ""
+                    out.append(f"\n    [{dt}]{acc}")
+                    out.append(f"    Q: {q}")
+                    out.append(f"    A: {a[:1200] if a and a.strip() and a != 'nan' else '(no response recorded)'}")
+            out.append("\n===== END =====")
+            return "\n".join(out)
 
         def _detect_sellers(text: str) -> list:
+            """Find seller IDs mentioned in text by ID or company name / email domain."""
             text_upper = text.upper()
-            # Normalise: strip punctuation/spaces for fuzzy domain matching
             text_norm  = re.sub(r"[^a-z0-9]", "", text.lower())
             found = set()
             for s in sellers:
                 sid = s["seller_id"]
-                # 1. Direct seller_id match (e.g. "AAIDF")
                 if len(sid) >= 3 and sid in text_upper:
-                    found.add(sid)
-                    continue
-                # 2. Email domain match (e.g. "paula's choice" → "paulaschoice" → @paulaschoice.vn)
-                email = s.get("email", "")
-                if email and "@" in email:
-                    domain_part = re.sub(r"[^a-z0-9]", "",
-                                         email.split("@")[1].split(".")[0].lower())
-                    if len(domain_part) >= 4 and domain_part in text_norm:
-                        found.add(sid)
-                        continue
-                # 3. All emails for this seller (catches other users at same domain)
-                for em in s.get("all_emails", []):
+                    found.add(sid); continue
+                for em in [s.get("email", "")] + s.get("all_emails", []):
                     if em and "@" in em:
-                        dp = re.sub(r"[^a-z0-9]", "", em.split("@")[1].split(".")[0].lower())
+                        dp = re.sub(r"[^a-z0-9]", "",
+                                    em.split("@")[1].split(".")[0].lower())
                         if len(dp) >= 4 and dp in text_norm:
-                            found.add(sid)
-                            break
+                            found.add(sid); break
             return list(found)
 
         if "hoppr_chat" not in st.session_state:
@@ -884,18 +919,15 @@ Current data snapshot:
         # Example prompts
         st.markdown("**Try asking:**")
         hcols = st.columns(4)
-        hoppr_examples = [
+        for i, ep in enumerate([
+            "Show all queries for AAIDF (Paula's Choice)",
             "Which sellers are going quiet this week?",
-            "What are sellers asking about most?",
-            "How many data accuracy issues this month?",
+            "What are the top question types?",
             "Who are the top 5 sellers by query volume?",
-        ]
-        for i, ep in enumerate(hoppr_examples):
+        ]):
             with hcols[i]:
                 if st.button(ep, key=f"hq_{i}", use_container_width=True):
                     st.session_state["hoppr_prefill"] = ep
-
-        st.markdown("")
 
         for msg in st.session_state.hoppr_chat:
             with st.chat_message(msg["role"]):
@@ -915,10 +947,35 @@ Current data snapshot:
                         import anthropic as _anthropic
                         mentioned = _detect_sellers(user_q)
                         extra = ""
-                        if mentioned and not eval_processed.empty:
+                        if mentioned:
                             for sid in mentioned[:3]:
-                                extra += _get_seller_detail(sid, eval_processed)
-                        system = HOPPR_SYSTEM + (f"\n\nFULL QUERY DATA FOR MENTIONED SELLERS:\n{extra}" if extra else "")
+                                detail = _get_seller_detail(sid, eval_processed)
+                                if detail:
+                                    extra += detail
+                                else:
+                                    # eval not loaded — inject full seller info from User_State
+                                    s_info = next((s for s in sellers
+                                                   if s["seller_id"] == sid), None)
+                                    if s_info:
+                                        extra += (
+                                            f"\n===== SELLER INFO: {sid} =====\n"
+                                            f"Email: {s_info.get('email','')}\n"
+                                            f"All users: {s_info.get('all_emails', [])}\n"
+                                            f"Total queries: {s_info.get('q_total',0)}\n"
+                                            f"Recent (7d): {s_info.get('q_recent',0)}\n"
+                                            f"Classification: {s_info.get('classification','')}\n"
+                                            f"Trend: {s_info.get('trend','')}\n"
+                                            f"Last active: {s_info.get('last_active','')}\n"
+                                            f"What they ask: {s_info.get('q_summary','')}\n"
+                                            f"Answer quality: {s_info.get('a_summary','')}\n"
+                                            f"Recommended action: {s_info.get('action','')}\n"
+                                            f"NOTE: Individual Q&A rows not available "
+                                            f"(Evaluation_sheet failed to load).\n"
+                                            f"===== END =====\n"
+                                        )
+                        system = HOPPR_SYSTEM
+                        if extra:
+                            system += f"\n\n=== DETAILED DATA FOR MENTIONED SELLERS ===\n{extra}"
                         ai = _anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
                         result = ai.messages.create(
                             model="claude-sonnet-4-20250514",
@@ -929,11 +986,11 @@ Current data snapshot:
                         )
                         response = result.content[0].text
                     except Exception as e:
-                        response = f"Error: {e}"
+                        response = f"Error calling AI: {e}"
                 st.markdown(response)
                 st.session_state.hoppr_chat.append({"role": "assistant", "content": response})
 
         if st.session_state.hoppr_chat:
-            if st.button("Clear chat", key="clear_hoppr_chat"):
+            if st.button("🗑️ Clear chat", key="clear_hoppr_chat"):
                 st.session_state.hoppr_chat = []
                 st.rerun()
