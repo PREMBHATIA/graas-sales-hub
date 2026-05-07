@@ -509,11 +509,18 @@ if not eval_processed.empty and "_answer" in eval_processed.columns:
     _ans_real = _ans_clean[~_ans_clean.str.lower().isin(
         ["", "nan", "loading...", "loading"]
     )]
-    _pct_real = len(_ans_real) / len(eval_processed) * 100 if len(eval_processed) else 0
+    _real_count = len(_ans_real)
+    _missing_count = len(eval_processed) - _real_count
+    _pct_real = _real_count / len(eval_processed) * 100 if len(eval_processed) else 0
+    _q_loading = st.session_state.get("_loading_rows_filtered", 0)
+
     _msg = (
-        f"📊 **Answer column health:** {len(_ans_real)} of {len(eval_processed)} "
-        f"rows have a real answer ({_pct_real:.0f}%). "
-        f"Reading question from `{q_col_e}`, answer from `{a_col_e}`."
+        f"📊 **Hoppr logging health:** "
+        f"{_real_count} of {len(eval_processed) + _q_loading} total rows have BOTH "
+        f"question + answer captured ({_pct_real:.0f}% complete). "
+        f"**{_missing_count}** rows have a question but `Loading…` in the answer column · "
+        f"**{_q_loading}** rows had `Loading…` in the question column too. "
+        f"Reading from `{q_col_e}` / `{a_col_e}`."
     )
     if _pct_real < 70:
         st.warning(_msg)
@@ -1159,70 +1166,62 @@ with tab_accounts:
                            "comparison (vs/growth). Pure follow-ups and very short prompts are capped.")
 
             st.markdown("#### 📋 Query Timeline")
-            # Filter out rows where question or answer is just "Loading..." (Hoppr log noise)
             timeline_all = acct_f.sort_values("_date", ascending=False)
-            loading_mask = (
-                timeline_all["_question"].str.strip().str.lower().isin(["loading...", "loading", ""])
-                | timeline_all["_question"].isna()
-            )
-            timeline_loading = timeline_all[loading_mask]
-            timeline = timeline_all[~loading_mask].head(100)
-            if not timeline_loading.empty:
-                st.caption(f"ℹ️ {len(timeline_loading)} incomplete entries hidden (answer still loading when logged)")
+
+            # Split rows into 3 buckets:
+            #   answered      — both Q and A captured (the useful ones)
+            #   no_answer     — Q captured but Hoppr never logged an answer
+            #   no_question   — Q itself was Loading... (shouldn't happen post-filter, but safe)
+            _q = timeline_all["_question"].astype(str).str.strip().str.lower()
+            _a = timeline_all["_answer"].astype(str).str.strip().str.lower()
+            _empty = ["loading...", "loading", "", "nan"]
+            no_question_mask = _q.isin(_empty)
+            no_answer_mask   = (~no_question_mask) & _a.isin(_empty)
+            answered_mask    = (~no_question_mask) & (~no_answer_mask)
+
+            no_answer_rows = timeline_all[no_answer_mask]
+            timeline       = timeline_all[answered_mask].head(100)
+
+            # Single clean banner instead of per-row warnings
+            if len(no_answer_rows) > 0:
+                pct = len(no_answer_rows) / max(1, len(timeline_all)) * 100
+                st.warning(
+                    f"⚠️ **Hoppr logging issue:** {len(no_answer_rows)} of "
+                    f"{len(timeline_all)} queries ({pct:.0f}%) have a question "
+                    f"but no captured answer. The questions show in analytics; "
+                    f"the answers are missing from the sheet (Hoppr team to fix)."
+                )
+                with st.expander(f"Show the {len(no_answer_rows)} questions with no captured answer"):
+                    for _, qrow in no_answer_rows.head(50).iterrows():
+                        dt = str(qrow["_date"])[:10]
+                        em = str(qrow["_email"]).split("@")[0]
+                        st.caption(f"• {dt} — {em} — {str(qrow['_question'])[:200]}")
+
             for _, qrow in timeline.iterrows():
                 dt       = str(qrow["_date"])[:10]
                 em       = str(qrow["_email"])
                 question = str(qrow["_question"])
                 answer   = str(qrow["_answer"])
-                # Detect answer quality
-                is_loading_ans = answer.strip().lower() in ("loading...", "loading", "", "nan")
                 has_data = any(c in answer for c in ["📊", "|", "%", "table", "##"])
                 failed   = any(w in answer.lower() for w in
                                ["unable", "don't have", "not available", "cannot provide", "no data"])
                 acc_flag = "🔴 " if is_accuracy(question) else ""
-                if is_loading_ans:
-                    status = "⏳"
-                elif failed:
-                    status = "⚠️"
-                elif has_data:
-                    status = "✅"
-                else:
-                    status = "➡️"
+                if failed:    status = "⚠️"
+                elif has_data: status = "✅"
+                else:          status = "➡️"
                 em_short = em.split("@")[0] if "@" in em else em
-                # Show first 120 chars of question in expander header
                 q_short = question[:120] + ("…" if len(question) > 120 else "")
                 with st.expander(f"{acc_flag}{status} {dt} — **{em_short}** — {q_short}"):
                     st.markdown(f"**Q:** {question}")
                     st.markdown("**A:**")
-                    if is_loading_ans:
-                        # Diagnostic — show what's actually in the cell
-                        raw_repr = repr(answer)[:120]
-                        why = (
-                            "still loading when logged"      if answer.strip().lower() in ("loading...", "loading")
-                            else "cell is empty"             if answer.strip() == ""
-                            else "cell is NaN / null"        if answer.strip().lower() == "nan"
-                            else "no usable content"
-                        )
-                        st.warning(
-                            f"⚠️ Answer column `{a_col_e or '?'}` for this row: **{why}**.\n\n"
-                            f"Raw value: `{raw_repr}`\n\n"
-                            f"If you expected an answer here, try the 🔄 Refresh button at "
-                            f"the top — the sheet is cached for 30 mins, so very recent "
-                            f"queries may not show their answer yet."
-                        )
+                    if len(answer) > 800:
+                        st.markdown(answer[:800] + "…")
+                        with st.expander("Show full answer"):
+                            st.markdown(answer)
                     else:
-                        # Show up to 800 chars; offer expander for full text
-                        ans_display = answer if answer and answer != "nan" else ""
-                        if not ans_display:
-                            st.caption("No answer recorded in this row.")
-                        elif len(ans_display) > 800:
-                            st.markdown(ans_display[:800] + "…")
-                            with st.expander("Show full answer"):
-                                st.markdown(ans_display)
-                        else:
-                            st.markdown(ans_display)
-            if len(timeline) == 100 and len(timeline_all[~loading_mask]) > 100:
-                st.caption(f"Showing most recent 100 of {len(timeline_all[~loading_mask])} queries.")
+                        st.markdown(answer)
+            if len(timeline) == 100 and answered_mask.sum() > 100:
+                st.caption(f"Showing most recent 100 of {int(answered_mask.sum())} answered queries.")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
