@@ -227,16 +227,38 @@ ACCURACY_KEYWORDS = [
 ]
 
 QUESTION_BUCKETS = {
-    "Revenue / Sales":  ["revenue", "gmv", "sales", "selling", "growth", "income", "orders"],
-    "Ads / ROAS":       ["roas", "campaign", "paid", "advertisement", "spend", " ad ", " ads "],
-    "Traffic":          ["traffic", "visitor", "visit", "session", "pageview", "click"],
-    "Product / SKU":    ["sku", "product", "listing", "catalogue", "catalog", "item"],
-    "Affiliates":       ["affiliate", "creator", "commission", "partner", "influencer"],
-    "Root Cause":       ["decline", "drop", "reason", "root cause", "why", "fell", "decreased"],
-    "Comparison / KPI": ["kpi", "compare", "comparison", " vs ", "versus", "benchmark"],
-    "Optimisation":     ["optimis", "optimiz", "recommend", "should i", "how to", "improve"],
-    "YoY / Trends":     ["year on year", "yoy", "last year", "month on month", "trend"],
-    "Market / Geo":     ["country", "market", "malaysia", "philippines", "thailand", "indonesia", "india"],
+    # ── 4 meta-categories the team tracks ─────────────────────────────────────
+    "Revenue & GMV/NMV": [
+        "gmv", "nmv", "revenue", "sales", "orders", "gross merchandise",
+        "net merchandise", "nett merchandise", "gross revenue", "net revenue",
+        "gross sales", "net sales", "aov", "average order value", "conversion",
+        "checkout", "purchase", "transaction", "top line", "topline",
+        "income", "earning", "profit", "margin", "growth", "selling",
+        "total sales", "total revenue", "monthly sales", "daily sales",
+        "weekly sales", "sale performance", "sales performance",
+    ],
+    "Ads, Traffic & ROAS": [
+        "roas", "return on ad", "campaign", "paid", "advertisement",
+        " ad ", " ads ", "cpc", "cpa", "ctr", "click-through",
+        "traffic", "visitor", "visit", "session", "pageview", "page view",
+        "impression", "reach", "ad spend", "budget", "marketing spend",
+        "facebook ads", "google ads", "tiktok ads", "meta ads", "shopee ads",
+        "lazada ads", "sponsored", "search ads", "display ads",
+    ],
+    "SKU & Products": [
+        "sku", "product", "listing", "catalogue", "catalog", "item",
+        "variant", "inventory", "stock", "category", "brand",
+        "bestseller", "best seller", "best selling", "top product",
+        "top selling", "top sku", "hero product", "slow moving",
+        "new product", "out of stock",
+    ],
+    "Downloads & Exports": [
+        "download", "export", "excel", "csv", "spreadsheet", "sheet",
+        "file", "data export", "extract", "pull data", "get data",
+        "raw data", "data download", "generate report", "download report",
+        "export data", "download data",
+    ],
+    # ── Additional signal ──────────────────────────────────────────────────────
     "Data Accuracy":    ACCURACY_KEYWORDS,
 }
 
@@ -727,24 +749,48 @@ with tab_accounts:
                     st.markdown(us.get("reason", "—")[:2000])
 
             st.markdown("#### 📋 Query Timeline")
-            timeline = acct_f.sort_values("_date", ascending=False).head(100)
+            # Filter out rows where question or answer is just "Loading..." (Hoppr log noise)
+            timeline_all = acct_f.sort_values("_date", ascending=False)
+            loading_mask = (
+                timeline_all["_question"].str.strip().str.lower().isin(["loading...", "loading", ""])
+                | timeline_all["_question"].isna()
+            )
+            timeline_loading = timeline_all[loading_mask]
+            timeline = timeline_all[~loading_mask].head(100)
+            if not timeline_loading.empty:
+                st.caption(f"ℹ️ {len(timeline_loading)} incomplete entries hidden (answer still loading when logged)")
             for _, qrow in timeline.iterrows():
                 dt       = str(qrow["_date"])[:10]
                 em       = str(qrow["_email"])
-                question = str(qrow["_question"])[:200]
+                question = str(qrow["_question"])
                 answer   = str(qrow["_answer"])
-                has_data = any(c in answer for c in ["📊", "|", "%", "table"])
+                # Detect answer quality
+                is_loading_ans = answer.strip().lower() in ("loading...", "loading", "", "nan")
+                has_data = any(c in answer for c in ["📊", "|", "%", "table", "##"])
                 failed   = any(w in answer.lower() for w in
                                ["unable", "don't have", "not available", "cannot provide", "no data"])
                 acc_flag = "🔴 " if is_accuracy(question) else ""
-                status   = "⚠️" if failed else ("✅" if has_data else "➡️")
+                if is_loading_ans:
+                    status = "⏳"
+                elif failed:
+                    status = "⚠️"
+                elif has_data:
+                    status = "✅"
+                else:
+                    status = "➡️"
                 em_short = em.split("@")[0] if "@" in em else em
-                with st.expander(f"{acc_flag}{status} {dt} — **{em_short}** — {question}"):
+                # Show first 120 chars of question in expander header
+                q_short = question[:120] + ("…" if len(question) > 120 else "")
+                with st.expander(f"{acc_flag}{status} {dt} — **{em_short}** — {q_short}"):
                     st.markdown(f"**Q:** {question}")
                     st.markdown("**A:**")
-                    st.markdown(answer[:800] if answer else "No answer recorded")
-            if len(acct_f) > 100:
-                st.caption(f"Showing most recent 100 of {len(acct_f)} queries.")
+                    if is_loading_ans:
+                        st.caption("Answer not captured (Hoppr was still loading when this was logged)")
+                    else:
+                        # Show full answer — no truncation
+                        st.markdown(answer if answer and answer != "nan" else "No answer recorded")
+            if len(timeline) == 100 and len(timeline_all[~loading_mask]) > 100:
+                st.caption(f"Showing most recent 100 of {len(timeline_all[~loading_mask])} queries.")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
