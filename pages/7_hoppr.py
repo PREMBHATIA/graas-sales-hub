@@ -176,7 +176,7 @@ raw_user_state, _err_user_state = load_user_state()
 raw_funnel,     _err_funnel     = load_funnel()
 
 # ── Data status ───────────────────────────────────────────────────────────────
-with st.expander("🔍 Data Status", expanded=False):
+with st.expander("🔍 Data Status (click to hide)", expanded=True):
     def _status(label, df, err, extra=""):
         if err:
             st.error(f"❌ **{label}**: {err}")
@@ -260,26 +260,59 @@ if not raw_eval.empty:
     edf = raw_eval.copy()
     ecols = [str(c).strip() for c in edf.columns]
     edf.columns = ecols
-    # Flexible column matching — handles DATE, Date, Query Date, Timestamp, etc.
-    sid_col_e   = (next((c for c in ecols if "seller" in c.lower() and "id" in c.lower()), None)
-                   or next((c for c in ecols if c.lower() in ("seller", "seller_id", "account")), None))
-    email_col_e = next((c for c in ecols if "email" in c.lower()), None)
-    date_col_e  = (next((c for c in ecols if c.strip().lower() == "date"), None)
-                   or next((c for c in ecols if "date" in c.lower() or "time" in c.lower()), None))
-    q_col_e     = (next((c for c in ecols if "question" in c.lower()), None)
-                   or next((c for c in ecols if "query" in c.lower() and "count" not in c.lower()), None)
-                   or next((c for c in ecols if "user_input" in c.lower() or "input" in c.lower()), None))
-    a_col_e     = (next((c for c in ecols if "answer" in c.lower()), None)
-                   or next((c for c in ecols if "response" in c.lower() or "reply" in c.lower()), None)
-                   or next((c for c in ecols if "output" in c.lower()), None))
 
-    # Show detected columns in data status expander (already rendered above — append to session)
-    if "eval_col_debug" not in st.session_state:
-        st.session_state["eval_col_debug"] = (
-            f"Eval cols detected → seller={sid_col_e}, email={email_col_e}, "
-            f"date={date_col_e}, question={q_col_e}, answer={a_col_e} | "
-            f"All cols: {ecols[:15]}"
-        )
+    # ── Named column detection (broad) ────────────────────────────────────────
+    sid_col_e = (
+        next((c for c in ecols if "seller" in c.lower() and "id" in c.lower()), None)
+        or next((c for c in ecols if c.lower() in ("seller", "seller_id", "account")), None)
+    )
+    email_col_e = next((c for c in ecols if "email" in c.lower()), None)
+    date_col_e = (
+        next((c for c in ecols if c.strip().lower() == "date"), None)
+        or next((c for c in ecols if "date" in c.lower() or "timestamp" in c.lower()), None)
+    )
+    q_col_e = (
+        next((c for c in ecols if "question" in c.lower()), None)
+        or next((c for c in ecols if "query" in c.lower() and "count" not in c.lower()), None)
+        or next((c for c in ecols if "user_input" in c.lower() or "user_message" in c.lower()), None)
+        or next((c for c in ecols if c.lower() in ("input", "message", "prompt")), None)
+    )
+    a_col_e = (
+        next((c for c in ecols if "answer" in c.lower()), None)
+        or next((c for c in ecols if "response" in c.lower() or "reply" in c.lower()), None)
+        or next((c for c in ecols if "output" in c.lower() or "bot_message" in c.lower()), None)
+        or next((c for c in ecols if "ai" in c.lower() and "response" not in c.lower()
+                 and c.lower() not in ("ai",)), None)
+    )
+
+    # ── Positional / content fallback — if named detection failed ─────────────
+    # Structure from sheet: seller_id | email | date | session_id | turn | QUERY | RESPONSE
+    # Skip known cols; the 2nd-to-last long-text col = query, last col = response
+    if q_col_e is None or a_col_e is None:
+        known = {c for c in [sid_col_e, email_col_e, date_col_e] if c}
+        # Identify string cols with non-trivial length (exclude IDs / short fields)
+        str_cols = []
+        for c in ecols:
+            if c in known:
+                continue
+            try:
+                avg_len = edf[c].astype(str).str.len().mean()
+                if avg_len > 10:  # skip short codes / numbers
+                    str_cols.append((c, avg_len))
+            except Exception:
+                pass
+        str_cols.sort(key=lambda x: x[1])  # ascending avg length
+        if len(str_cols) >= 2 and q_col_e is None:
+            q_col_e = str_cols[-2][0]   # second-longest = query
+        if len(str_cols) >= 1 and a_col_e is None:
+            a_col_e = str_cols[-1][0]   # longest = response
+
+    # ── Always store debug info ───────────────────────────────────────────────
+    st.session_state["eval_col_debug"] = (
+        f"seller={sid_col_e} | email={email_col_e} | date={date_col_e} | "
+        f"question={q_col_e} | answer={a_col_e} | "
+        f"all_cols={ecols}"
+    )
 
     if sid_col_e and date_col_e and q_col_e:
         edf["_date"]     = pd.to_datetime(edf[date_col_e], errors="coerce")
