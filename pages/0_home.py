@@ -38,11 +38,15 @@ st.markdown('<p class="sub-header">Pipeline, All-e & Hoppr — shared team view<
 
 st.markdown('<p class="section-label">Cross-Product</p>', unsafe_allow_html=True)
 
-col1, _ = st.columns([1, 3])
-with col1:
+xc1, xc2, _ = st.columns([1, 1, 2])
+with xc1:
     st.markdown("### 📋 Pipeline")
     st.markdown("Meetings & proposals — All-e + Hoppr")
     st.page_link("pages/1_pipeline.py", label="Open Pipeline →")
+with xc2:
+    st.markdown("### 💬 Ask Graas")
+    st.markdown("Cross-product Q&A — All-e, Extract, MOR, Hoppr")
+    st.page_link("pages/4_ask_graas.py", label="Ask Graas →")
 
 st.markdown("---")
 
@@ -50,7 +54,7 @@ st.markdown("---")
 
 st.markdown('<p class="section-label">All-e</p>', unsafe_allow_html=True)
 
-c1, c2, c3, c4, c5 = st.columns(5)
+c1, c2, c3, c4 = st.columns(4)
 
 with c1:
     st.markdown("### 🤖 All-e")
@@ -71,11 +75,6 @@ with c4:
     st.markdown("### 📝 Proposal")
     st.markdown("Build a customer proposal")
     st.page_link("pages/6_proposal.py", label="Open Proposal →")
-
-with c5:
-    st.markdown("### 💬 Ask All-e")
-    st.markdown("Pipeline & solutions architect")
-    st.page_link("pages/4_ask_graas.py", label="Ask All-e →")
 
 st.markdown("---")
 

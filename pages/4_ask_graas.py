@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 _env_path = str(Path(__file__).resolve().parent.parent / ".env")
 load_dotenv(_env_path, override=True)
 
-st.set_page_config(page_title="Ask All-e | Sales Hub", page_icon="💬", layout="wide")
+st.set_page_config(page_title="Ask Graas | Sales Hub", page_icon="💬", layout="wide")
 
 # Style citations in dark blue
 st.markdown("""<style>
@@ -32,7 +32,8 @@ def _style_citations(text: str) -> str:
     )
 
 
-st.markdown("## 💬 Ask All-e")
+st.markdown("## 💬 Ask Graas")
+st.caption("Cross-product Q&A across All-e, Extract, MOR, and Hoppr — pulls from the full Revenue Call Sheet.")
 
 # ── Check API Key ────────────────────────────────────────────────────────────
 
