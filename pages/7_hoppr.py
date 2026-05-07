@@ -945,20 +945,46 @@ with tab_accounts:
 
         dd_col1, dd_col2 = st.columns([3, 1])
         with dd_col1:
-            if not eval_processed.empty:
-                sq = eval_processed["_seller"].value_counts().to_dict()
-                dd_opts = [f"{sid} ({sq[sid]}Q)" for sid in sorted(sq, key=lambda x: -sq[x])]
-            else:
-                dd_opts = [f"{s['seller_id']} ({s['q_total']}Q)"
-                           for s in sorted(sellers, key=lambda x: -x.get("q_total", 0))]
+            # Build options from ALL sellers (not just those with eval rows).
+            # Sellers whose only queries were "Loading..." get filtered from
+            # eval_processed, so they would otherwise vanish from the picker.
+            sq = (eval_processed["_seller"].value_counts().to_dict()
+                  if not eval_processed.empty else {})
+            dd_opts = []
+            for s in sorted(sellers,
+                            key=lambda x: -(sq.get(x["seller_id"], 0)
+                                            or x.get("q_total", 0))):
+                sid = s["seller_id"]
+                eval_q = sq.get(sid, 0)
+                total_q = s.get("q_total", 0)
+                if eval_q > 0:
+                    dd_opts.append(f"{sid} ({eval_q}Q)")
+                elif total_q > 0:
+                    dd_opts.append(f"{sid} ({total_q}Q · no logs)")
+                else:
+                    dd_opts.append(f"{sid} (—)")
+            if not dd_opts and not eval_processed.empty:
+                # Fallback if sellers list was empty
+                dd_opts = [f"{sid} ({sq[sid]}Q)"
+                           for sid in sorted(sq, key=lambda x: -sq[x])]
             sel_dd = st.selectbox("Select account", dd_opts, key="dd_seller")
         with dd_col2:
             dd_period = st.radio("Usage period", ["1W", "1M", "3M", "All"], index=2,
                                  horizontal=False, key="dd_period")
 
-        if sel_dd and not eval_processed.empty:
+        if sel_dd:
             sel_sid  = sel_dd.split(" (")[0]
-            acct_rows = eval_processed[eval_processed["_seller"] == sel_sid].copy()
+            acct_rows = (eval_processed[eval_processed["_seller"] == sel_sid].copy()
+                         if not eval_processed.empty
+                         else pd.DataFrame())
+            if acct_rows.empty:
+                st.info(
+                    f"⚠️ No Q&A logs found for **{sel_sid}** in the Evaluation_sheet. "
+                    f"This seller exists in User_State (so they have an account record) "
+                    f"but every logged query was either 'Loading…' or empty — meaning "
+                    f"Hoppr never captured a completed response for them. "
+                    f"Showing User_State summary below."
+                )
             us = {}
             if not raw_user_state.empty:
                 for i in range(len(raw_user_state)):
@@ -970,14 +996,28 @@ with tab_accounts:
                               "reason":  v[9] if len(v) > 9 else ""}
                         break
 
-            emails    = [e for e in acct_rows["_email"].unique() if e and e != "nan"]
-            all_dates = sorted(acct_rows["_date"].dropna().unique())
+            # Safe access — acct_rows may be empty or column-less
+            if acct_rows.empty or "_email" not in acct_rows.columns:
+                emails = []
+                all_dates = []
+            else:
+                emails    = [e for e in acct_rows["_email"].unique() if e and e != "nan"]
+                all_dates = sorted(acct_rows["_date"].dropna().unique())
             first_date = str(all_dates[0])[:10]  if all_dates else "—"
             last_date  = str(all_dates[-1])[:10] if all_dates else "—"
 
+            # Fallback to User_State values when no eval rows
+            sel_seller_meta = next((s for s in sellers if s["seller_id"] == sel_sid), {})
+            display_total = (len(acct_rows) if not acct_rows.empty
+                             else sel_seller_meta.get("q_total", 0))
+            display_users = (len(emails) if emails
+                             else sel_seller_meta.get("user_count", 1))
+            if last_date == "—" and sel_seller_meta.get("last_active"):
+                last_date = sel_seller_meta["last_active"]
+
             kk1, kk2, kk3, kk4, kk5 = st.columns(5)
-            with kk1: st.metric("Total Queries", len(acct_rows))
-            with kk2: st.metric("Users", len(emails))
+            with kk1: st.metric("Total Queries", display_total)
+            with kk2: st.metric("Users", display_users)
             with kk3: st.metric("First Active", first_date)
             with kk4: st.metric("Last Active", last_date)
             with kk5: st.metric("Classification", us.get("bucket", "—") or "—")
