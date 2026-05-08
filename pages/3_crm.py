@@ -1335,8 +1335,7 @@ with tab_compose:
                     st.markdown(
                         f"**Will send to:** `{effective_to_email}`{test_badge}  \n"
                         f"**From:** Graas Insights `<insights@graas.ai>`  \n"
-                        f"**Reply-To:** {sender_display_name} `<{sender_reply_to}>`  \n"
-                        f"**Personalized for:** {send_target['person_name']} at {send_target['company']}"
+                        f"**Reply-To:** {sender_display_name} `<{sender_reply_to}>`"
                     )
                 with cols[1]:
                     send_disabled = (left <= 0) or (test_mode and not test_email) or no_touch_block
