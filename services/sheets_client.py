@@ -33,6 +33,13 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive.readonly",
 ]
 
+# Writer scopes — used only by the email log (append-only). Kept separate from
+# the read-only client so existing read paths are unaffected.
+WRITER_SCOPES = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive",
+]
+
 
 def _get_client() -> Optional[gspread.Client]:
     """Get authenticated gspread client. Returns None if no credentials."""
@@ -71,6 +78,77 @@ def _get_credentials() -> Optional[Credentials]:
     if not full_path.exists():
         return None
     return Credentials.from_service_account_file(str(full_path), scopes=SCOPES)
+
+
+def _get_writer_client() -> Optional[gspread.Client]:
+    """Get gspread client with read+write scopes. Used only by email log."""
+    try:
+        import streamlit as st
+        if hasattr(st, 'secrets') and 'gcp_service_account' in st.secrets:
+            creds = Credentials.from_service_account_info(
+                dict(st.secrets["gcp_service_account"]), scopes=WRITER_SCOPES
+            )
+            return gspread.authorize(creds)
+    except Exception:
+        pass
+
+    creds_path = os.getenv("GOOGLE_CREDENTIALS_PATH", "credentials/service_account.json")
+    full_path = Path(__file__).parent.parent / creds_path
+    if not full_path.exists():
+        return None
+    creds = Credentials.from_service_account_file(str(full_path), scopes=WRITER_SCOPES)
+    return gspread.authorize(creds)
+
+
+def append_log_row(sheet_id: str, tab_name: str, row: list, headers: Optional[list] = None) -> bool:
+    """Append a single row to a sheet tab. Creates the tab + headers if missing.
+
+    Returns True on success, False on failure (caller decides how to react).
+    """
+    client = _get_writer_client()
+    if client is None:
+        return False
+    try:
+        spreadsheet = client.open_by_key(sheet_id)
+    except Exception:
+        return False
+    try:
+        worksheet = spreadsheet.worksheet(tab_name)
+    except Exception:
+        # Tab doesn't exist — create it with headers
+        try:
+            worksheet = spreadsheet.add_worksheet(title=tab_name, rows=1000, cols=max(len(row), 20))
+            if headers:
+                worksheet.append_row(headers, value_input_option="USER_ENTERED")
+        except Exception:
+            return False
+    try:
+        # If sheet is empty and headers provided, write headers first
+        if headers:
+            existing = worksheet.row_values(1)
+            if not existing:
+                worksheet.append_row(headers, value_input_option="USER_ENTERED")
+        worksheet.append_row(row, value_input_option="USER_ENTERED")
+        return True
+    except Exception:
+        return False
+
+
+def fetch_log_rows(sheet_id: str, tab_name: str) -> pd.DataFrame:
+    """Read all rows from a log sheet (no caching — always fresh for cap counting)."""
+    client = _get_writer_client()
+    if client is None:
+        return pd.DataFrame()
+    try:
+        spreadsheet = client.open_by_key(sheet_id)
+        worksheet = spreadsheet.worksheet(tab_name)
+        data = worksheet.get_all_values()
+        if not data or len(data) < 2:
+            return pd.DataFrame()
+        headers = data[0]
+        return pd.DataFrame(data[1:], columns=headers)
+    except Exception:
+        return pd.DataFrame()
 
 
 def fetch_google_doc_text(doc_id: str, force_refresh: bool = False) -> str:

@@ -517,10 +517,11 @@ contacts['recency_key'] = contacts['days_silent'].apply(_recency_key)
 
 # ══════════════════════════════════════════════════════════════════════════════
 
-tab_contacts, tab_segments, tab_compose = st.tabs([
+tab_contacts, tab_segments, tab_compose, tab_analytics = st.tabs([
     "👥 Contacts",
     "🎯 Segments",
     "✉️ Email Composer",
+    "📊 Analytics",
 ])
 
 
@@ -893,96 +894,6 @@ with tab_segments:
             'recency': 'Recency', 'last_contact': 'Last Contact',
         }), use_container_width=True, hide_index=True, height=400)
 
-    st.markdown("---")
-
-    # ── Active / Dropped status breakdown (kept for reference) ────────────────
-    col_l, col_r = st.columns(2)
-    with col_l:
-        st.markdown("#### Active Leads by Status")
-        active_all = emailable[emailable['segment'] == 'Active']
-        status_counts = active_all.groupby('lead_status')['company'].nunique()
-
-        status_labels = {
-            '1-Pilot': ('🟢', 'Pilot'),
-            '2-POC': ('🔵', 'POC'),
-            '3-Proposal sent': ('🟡', 'Proposal Sent'),
-            '4-TOF': ('⚪', 'Top of Funnel'),
-        }
-        for status_key, (icon, label) in status_labels.items():
-            count = status_counts.get(status_key, 0)
-            contacts_in = len(active_all[active_all['lead_status'] == status_key])
-            st.markdown(f"{icon} **{label}** — {count} companies, {contacts_in} contacts")
-
-        st.markdown(f"**Total active:** {active_all['company'].nunique()} companies, {len(active_all)} contacts")
-
-    with col_r:
-        st.markdown("#### Dropped Leads by Owner")
-        dropped_all = emailable[emailable['segment'] == 'Dropped']
-
-        owner_counts = dropped_all.groupby('outreach_owner')['company'].nunique()
-        for owner, count in owner_counts.items():
-            if owner and owner not in ('', 'nan', 'Not needed'):
-                contacts_in = len(dropped_all[dropped_all['outreach_owner'] == owner])
-                st.markdown(f"👤 **Owner: {owner}** — {count} companies, {contacts_in} contacts")
-
-        not_needed = len(dropped_all[dropped_all['outreach_owner'].isin(['Not needed', ''])])
-        st.markdown(f"⏸️ **Not needed / Unassigned** — {not_needed} contacts")
-        st.markdown(f"**Total dropped (with email):** {dropped_all['company'].nunique()} companies, {len(dropped_all)} contacts")
-
-    st.markdown("---")
-
-    # ── By Vertical ───────────────────────────────────────────────────────────
-    col_v, col_g = st.columns(2)
-
-    with col_v:
-        st.markdown("#### By Vertical")
-        vert_df = emailable.groupby(['vertical', 'segment'])['company'].nunique().reset_index()
-        vert_df.columns = ['Vertical', 'Segment', 'Companies']
-        vert_df = vert_df[vert_df['Vertical'] != '']
-        if not vert_df.empty:
-            fig_v = px.bar(vert_df.sort_values('Companies', ascending=True),
-                           x='Companies', y='Vertical', color='Segment',
-                           orientation='h', color_discrete_map={'Active': '#4F46E5', 'Dropped': '#6B7280'})
-            fig_v.update_layout(height=400, template="plotly_dark",
-                                margin=dict(l=20, r=20, t=20, b=20), legend=dict(orientation='h', y=-0.15))
-            st.plotly_chart(fig_v, use_container_width=True)
-
-    with col_g:
-        st.markdown("#### By Entity Type")
-        geo_df = emailable.groupby(['entity_type', 'segment'])['company'].nunique().reset_index()
-        geo_df.columns = ['Entity', 'Segment', 'Companies']
-        geo_df = geo_df[geo_df['Entity'] != '']
-        if not geo_df.empty:
-            fig_g = px.bar(geo_df.sort_values('Companies', ascending=True),
-                           x='Companies', y='Entity', color='Segment',
-                           orientation='h', color_discrete_map={'Active': '#4F46E5', 'Dropped': '#6B7280'})
-            fig_g.update_layout(height=400, template="plotly_dark",
-                                margin=dict(l=20, r=20, t=20, b=20), legend=dict(orientation='h', y=-0.15))
-            st.plotly_chart(fig_g, use_container_width=True)
-
-    # ── Staleness view ────────────────────────────────────────────────────────
-    st.markdown("---")
-    st.markdown("#### Engagement Staleness (Active Leads)")
-    if 'days_silent' in emailable.columns:
-        active_stale = emailable[emailable['segment'] == 'Active'].copy()
-        active_stale = active_stale[active_stale['days_silent'].notna()]
-
-        def stale_bucket(d):
-            if d <= 7:
-                return '🟢 <7 days'
-            elif d <= 14:
-                return '🟡 7-14 days'
-            elif d <= 30:
-                return '🟠 14-30 days'
-            else:
-                return '🔴 30+ days'
-
-        active_stale['staleness'] = active_stale['days_silent'].apply(stale_bucket)
-        stale_summary = active_stale.groupby('staleness')['company'].nunique().reset_index()
-        stale_summary.columns = ['Staleness', 'Companies']
-        stale_summary = stale_summary.sort_values('Staleness')
-        st.dataframe(stale_summary, use_container_width=True, hide_index=True)
-
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 3: EMAIL COMPOSER
@@ -1180,7 +1091,16 @@ with tab_compose:
     template = EMAIL_TEMPLATES[template_name]
 
     with tc2:
-        sender_name = st.text_input("Sender name", value="Prem", key="sender_name")
+        from services.email_sender import SENDERS as _SENDERS
+        sender_label = st.selectbox(
+            "Send as",
+            list(_SENDERS.keys()),
+            help="Visible 'From' is always Graas Insights <insights@graas.ai>. "
+                 "Replies route to the selected person's inbox via Reply-To.",
+            key="sender_label",
+        )
+        sender_display_name, sender_reply_to = _SENDERS[sender_label]
+        sender_name = sender_display_name.split()[0]  # for {sender} substitution
         subject = st.text_input("Subject", value=template["subject"], key="email_subject")
         body = st.text_area("Body", value=template["body"], height=300, key="email_body")
 
@@ -1225,25 +1145,285 @@ with tab_compose:
 
     st.markdown("---")
 
-    # ── Step 4: Actions ───────────────────────────────────────────────────────
-    st.markdown("#### 4. Copy & Send")
+    # ── Step 4: Send ──────────────────────────────────────────────────────────
+    st.markdown("#### 4. Send")
 
-    ac1, ac2 = st.columns(2)
+    from services.email_sender import (
+        send_email,
+        preflight_check,
+        remaining_cap,
+        get_weekly_cap,
+        get_sends_this_week,
+        recent_sends,
+    )
 
-    with ac1:
-        st.markdown("**All recipient emails** (copy into Gmail BCC)")
-        all_emails = ', '.join(recipients['email'].unique().tolist())
-        st.code(all_emails, language=None)
+    pre_err = preflight_check()
+    if pre_err:
+        st.error(
+            f"⚠️ Email sending is not configured: **{pre_err}**\n\n"
+            "Add the missing keys to `.env`:\n"
+            "- `SMTP_USER=insights@graas.ai`\n"
+            "- `SMTP_PASS=<16-char Gmail App Password>`\n"
+            "- `EMAIL_LOG_SHEET_ID=<sheet id of 'Graas Outreach Log'>`\n"
+            "- `WEEKLY_SEND_CAP=50` (optional)\n\n"
+            "Sheet must be shared with the service account (Editor permission)."
+        )
+    else:
+        # Cap status
+        used = get_sends_this_week()
+        cap = get_weekly_cap()
+        left = max(0, cap - used)
+        bar_color = "🟢" if left > 10 else ("🟡" if left > 0 else "🔴")
+        cap_cols = st.columns([2, 1])
+        with cap_cols[0]:
+            st.markdown(f"{bar_color} **Weekly send cap:** {used}/{cap} used · **{left} remaining**")
+            st.progress(min(used / cap, 1.0) if cap > 0 else 0)
+        with cap_cols[1]:
+            st.caption("Cap counts all successful sends in the trailing 7 days, across all senders.")
 
-    with ac2:
-        st.markdown("**Emails by company** (for personalized sends)")
-        for co in recipients['company'].unique()[:20]:
-            co_emails = recipients[recipients['company'] == co]['email'].tolist()
-            co_names = recipients[recipients['company'] == co]['person_name'].tolist()
-            names_str = ', '.join(co_names)
-            emails_str = ', '.join(co_emails)
-            st.markdown(f"**{co}** ({names_str})")
-            st.code(emails_str, language=None)
+        # Single-recipient send (preview row drives this)
+        st.markdown("##### Send the previewed email")
 
-        if len(recipients['company'].unique()) > 20:
-            st.caption(f"... and {len(recipients['company'].unique()) - 20} more companies")
+        if not recipients.empty:
+            # Build recipient list for the dropdown — one row per (company, contact)
+            contact_options = []
+            for _, row in recipients.iterrows():
+                if row.get("email") and "@" in str(row["email"]):
+                    label = f"{row['person_name']} <{row['email']}> · {row['company']}"
+                    contact_options.append((label, row.to_dict()))
+
+            if not contact_options:
+                st.warning("No valid recipient emails in the current segment.")
+            else:
+                # Default to first contact of preview_co if available
+                default_idx = 0
+                for i, (_, r) in enumerate(contact_options):
+                    if r["company"] == preview_co:
+                        default_idx = i
+                        break
+
+                send_label = st.selectbox(
+                    "Recipient",
+                    [c[0] for c in contact_options],
+                    index=default_idx,
+                    key="send_recipient",
+                )
+                send_target = dict(contact_options[[c[0] for c in contact_options].index(send_label)][1])
+
+                # Render personalized subject + body for the chosen recipient
+                rendered_subject_send = subject.format(
+                    company=send_target["company"], name=send_target["person_name"],
+                    vertical=send_target["vertical"], sender=sender_name,
+                ) if "{" in subject else subject
+
+                rendered_body_send = body
+                for k, v in {
+                    "{company}": send_target["company"],
+                    "{name}": send_target["person_name"],
+                    "{vertical}": send_target["vertical"],
+                    "{sender}": sender_name,
+                    "{designation}": send_target.get("designation", ""),
+                }.items():
+                    rendered_body_send = rendered_body_send.replace(k, str(v))
+
+                # Two-step confirm to avoid misclicks
+                confirm_key = "send_confirm_armed"
+                if confirm_key not in st.session_state:
+                    st.session_state[confirm_key] = False
+
+                cols = st.columns([2, 1, 1])
+                with cols[0]:
+                    st.markdown(
+                        f"**Will send to:** `{send_target['email']}`  \n"
+                        f"**From:** Graas Insights `<insights@graas.ai>`  \n"
+                        f"**Reply-To:** {sender_display_name} `<{sender_reply_to}>`"
+                    )
+                with cols[1]:
+                    if not st.session_state[confirm_key]:
+                        if st.button("📧 Send email", type="primary", disabled=(left <= 0),
+                                     use_container_width=True, key="send_arm"):
+                            st.session_state[confirm_key] = True
+                            st.rerun()
+                    else:
+                        if st.button("✅ Confirm send", type="primary",
+                                     use_container_width=True, key="send_confirm"):
+                            ok, msg = send_email(
+                                sender_label=sender_label,
+                                to_email=send_target["email"],
+                                to_name=send_target["person_name"],
+                                company=send_target["company"],
+                                subject=rendered_subject_send,
+                                body=rendered_body_send,
+                                bucket=str(send_target.get("playbook_bucket", "")) or str(send_target.get("recency", "")),
+                                template=template_name,
+                            )
+                            st.session_state[confirm_key] = False
+                            if ok:
+                                st.success(f"✅ Sent to {send_target['email']}")
+                            else:
+                                st.error(f"❌ Send failed: {msg}")
+                            st.rerun()
+                with cols[2]:
+                    if st.session_state[confirm_key]:
+                        if st.button("Cancel", use_container_width=True, key="send_cancel"):
+                            st.session_state[confirm_key] = False
+                            st.rerun()
+
+                if left <= 0:
+                    st.warning(f"Weekly cap of {cap} reached. New sends blocked until older sends roll out of the 7-day window.")
+
+        # Bulk-copy fallback (kept for manual / Gmail-direct workflows)
+        with st.expander("📋 Copy emails for manual sending (Gmail BCC, etc.)"):
+            ac1, ac2 = st.columns(2)
+            with ac1:
+                st.markdown("**All recipient emails**")
+                all_emails = ', '.join(recipients['email'].unique().tolist())
+                st.code(all_emails, language=None)
+            with ac2:
+                st.markdown("**Emails by company**")
+                for co in recipients['company'].unique()[:20]:
+                    co_emails = recipients[recipients['company'] == co]['email'].tolist()
+                    co_names = recipients[recipients['company'] == co]['person_name'].tolist()
+                    st.markdown(f"**{co}** ({', '.join(co_names)})")
+                    st.code(', '.join(co_emails), language=None)
+                if len(recipients['company'].unique()) > 20:
+                    st.caption(f"... and {len(recipients['company'].unique()) - 20} more companies")
+
+        st.caption("📊 Open the **Analytics** tab to see send history, volume by sender, and outreach metrics.")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 4: ANALYTICS
+# ══════════════════════════════════════════════════════════════════════════════
+
+with tab_analytics:
+    st.markdown("### 📊 Outreach Analytics")
+    st.caption("Email outreach metrics from the Graas Outreach Log. "
+               "Sent is tracked today; opens / replies / unsubscribes need Phase 2 (hosted pixel + reply polling).")
+
+    from services.email_sender import (
+        recent_sends as _recent_sends,
+        get_weekly_cap as _get_weekly_cap,
+        get_sends_this_week as _get_sends_this_week,
+        preflight_check as _preflight_check,
+    )
+
+    a_pre_err = _preflight_check()
+    if a_pre_err:
+        st.warning(f"⚠️ {a_pre_err} — analytics will be empty until email sending is configured (see **Email Composer** tab).")
+
+    # Pull the full log once
+    log_df = _recent_sends(limit=10000)
+
+    if log_df.empty:
+        st.info("No sends logged yet. Once you send your first email from the composer, metrics will populate here.")
+    else:
+        # Parse timestamp once
+        log_df = log_df.copy()
+        log_df["_ts"] = pd.to_datetime(log_df["timestamp_utc"], errors="coerce", utc=True)
+        log_df = log_df[log_df["_ts"].notna()]
+
+        now_utc = pd.Timestamp.now(tz="UTC")
+        sent_df = log_df[log_df["status"] == "sent"]
+        sent_7d = sent_df[sent_df["_ts"] >= now_utc - pd.Timedelta(days=7)]
+        sent_30d = sent_df[sent_df["_ts"] >= now_utc - pd.Timedelta(days=30)]
+        failed_7d = log_df[(log_df["status"] != "sent") & (log_df["_ts"] >= now_utc - pd.Timedelta(days=7))]
+
+        # ── KPI tiles ─────────────────────────────────────────────────────────
+        k1, k2, k3, k4 = st.columns(4)
+        k1.metric("📤 Sent (7d)", len(sent_7d), help=f"{len(sent_30d)} in last 30 days · {len(sent_df)} all-time")
+        k2.metric("👀 Opened", "—", help="Phase 2: requires hosted tracking pixel")
+        k3.metric("↩️ Replied", "—", help="Phase 2: requires Gmail API reply polling")
+        k4.metric("🚫 Unsubscribed", "—", help="Phase 2: requires hosted unsubscribe endpoint")
+
+        # Weekly cap row
+        cap = _get_weekly_cap()
+        used = _get_sends_this_week()
+        st.markdown(f"**Weekly send cap:** {used} / {cap} used · {max(0, cap - used)} remaining")
+        st.progress(min(used / cap, 1.0) if cap > 0 else 0)
+
+        # Failure callout
+        if not failed_7d.empty:
+            st.error(f"⚠️ {len(failed_7d)} send failure(s) in the last 7 days — see Recent sends below for details.")
+
+        st.markdown("---")
+
+        # ── Volume over time + by sender ──────────────────────────────────────
+        col_a, col_b = st.columns([3, 2])
+
+        with col_a:
+            st.markdown("#### Sends per day (last 30 days)")
+            daily = (sent_30d.assign(_day=sent_30d["_ts"].dt.tz_convert(None).dt.date)
+                            .groupby("_day").size().reset_index(name="Sends"))
+            if daily.empty:
+                st.caption("No sends in the last 30 days.")
+            else:
+                fig_daily = px.bar(daily, x="_day", y="Sends",
+                                   color_discrete_sequence=["#4F46E5"])
+                fig_daily.update_layout(template="plotly_dark", height=280,
+                                        margin=dict(l=10, r=10, t=10, b=10),
+                                        xaxis_title=None, yaxis_title="Sends")
+                st.plotly_chart(fig_daily, use_container_width=True)
+
+        with col_b:
+            st.markdown("#### By sender (last 30d)")
+            if "sender_label" in sent_30d.columns and not sent_30d.empty:
+                by_sender = (sent_30d.groupby("sender_label").size()
+                             .reset_index(name="Sends").sort_values("Sends", ascending=True))
+                fig_s = px.bar(by_sender, x="Sends", y="sender_label", orientation="h",
+                               color_discrete_sequence=["#7C3AED"])
+                fig_s.update_layout(template="plotly_dark", height=280,
+                                    margin=dict(l=10, r=10, t=10, b=10),
+                                    xaxis_title=None, yaxis_title=None)
+                st.plotly_chart(fig_s, use_container_width=True)
+            else:
+                st.caption("No sender data yet.")
+
+        # ── By template + by bucket ───────────────────────────────────────────
+        col_c, col_d = st.columns(2)
+        with col_c:
+            st.markdown("#### By template (last 30d)")
+            if "template" in sent_30d.columns and not sent_30d.empty:
+                by_t = (sent_30d.groupby("template").size().reset_index(name="Sends")
+                        .sort_values("Sends", ascending=True))
+                by_t = by_t[by_t["template"] != ""]
+                if by_t.empty:
+                    st.caption("No template data.")
+                else:
+                    fig_t = px.bar(by_t, x="Sends", y="template", orientation="h",
+                                   color_discrete_sequence=["#10B981"])
+                    fig_t.update_layout(template="plotly_dark", height=280,
+                                        margin=dict(l=10, r=10, t=10, b=10),
+                                        xaxis_title=None, yaxis_title=None)
+                    st.plotly_chart(fig_t, use_container_width=True)
+            else:
+                st.caption("No template data yet.")
+
+        with col_d:
+            st.markdown("#### By bucket (last 30d)")
+            if "bucket" in sent_30d.columns and not sent_30d.empty:
+                by_b = (sent_30d.groupby("bucket").size().reset_index(name="Sends")
+                        .sort_values("Sends", ascending=True))
+                by_b = by_b[by_b["bucket"] != ""]
+                if by_b.empty:
+                    st.caption("No bucket data.")
+                else:
+                    fig_b = px.bar(by_b, x="Sends", y="bucket", orientation="h",
+                                   color_discrete_sequence=["#F59E0B"])
+                    fig_b.update_layout(template="plotly_dark", height=280,
+                                        margin=dict(l=10, r=10, t=10, b=10),
+                                        xaxis_title=None, yaxis_title=None)
+                    st.plotly_chart(fig_b, use_container_width=True)
+            else:
+                st.caption("No bucket data yet.")
+
+        st.markdown("---")
+
+        # ── Recent sends table ────────────────────────────────────────────────
+        st.markdown("#### 📬 Recent sends")
+        recent_view = log_df.sort_values("_ts", ascending=False).head(50).copy()
+        recent_view["timestamp_utc"] = recent_view["_ts"].dt.strftime("%d %b %H:%M UTC")
+        cols_to_show = [c for c in
+            ["timestamp_utc", "sender_label", "to_email", "company", "template", "subject", "status", "error_msg"]
+            if c in recent_view.columns]
+        st.dataframe(recent_view[cols_to_show], use_container_width=True, hide_index=True, height=420)
