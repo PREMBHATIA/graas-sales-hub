@@ -1249,8 +1249,10 @@ with tab_compose:
                     else:
                         st.caption(f"📋 Playbook bucket(s): **{bucket_str}**")
 
-                if target_note:
-                    st.warning(f"{target_note}")
+                # NaN is truthy in Python, so a plain `if target_note:` would
+                # render the string "nan" for accounts without a playbook note.
+                if isinstance(target_note, str) and target_note.strip() and target_note.strip().lower() != "nan":
+                    st.warning(target_note)
 
                 test_email = ""
                 if test_mode:
