@@ -282,6 +282,217 @@ def _recency_bucket(d):
 
 contacts['recency'] = contacts['days_silent'].apply(_recency_bucket)
 
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PLAYBOOK BUCKETS — sourced from "All-e email re-engagement" Google Doc
+# Last sync: 7 May 2026 (V1). Doc:
+# https://docs.google.com/document/d/1kbDEjVTpVpFdrdtxhhEomdtss1f05O2Fm8ph4Y1TY1Y
+# ══════════════════════════════════════════════════════════════════════════════
+
+PLAYBOOK_BUCKETS = {
+    "Timing-Paused": {
+        "icon": "⏸️",
+        "color": "#3B82F6",
+        "desc": "Intent was real. Window closed (reorgs, budgets, planning). Not a fit issue. Highest recovery potential.",
+        "framework": "A — Market Signal",
+        "cadence": "1 insight email → 3-week wait → 1 follow-on different angle → pause",
+        "rules": [
+            "Use a vertical insight as the re-entry — peer-level, brief, zero urgency",
+            "Don't reference the prior stall",
+            "Reinforce the problem hasn't been solved by waiting",
+        ],
+        "accounts": [
+            "Polycab", "Haier", "Prince Pipes", "Voltas",
+            "Forest Essentials", "Versuni", "Shalimar Paints",
+            "910 Indonesia", "Chickin",
+        ],
+    },
+    "Evaluation Stalled": {
+        "icon": "🔄",
+        "color": "#F59E0B",
+        "desc": "Multi-stakeholder engagement happened. Proposal/POC done. Stall is at internal approval — not fit rejection.",
+        "framework": "B — Outcome Reference",
+        "cadence": "1 outcome-reference email → 4-week wait → 1 short follow-on → pause",
+        "rules": [
+            "Lead with one specific deployment outcome in their vertical",
+            "Frame around integration complexity (ERP sync, credit, scheme logic)",
+            "Reads like a practitioner's note, not a sales email",
+            "Kajaria & Kent RO: do NOT reference voice — use WA/FA digitization angle",
+        ],
+        "accounts": [
+            "Wakefit", "SRMB", "RR Kabel", "TTK Prestige",
+            "Aditya Birla Fashion", "Reebok",
+            "Power Buy", "Wipro Enterprises", "Rich Products",
+            "Eureka Forbes", "KRBL", "Kajaria", "Kent RO",
+        ],
+    },
+    "Competitor-Adjacent": {
+        "icon": "🛡️",
+        "color": "#A855F7",
+        "desc": "Has adjacent solution (Bizom, yellow.ai, Salesforce, Haptik). Re-entry is the gap their tool can't close — not replacement.",
+        "framework": "C — Adoption Gap",
+        "cadence": "1 analytical insight email → 4-6 week pause → re-evaluate",
+        "rules": [
+            "Position All-e as additive — never competitive",
+            "Never name-drop their vendor's limitations",
+            "Use the adoption-gap data (DMS/SFA at <15%) as re-entry",
+            "Borosil: do NOT reference voice — find a non-voice angle",
+        ],
+        "accounts": [
+            "Sheela Foam", "Group Meeran", "Usha Electricals",
+            "Bajaj Consumer Care", "Borosil",
+        ],
+    },
+    "Ghost Accounts": {
+        "icon": "👻",
+        "color": "#6B7280",
+        "desc": "Met once or twice, genuine initial interest, then silence. One precisely-targeted email — never a sequence.",
+        "framework": "E — Specific Trigger",
+        "cadence": "1 targeted email only. No follow-on unless they reply. If no reply in 3 weeks, archive 90 days.",
+        "rules": [
+            "Reference the SPECIFIC use case from meeting notes — never generic",
+            "Reads like a peer note, not a vendor follow-up",
+        ],
+        "accounts": [
+            "Finolex", "Topcem", "Hindustan Pencils", "KLF Nirmal",
+            "KRBL", "TIPL", "Talbros", "Dalmia Bharat", "Fairprice",
+            "Duroflex",
+        ],
+    },
+    "Strategic Slow Movers": {
+        "icon": "🎯",
+        "color": "#10B981",
+        "desc": "Large enterprises, well-qualified use case, multi-stakeholder. Internal velocity is structurally low. Long-horizon maintenance.",
+        "framework": "D — Founder-Tone Strategic Note",
+        "cadence": "1 insight per 4-6 weeks, indefinitely — until they signal readiness or explicitly close",
+        "rules": [
+            "Strategic, founder-to-senior-leader. Reads like a quarterly letter.",
+            "No product references",
+            "Send as Prem or Amruta directly — not generic insights@",
+        ],
+        "accounts": [
+            "Wipro Enterprises", "RR Kabel", "TTK Prestige",
+            "Polycab", "Haier", "Tata Consumer",
+            "Aditya Birla Fashion", "Reebok",
+        ],
+    },
+}
+
+# Per-account special instructions from playbook footnotes
+PLAYBOOK_NOTES = {
+    "Sheela Foam": "⚠️ HOLD OFF for now (playbook footnote — pls hold off)",
+    "Polycab": "ℹ️ Narrative angle: retailer-to-distributor ordering specifically",
+    "Versuni": "ℹ️ OneChef proposal already sent (INR 5L+1L monthly), dropped Apr 20",
+    "Sheela Foam ": "⚠️ HOLD OFF for now",  # trailing-space variant
+    "Haier": "ℹ️ Acquisition pause should now have passed",
+    "Forest Essentials": "ℹ️ Internal systems change should now be complete",
+    "Borosil": "⚠️ Evaluating voice players — DO NOT reference voice in outreach",
+    "Kajaria": "⚠️ Voice startup pilot first; do NOT reference voice. Use WA/FA digitization.",
+    "Kent RO": "⚠️ Working with Haptik for outbound voice. Do NOT reference voice.",
+    "Bajaj Electricals": "🚫 Already using conversational AI (voice) — explicit low interest",
+    "Anmol Industries": "🚫 Has Bizom DMS with direct overlap — not before 9 months",
+    "Hindware": "🚫 Rejected formal proposal Feb 2026 — re-engage Aug 2026 only on trigger",
+    "Growsari": "🚫 Pilot discontinued Mar 2026 — revisit Jan 2027 only",
+    "Godrej Consumer Products": "↪️ Hand off to hoppr GTM (marketplace use case, not All-e)",
+    "Cello World": "↪️ Hand off to hoppr GTM (D2C too small, wants hoppr for marketplace)",
+}
+
+NO_TOUCH = {
+    "Structural ICP Mismatch (permanent)": {
+        "icon": "🚫",
+        "desc": "No B2B trade/distribution channel that All-e addresses.",
+        "accounts": {
+            "Liberty Steel": "Contract manufacturing, no distributor network",
+            "Makson Group": "Contract manufacturing, 10-15 customers, no retail",
+            "Genus Power": "Government tenders, no distributor channel",
+            "Merino Group": "Custom projects, project teams upfront",
+            "Tata Electronics": "4 warehouses, customer pickup, no channel",
+            "Amber Group": "AC components to OEMs, no retail",
+            "Lubi Electronics": "Auto electronic parts to OEMs",
+            "Stelmec": "B2B industrial, no trade distribution",
+            "AB InBev": "State excise controls, sector explicitly unsuitable",
+            "Bajaj Electricals": "Already using conversational AI for retailer ordering",
+        },
+    },
+    "Hard Rejection / Pilot Ended (6-12mo cooldown)": {
+        "icon": "⛔",
+        "desc": "Off list for 6-12 months. Re-engage only on specific trigger.",
+        "accounts": {
+            "Hindware": "Rejected proposal Feb 2026, chose competitor. Re-engage Aug 2026 only on trigger (e.g. competitor failure)",
+            "Growsari": "Pilot discontinued Mar 2026 (H1 profitability + ROI). Revisit Jan 2027",
+            "Anmol Industries": "Has Bizom DMS with direct overlap. Not before 9 months",
+        },
+    },
+    "Product Misdirection → hoppr": {
+        "icon": "↪️",
+        "desc": "Live prospects but for hoppr — not All-e. Hand off to hoppr GTM.",
+        "accounts": {
+            "Godrej Consumer Products": "hoppr for Shopee/TikTok marketplace. Hand off, remove from All-e pipeline.",
+            "Cello World": "D2C only 50 orders/day, too small for All-e. Wants hoppr for marketplace.",
+        },
+    },
+}
+
+
+def _normalize_company(name: str) -> str:
+    """Lowercase, strip, collapse spaces — for fuzzy matching."""
+    return " ".join((name or "").lower().split())
+
+
+def playbook_lookup(company: str):
+    """Returns dict with bucket(s), no_touch info, and special notes for a company."""
+    cl = _normalize_company(company)
+    if not cl:
+        return {"buckets": [], "no_touch": None, "note": None}
+
+    # No-touch check first (highest priority)
+    no_touch = None
+    for category, info in NO_TOUCH.items():
+        for acc, reason in info["accounts"].items():
+            an = _normalize_company(acc)
+            if an in cl or cl in an:
+                no_touch = {"category": category, "icon": info["icon"], "reason": reason}
+                break
+        if no_touch:
+            break
+
+    # All matching buckets (some accounts appear in multiple)
+    matched_buckets = []
+    for bucket, info in PLAYBOOK_BUCKETS.items():
+        for acc in info["accounts"]:
+            an = _normalize_company(acc)
+            if an in cl or cl in an:
+                matched_buckets.append(bucket)
+                break
+
+    # Special note (look up by playbook key, fuzzy)
+    note = None
+    for k, v in PLAYBOOK_NOTES.items():
+        kn = _normalize_company(k)
+        if kn in cl or cl in kn:
+            note = v
+            break
+
+    return {"buckets": matched_buckets, "no_touch": no_touch, "note": note}
+
+
+# Apply to contacts dataframe
+def _bucket_label(company):
+    res = playbook_lookup(company)
+    if res["no_touch"]:
+        return f"🚫 No Touch — {res['no_touch']['category'].split(' (')[0]}"
+    if res["buckets"]:
+        return res["buckets"][0]  # primary bucket
+    return None
+
+contacts["playbook_bucket"] = contacts["company"].apply(_bucket_label)
+contacts["playbook_no_touch"] = contacts["company"].apply(
+    lambda c: playbook_lookup(c)["no_touch"]
+)
+contacts["playbook_note"] = contacts["company"].apply(
+    lambda c: playbook_lookup(c)["note"]
+)
+
 # Short key for filtering (without emoji)
 def _recency_key(d):
     if pd.isna(d):
@@ -533,93 +744,132 @@ with tab_contacts:
 # ══════════════════════════════════════════════════════════════════════════════
 
 with tab_segments:
-    st.markdown("### Audience Segments")
-    st.caption("Different segments need different outreach. Hot leads get a direct follow-up; cold leads need a re-introduction.")
+    st.markdown("### Re-engagement Buckets")
+    st.caption(
+        "Sourced from Amruta's *All-e email re-engagement* playbook (V1, 7 May 2026). "
+        "Each bucket has a defined framework, cadence, and rules. "
+        "Accounts with explicit warnings (voice references, vendor lock-in nuances) are flagged inline."
+    )
 
-    emailable = contacts[contacts['has_email']]
+    emailable = contacts[contacts['has_email']].copy()
 
-    # ── Recency × Segment matrix ──────────────────────────────────────────────
-    st.markdown("#### 🎯 Recency × Status Matrix")
-    st.caption("The cross-tab that matters most — recently met leads (Hot/Warm) are your priority")
+    # ── Top-line counts by bucket ─────────────────────────────────────────────
+    bucketed = emailable[emailable['playbook_bucket'].notna()]
+    no_touch_df = emailable[emailable['playbook_no_touch'].notna()]
+    in_buckets_df = emailable[
+        emailable['playbook_bucket'].notna()
+        & emailable['playbook_no_touch'].isna()
+    ]
+    unbucketed = emailable[
+        emailable['playbook_bucket'].isna()
+        & emailable['playbook_no_touch'].isna()
+    ]
 
-    recency_order = ['🔥 Hot (<30d)', '☀️ Warm (30-90d)', '❄️ Cool (90-180d)', '🧊 Cold (180+d)', '⚫ No date']
-    matrix = emailable.groupby(['recency', 'segment'])['company'].nunique().unstack(fill_value=0)
-    matrix = matrix.reindex(recency_order, fill_value=0)
-    if 'Active' not in matrix.columns:
-        matrix['Active'] = 0
-    if 'Dropped' not in matrix.columns:
-        matrix['Dropped'] = 0
-    matrix['Total'] = matrix['Active'] + matrix['Dropped']
-    matrix = matrix.reset_index().rename(columns={'recency': 'Recency'})
-    st.dataframe(matrix, use_container_width=True, hide_index=True)
+    kc1, kc2, kc3, kc4 = st.columns(4)
+    with kc1: st.metric("In playbook buckets", in_buckets_df['company'].nunique())
+    with kc2: st.metric("🚫 No Touch", no_touch_df['company'].nunique())
+    with kc3: st.metric("Unbucketed", unbucketed['company'].nunique())
+    with kc4: st.metric("Total emailable", emailable['company'].nunique())
 
     st.markdown("---")
 
-    # ── Outreach Priority Groups ──────────────────────────────────────────────
-    st.markdown("#### 📬 Outreach Priority Groups")
-    st.caption("These are the segments that should receive different emails")
+    # ── No Touch list (warning, top of page) ──────────────────────────────────
+    if not no_touch_df.empty:
+        with st.expander(
+            f"🚫 **No Touch list** — {no_touch_df['company'].nunique()} accounts that must NOT receive outreach",
+            expanded=False,
+        ):
+            for category, info in NO_TOUCH.items():
+                cat_companies = []
+                for acc_name in info["accounts"]:
+                    matches = no_touch_df[
+                        no_touch_df['company'].str.lower().str.contains(
+                            acc_name.lower(), na=False, regex=False
+                        )
+                    ]
+                    if not matches.empty:
+                        cat_companies.append((acc_name, info["accounts"][acc_name], matches))
+                if not cat_companies:
+                    continue
+                st.markdown(f"**{info['icon']} {category}** — _{info['desc']}_")
+                for acc_name, reason, matches in cat_companies:
+                    n = matches['company'].nunique()
+                    st.markdown(f"- **{acc_name}** ({n} contact{'s' if n != 1 else ''}) — {reason}")
+                st.markdown("")
 
-    priority_groups = [
-        {
-            'key': 'hot_active',
-            'label': '🔥 Hot + Active',
-            'desc': 'Met recently, still in pipeline — direct follow-up',
-            'filter': (emailable['recency_key'] == 'hot') & (emailable['segment'] == 'Active'),
-            'template': 'Follow-up (Active Leads)',
-        },
-        {
-            'key': 'hot_dropped',
-            'label': '🔥 Hot + Dropped',
-            'desc': 'Met recently but marked dropped — re-engage immediately',
-            'filter': (emailable['recency_key'] == 'hot') & (emailable['segment'] == 'Dropped'),
-            'template': 'Hot Re-engagement (Recent)',
-        },
-        {
-            'key': 'warm',
-            'label': '☀️ Warm (30-90d)',
-            'desc': 'Conversation fading — nudge with a relevant update',
-            'filter': (emailable['recency_key'] == 'warm'),
-            'template': 'Warm Nudge',
-        },
-        {
-            'key': 'cool',
-            'label': '❄️ Cool (90-180d)',
-            'desc': 'Gone quiet — reintroduce with what\'s new',
-            'filter': (emailable['recency_key'] == 'cool'),
-            'template': 'Cool Re-introduction',
-        },
-        {
-            'key': 'cold',
-            'label': '🧊 Cold (180+d)',
-            'desc': 'Essentially fresh — treat like a new intro with "we met before" context',
-            'filter': (emailable['recency_key'] == 'cold'),
-            'template': 'Cold Re-introduction',
-        },
-        {
-            'key': 'no_date',
-            'label': '⚫ No Contact Date',
-            'desc': 'No recorded interaction — treat as cold intro',
-            'filter': (emailable['recency_key'] == 'no_date'),
-            'template': 'Meeting Request (Cold)',
-        },
-    ]
+    # ── Playbook buckets (the main event) ─────────────────────────────────────
+    st.markdown("#### 📬 Playbook Buckets")
+    st.caption("Each bucket has a designated email framework. Click to expand contacts + see rules.")
 
-    for pg in priority_groups:
-        grp = emailable[pg['filter']]
-        n_companies = grp['company'].nunique()
-        n_contacts = len(grp)
-        if n_contacts == 0:
-            continue
-        with st.expander(f"**{pg['label']}** — {n_companies} companies, {n_contacts} contacts  ·  _{pg['desc']}_"):
-            st.caption(f"Suggested template: **{pg['template']}**")
-            preview = grp[['company', 'person_name', 'email', 'designation', 'lead_status', 'last_contact']].copy()
-            preview['last_contact'] = preview['last_contact'].apply(
-                lambda x: x.strftime('%d %b %Y') if pd.notna(x) else '—')
-            preview = preview.sort_values('last_contact', ascending=False)
-            st.dataframe(preview.rename(columns={
-                'company': 'Company', 'person_name': 'Name', 'email': 'Email',
-                'designation': 'Title', 'lead_status': 'Status', 'last_contact': 'Last Contact',
-            }), use_container_width=True, hide_index=True, height=250)
+    for bucket_name, info in PLAYBOOK_BUCKETS.items():
+        bucket_grp = bucketed[bucketed['playbook_bucket'] == bucket_name]
+        n_companies = bucket_grp['company'].nunique()
+        n_contacts = len(bucket_grp)
+
+        # Companies from playbook list that we did NOT find in the data
+        found_companies = {_normalize_company(c) for c in bucket_grp['company'].unique()}
+        missing = []
+        for acc in info["accounts"]:
+            an = _normalize_company(acc)
+            if not any(an in fc or fc in an for fc in found_companies):
+                missing.append(acc)
+
+        header = f"{info['icon']} **{bucket_name}** — {n_companies} companies, {n_contacts} contacts  ·  Framework: {info['framework']}"
+        with st.expander(header, expanded=False):
+            st.markdown(f"_{info['desc']}_")
+            st.markdown(f"**📨 Cadence:** {info['cadence']}")
+            st.markdown("**📋 Rules:**")
+            for rule in info["rules"]:
+                st.markdown(f"- {rule}")
+
+            if not bucket_grp.empty:
+                st.markdown("**Contacts:**")
+                preview = bucket_grp[['company', 'person_name', 'email', 'designation',
+                                      'lead_status', 'last_contact', 'playbook_note']].copy()
+                preview['last_contact'] = preview['last_contact'].apply(
+                    lambda x: x.strftime('%d %b %Y') if pd.notna(x) else '—')
+                preview = preview.sort_values(['company', 'last_contact'], ascending=[True, False])
+                preview['playbook_note'] = preview['playbook_note'].fillna('')
+                st.dataframe(preview.rename(columns={
+                    'company': 'Company', 'person_name': 'Name', 'email': 'Email',
+                    'designation': 'Title', 'lead_status': 'Status',
+                    'last_contact': 'Last Contact', 'playbook_note': '⚠️ Note',
+                }), use_container_width=True, hide_index=True, height=min(280, 40 + 35 * len(preview)))
+
+            if missing:
+                st.warning(
+                    f"📋 Listed in playbook but NOT found in CRM data ({len(missing)}): "
+                    f"{', '.join(missing)}. "
+                    f"Either add them to the All-e Active/Dropped sheet, or update the spelling in the playbook."
+                )
+
+    st.markdown("---")
+
+    # ── Unbucketed accounts (recency view as fallback) ────────────────────────
+    with st.expander(
+        f"📂 **Unbucketed accounts** — {unbucketed['company'].nunique()} companies not in playbook (recency view)",
+        expanded=False,
+    ):
+        st.caption("These accounts are not classified in the playbook yet. Showing recency for context.")
+        recency_order = ['🔥 Hot (<30d)', '☀️ Warm (30-90d)', '❄️ Cool (90-180d)', '🧊 Cold (180+d)', '⚫ No date']
+        matrix = unbucketed.groupby(['recency', 'segment'])['company'].nunique().unstack(fill_value=0)
+        matrix = matrix.reindex(recency_order, fill_value=0)
+        if 'Active' not in matrix.columns: matrix['Active'] = 0
+        if 'Dropped' not in matrix.columns: matrix['Dropped'] = 0
+        matrix['Total'] = matrix['Active'] + matrix['Dropped']
+        matrix = matrix.reset_index().rename(columns={'recency': 'Recency'})
+        st.dataframe(matrix, use_container_width=True, hide_index=True)
+
+        un_preview = unbucketed[['company', 'person_name', 'email', 'segment', 'lead_status',
+                                 'recency', 'last_contact']].copy()
+        un_preview['last_contact'] = un_preview['last_contact'].apply(
+            lambda x: x.strftime('%d %b %Y') if pd.notna(x) else '—')
+        un_preview = un_preview.sort_values(['recency', 'company'])
+        st.dataframe(un_preview.rename(columns={
+            'company': 'Company', 'person_name': 'Name', 'email': 'Email',
+            'segment': 'Segment', 'lead_status': 'Status',
+            'recency': 'Recency', 'last_contact': 'Last Contact',
+        }), use_container_width=True, hide_index=True, height=400)
 
     st.markdown("---")
 
