@@ -1169,6 +1169,18 @@ with tab_compose:
             "Sheet must be shared with the service account (Editor permission)."
         )
     else:
+        # Show the result of the previous send attempt (if any)
+        last_result = st.session_state.get("last_send_result")
+        if last_result:
+            result_kind, result_to, result_msg = last_result
+            if result_kind == "ok":
+                st.success(f"✅ Sent to **{result_to}** — see Analytics tab for the log row.")
+            else:
+                st.error(f"❌ Send failed for **{result_to}**: {result_msg}")
+            if st.button("Dismiss", key="dismiss_send_result"):
+                del st.session_state["last_send_result"]
+                st.rerun()
+
         # Cap status
         used = get_sends_this_week()
         cap = get_weekly_cap()
@@ -1302,21 +1314,20 @@ with tab_compose:
                     else:
                         if st.button("✅ Confirm send", type="primary",
                                      use_container_width=True, key="send_confirm"):
-                            ok, msg = send_email(
-                                sender_label=sender_label,
-                                to_email=effective_to_email,
-                                to_name=effective_to_name,
-                                company=send_target["company"] + (" [TEST]" if test_mode else ""),
-                                subject=rendered_subject_send,
-                                body=rendered_body_send,
-                                bucket=str(send_target.get("playbook_bucket", "")) or str(send_target.get("recency", "")),
-                                template=template_name + (" (test)" if test_mode else ""),
-                            )
+                            with st.spinner(f"📨 Sending to {effective_to_email}…"):
+                                ok, msg = send_email(
+                                    sender_label=sender_label,
+                                    to_email=effective_to_email,
+                                    to_name=effective_to_name,
+                                    company=send_target["company"] + (" [TEST]" if test_mode else ""),
+                                    subject=rendered_subject_send,
+                                    body=rendered_body_send,
+                                    bucket=str(send_target.get("playbook_bucket", "")) or str(send_target.get("recency", "")),
+                                    template=template_name + (" (test)" if test_mode else ""),
+                                )
                             st.session_state[confirm_key] = False
-                            if ok:
-                                st.success(f"✅ Sent to {effective_to_email}")
-                            else:
-                                st.error(f"❌ Send failed: {msg}")
+                            # Stash result so we can show it after the rerun
+                            st.session_state["last_send_result"] = ("ok" if ok else "err", effective_to_email, msg)
                             st.rerun()
                 with cols[2]:
                     if st.session_state[confirm_key]:
