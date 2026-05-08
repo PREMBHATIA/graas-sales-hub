@@ -476,16 +476,22 @@ def playbook_lookup(company: str):
     return {"buckets": matched_buckets, "no_touch": no_touch, "note": note}
 
 
-# Apply to contacts dataframe
-def _bucket_label(company):
+# Apply to contacts dataframe — accounts can belong to multiple buckets
+# (playbook footnote: "Many accounts in this bucket are also present in
+# other buckets — E.g. Polycab.")
+def _bucket_label_primary(company):
+    """Primary bucket = first match. Used for KPI counts to avoid double-counting."""
     res = playbook_lookup(company)
     if res["no_touch"]:
         return f"🚫 No Touch — {res['no_touch']['category'].split(' (')[0]}"
     if res["buckets"]:
-        return res["buckets"][0]  # primary bucket
+        return res["buckets"][0]
     return None
 
-contacts["playbook_bucket"] = contacts["company"].apply(_bucket_label)
+contacts["playbook_bucket"] = contacts["company"].apply(_bucket_label_primary)
+contacts["playbook_buckets_all"] = contacts["company"].apply(
+    lambda c: playbook_lookup(c)["buckets"]
+)
 contacts["playbook_no_touch"] = contacts["company"].apply(
     lambda c: playbook_lookup(c)["no_touch"]
 )
@@ -766,7 +772,11 @@ with tab_segments:
     ]
 
     kc1, kc2, kc3, kc4 = st.columns(4)
-    with kc1: st.metric("In playbook buckets", in_buckets_df['company'].nunique())
+    with kc1:
+        st.metric("In playbook buckets", in_buckets_df['company'].nunique(),
+                  help="Unique companies with at least one playbook bucket. "
+                       "Many appear in multiple buckets (e.g. Polycab is both "
+                       "Timing-Paused AND Strategic).")
     with kc2: st.metric("🚫 No Touch", no_touch_df['company'].nunique())
     with kc3: st.metric("Unbucketed", unbucketed['company'].nunique())
     with kc4: st.metric("Total emailable", emailable['company'].nunique())
@@ -802,7 +812,13 @@ with tab_segments:
     st.caption("Each bucket has a designated email framework. Click to expand contacts + see rules.")
 
     for bucket_name, info in PLAYBOOK_BUCKETS.items():
-        bucket_grp = bucketed[bucketed['playbook_bucket'] == bucket_name]
+        # Multi-bucket: account appears in every bucket it matches
+        bucket_grp = emailable[
+            emailable['playbook_buckets_all'].apply(
+                lambda bs: bucket_name in (bs or [])
+            )
+            & emailable['playbook_no_touch'].isna()
+        ]
         n_companies = bucket_grp['company'].nunique()
         n_contacts = len(bucket_grp)
 
@@ -824,17 +840,23 @@ with tab_segments:
 
             if not bucket_grp.empty:
                 st.markdown("**Contacts:**")
+                # Show "Also in" column when account is in multiple buckets
                 preview = bucket_grp[['company', 'person_name', 'email', 'designation',
-                                      'lead_status', 'last_contact', 'playbook_note']].copy()
+                                      'lead_status', 'last_contact',
+                                      'playbook_buckets_all', 'playbook_note']].copy()
                 preview['last_contact'] = preview['last_contact'].apply(
                     lambda x: x.strftime('%d %b %Y') if pd.notna(x) else '—')
+                preview['Also in'] = preview['playbook_buckets_all'].apply(
+                    lambda bs: ', '.join(b for b in (bs or []) if b != bucket_name) or '—'
+                )
+                preview = preview.drop(columns=['playbook_buckets_all'])
                 preview = preview.sort_values(['company', 'last_contact'], ascending=[True, False])
                 preview['playbook_note'] = preview['playbook_note'].fillna('')
                 st.dataframe(preview.rename(columns={
                     'company': 'Company', 'person_name': 'Name', 'email': 'Email',
                     'designation': 'Title', 'lead_status': 'Status',
                     'last_contact': 'Last Contact', 'playbook_note': '⚠️ Note',
-                }), use_container_width=True, hide_index=True, height=min(280, 40 + 35 * len(preview)))
+                }), use_container_width=True, hide_index=True, height=min(320, 40 + 35 * len(preview)))
 
             if missing:
                 st.warning(
