@@ -1202,36 +1202,40 @@ with tab_compose:
                         default_idx = i
                         break
 
+                # Test-mode toggle goes FIRST so we can disable the recipient
+                # dropdown when test mode is on (cleaner UX: you're picking
+                # ONE thing — real send target OR test address, not both).
+                test_mode = st.checkbox(
+                    "🧪 Send to test address instead (override recipient email)",
+                    key="send_test_mode",
+                    help="When on: the real-recipient dropdown is locked, and the "
+                         "email is sent to the chosen test address. Personalization "
+                         "(Hi {name}, ... at {company}) still uses the recipient "
+                         "previewed above, so the test email matches what the real "
+                         "recipient would have received."
+                )
+
                 send_label = st.selectbox(
                     "Recipient",
                     [c[0] for c in contact_options],
                     index=default_idx,
                     key="send_recipient",
+                    disabled=test_mode,
+                    help="Locked in test mode — uncheck the test box above to send to a real recipient."
+                         if test_mode else None,
                 )
                 send_target = dict(contact_options[[c[0] for c in contact_options].index(send_label)][1])
 
-                # Test-mode override — lets you redirect this exact email to any
-                # address (e.g. yourself) without polluting the contact list.
-                # Personalization tokens still resolve from the selected contact,
-                # so the email content is identical to what the real recipient
-                # would receive — only the To: address changes.
-                test_mode = st.checkbox(
-                    "🧪 Send to test address instead (override recipient email)",
-                    key="send_test_mode",
-                    help="Useful for testing deliverability, From/Reply-To setup, "
-                         "and rendering. The email body still uses the selected "
-                         "contact's name/company for accurate personalization."
-                )
                 test_email = ""
                 if test_mode:
                     # Known internal testers — extend this list as needed.
                     TEST_RECIPIENTS = {
-                        "Prem (prem@graas.ai)":                 "prem@graas.ai",
-                        "Dhanashree (dhanashree.mohit@graas.ai)": "dhanashree.mohit@graas.ai",
-                        "Amruta (amruta@graas.ai)":             "amruta@graas.ai",
-                        "Gaurav (gaurav@graas.ai)":             "gaurav@graas.ai",
-                        "Insights (insights@graas.ai)":         "insights@graas.ai",
-                        "Custom…":                              "",
+                        "Prem (prem@graas.ai)":                     "prem@graas.ai",
+                        "Dhanashree (dhanashree.mohite@graas.ai)":  "dhanashree.mohite@graas.ai",
+                        "Amruta (amruta@graas.ai)":                 "amruta@graas.ai",
+                        "Gaurav (gaurav@graas.ai)":                 "gaurav@graas.ai",
+                        "Insights (insights@graas.ai)":             "insights@graas.ai",
+                        "Custom…":                                  "",
                     }
                     tcol1, tcol2 = st.columns([1, 1])
                     with tcol1:
