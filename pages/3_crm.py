@@ -1210,7 +1210,51 @@ with tab_compose:
                 )
                 send_target = dict(contact_options[[c[0] for c in contact_options].index(send_label)][1])
 
-                # Render personalized subject + body for the chosen recipient
+                # Test-mode override — lets you redirect this exact email to any
+                # address (e.g. yourself) without polluting the contact list.
+                # Personalization tokens still resolve from the selected contact,
+                # so the email content is identical to what the real recipient
+                # would receive — only the To: address changes.
+                test_mode = st.checkbox(
+                    "🧪 Send to test address instead (override recipient email)",
+                    key="send_test_mode",
+                    help="Useful for testing deliverability, From/Reply-To setup, "
+                         "and rendering. The email body still uses the selected "
+                         "contact's name/company for accurate personalization."
+                )
+                test_email = ""
+                if test_mode:
+                    # Known internal testers — extend this list as needed.
+                    TEST_RECIPIENTS = {
+                        "Prem (prem@graas.ai)":                 "prem@graas.ai",
+                        "Dhanashree (dhanashree.mohit@graas.ai)": "dhanashree.mohit@graas.ai",
+                        "Amruta (amruta@graas.ai)":             "amruta@graas.ai",
+                        "Gaurav (gaurav@graas.ai)":             "gaurav@graas.ai",
+                        "Insights (insights@graas.ai)":         "insights@graas.ai",
+                        "Custom…":                              "",
+                    }
+                    tcol1, tcol2 = st.columns([1, 1])
+                    with tcol1:
+                        test_choice = st.selectbox(
+                            "Test recipient",
+                            list(TEST_RECIPIENTS.keys()),
+                            key="send_test_choice",
+                        )
+                    if test_choice == "Custom…":
+                        with tcol2:
+                            test_email = st.text_input(
+                                "Custom email",
+                                value="",
+                                placeholder="someone@example.com",
+                                key="send_test_email_custom",
+                            ).strip()
+                    else:
+                        test_email = TEST_RECIPIENTS[test_choice]
+                        with tcol2:
+                            st.markdown(f"**→** `{test_email}`")
+
+                # Render personalized subject + body for the chosen contact
+                # (personalization always uses the dropdown contact, even in test mode)
                 rendered_subject_send = subject.format(
                     company=send_target["company"], name=send_target["person_name"],
                     vertical=send_target["vertical"], sender=sender_name,
@@ -1226,6 +1270,10 @@ with tab_compose:
                 }.items():
                     rendered_body_send = rendered_body_send.replace(k, str(v))
 
+                # Resolve the actual To: address (test override or real recipient)
+                effective_to_email = test_email if (test_mode and test_email) else send_target["email"]
+                effective_to_name = "Test (Prem)" if (test_mode and test_email) else send_target["person_name"]
+
                 # Two-step confirm to avoid misclicks
                 confirm_key = "send_confirm_armed"
                 if confirm_key not in st.session_state:
@@ -1233,14 +1281,17 @@ with tab_compose:
 
                 cols = st.columns([2, 1, 1])
                 with cols[0]:
+                    test_badge = " 🧪 **TEST MODE**" if (test_mode and test_email) else ""
                     st.markdown(
-                        f"**Will send to:** `{send_target['email']}`  \n"
+                        f"**Will send to:** `{effective_to_email}`{test_badge}  \n"
                         f"**From:** Graas Insights `<insights@graas.ai>`  \n"
-                        f"**Reply-To:** {sender_display_name} `<{sender_reply_to}>`"
+                        f"**Reply-To:** {sender_display_name} `<{sender_reply_to}>`  \n"
+                        f"**Personalized for:** {send_target['person_name']} at {send_target['company']}"
                     )
                 with cols[1]:
+                    send_disabled = (left <= 0) or (test_mode and not test_email)
                     if not st.session_state[confirm_key]:
-                        if st.button("📧 Send email", type="primary", disabled=(left <= 0),
+                        if st.button("📧 Send email", type="primary", disabled=send_disabled,
                                      use_container_width=True, key="send_arm"):
                             st.session_state[confirm_key] = True
                             st.rerun()
@@ -1249,17 +1300,17 @@ with tab_compose:
                                      use_container_width=True, key="send_confirm"):
                             ok, msg = send_email(
                                 sender_label=sender_label,
-                                to_email=send_target["email"],
-                                to_name=send_target["person_name"],
-                                company=send_target["company"],
+                                to_email=effective_to_email,
+                                to_name=effective_to_name,
+                                company=send_target["company"] + (" [TEST]" if test_mode else ""),
                                 subject=rendered_subject_send,
                                 body=rendered_body_send,
                                 bucket=str(send_target.get("playbook_bucket", "")) or str(send_target.get("recency", "")),
-                                template=template_name,
+                                template=template_name + (" (test)" if test_mode else ""),
                             )
                             st.session_state[confirm_key] = False
                             if ok:
-                                st.success(f"✅ Sent to {send_target['email']}")
+                                st.success(f"✅ Sent to {effective_to_email}")
                             else:
                                 st.error(f"❌ Send failed: {msg}")
                             st.rerun()
