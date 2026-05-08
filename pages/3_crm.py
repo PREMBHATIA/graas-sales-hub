@@ -1147,6 +1147,10 @@ with tab_compose:
         get_weekly_cap,
         get_sends_this_week,
         recent_sends,
+        last_sent_to,
+        get_dedup_days,
+        recent_sent_emails,
+        suppressed_emails,
     )
 
     pre_err = preflight_check()
@@ -1331,6 +1335,23 @@ with tab_compose:
                         f"never to {send_target['email']})."
                     )
 
+                # Dedup check — warn if this recipient was emailed within DEDUP_DAYS.
+                # Test mode bypasses (test addresses are hit repeatedly during testing).
+                dedup_override = False
+                dedup_days = get_dedup_days()
+                if not test_mode:
+                    _last_sent, _days_ago = last_sent_to(effective_to_email)
+                    if _last_sent and _days_ago is not None and _days_ago < dedup_days:
+                        st.warning(
+                            f"⚠️ **{effective_to_email}** was last emailed **{_days_ago} day(s) ago** "
+                            f"(dedup window = {dedup_days} days). Sending again is blocked unless you override."
+                        )
+                        dedup_override = st.checkbox(
+                            f"Send anyway (override {dedup_days}-day dedup)",
+                            key="dedup_override_box",
+                            help="Use sparingly — repeat sends inside the dedup window often feel spammy."
+                        )
+
                 cols = st.columns([2, 1, 1])
                 with cols[0]:
                     test_badge = " 🧪 **TEST MODE**" if (test_mode and test_email) else ""
@@ -1340,7 +1361,17 @@ with tab_compose:
                         f"**Reply-To:** {sender_display_name} `<{sender_reply_to}>`"
                     )
                 with cols[1]:
-                    send_disabled = (left <= 0) or (test_mode and not test_email) or no_touch_block
+                    # Disable Send if cap reached, or test-mode-without-email, or
+                    # No-Touch-blocked, or recipient is in dedup window without override.
+                    _last_sent_check, _days_check = last_sent_to(effective_to_email)
+                    in_dedup_window = (not test_mode and _last_sent_check is not None
+                                       and _days_check is not None and _days_check < dedup_days)
+                    send_disabled = (
+                        (left <= 0)
+                        or (test_mode and not test_email)
+                        or no_touch_block
+                        or (in_dedup_window and not dedup_override)
+                    )
                     if not st.session_state[confirm_key]:
                         if st.button("📧 Send email", type="primary", disabled=send_disabled,
                                      use_container_width=True, key="send_arm"):
@@ -1359,6 +1390,7 @@ with tab_compose:
                                     body=rendered_body_send,
                                     bucket=str(send_target.get("playbook_bucket", "")) or str(send_target.get("recency", "")),
                                     template=template_name + (" (test)" if test_mode else ""),
+                                    bypass_dedup=test_mode or dedup_override,
                                 )
                             st.session_state[confirm_key] = False
                             # Stash result so we can show it after the rerun
@@ -1389,6 +1421,205 @@ with tab_compose:
                     st.code(', '.join(co_emails), language=None)
                 if len(recipients['company'].unique()) > 20:
                     st.caption(f"... and {len(recipients['company'].unique()) - 20} more companies")
+
+        # ── Bulk send to filtered set ─────────────────────────────────────────
+        st.markdown("---")
+        st.markdown("##### 📨 Bulk send to all in current filter")
+        st.caption(
+            "Sends the **same template + body** to every recipient in the current Step 1 filter, "
+            "with `{name}`, `{company}`, `{vertical}` substituted per-person. "
+            "If you've added personal lines to the body (e.g. \"Hope golf is going well\"), reset to "
+            "the framework template first — they'll go to everyone otherwise."
+        )
+
+        if recipients.empty or not contact_options:
+            st.caption("No recipients in current filter. Adjust filters in Step 1 above.")
+        else:
+            # ── Pre-flight: build filter pipeline ─────────────────────────
+            bulk_pool = recipients[recipients["email"].apply(lambda e: bool(e) and "@" in str(e))].copy()
+            bulk_pool["_email_norm"] = bulk_pool["email"].str.lower().str.strip()
+
+            # Stage 1: total
+            stage_total = len(bulk_pool)
+
+            # Stage 2: remove No-Touch companies
+            def _is_no_touch(v):
+                return isinstance(v, dict) and v.get("category")
+            no_touch_mask = bulk_pool.get("playbook_no_touch", pd.Series([None]*len(bulk_pool))).apply(_is_no_touch)
+            bulk_no_touch = bulk_pool[no_touch_mask]
+            after_no_touch = bulk_pool[~no_touch_mask]
+            stage_after_nt = len(after_no_touch)
+
+            # Stage 3: remove suppressed
+            with st.spinner("Loading suppression + recent-send data…"):
+                supp_set = suppressed_emails()
+                recent_set = recent_sent_emails(get_dedup_days())
+            sup_mask = after_no_touch["_email_norm"].isin(supp_set)
+            bulk_supp = after_no_touch[sup_mask]
+            after_supp = after_no_touch[~sup_mask]
+            stage_after_supp = len(after_supp)
+
+            # Stage 4: remove recently-sent (dedup window)
+            dedup_mask = after_supp["_email_norm"].isin(recent_set)
+            bulk_dedup = after_supp[dedup_mask]
+            after_dedup = after_supp[~dedup_mask]
+            stage_final = len(after_dedup)
+
+            # Show filter pipeline
+            st.markdown(
+                f"**Filter pipeline:**  \n"
+                f"• {stage_total} contacts in current filter  \n"
+                f"• −{stage_total - stage_after_nt} No-Touch companies → **{stage_after_nt}**  \n"
+                f"• −{stage_after_nt - stage_after_supp} on suppression list → **{stage_after_supp}**  \n"
+                f"• −{stage_after_supp - stage_final} sent within last {get_dedup_days()}d (dedup) → **{stage_final}**  \n"
+                f"### → Will send to **{stage_final}** recipient(s)"
+            )
+
+            # Cap check
+            bulk_blocked_reason = None
+            if stage_final == 0:
+                bulk_blocked_reason = "No recipients left after filters."
+            elif stage_final > left:
+                bulk_blocked_reason = (
+                    f"{stage_final} sends would exceed the weekly cap "
+                    f"({used} used, {left} remaining of {cap}). "
+                    f"Reduce the filter or wait for cap to roll over."
+                )
+
+            # Drilldown of who's being filtered out (for transparency)
+            if stage_total > stage_final:
+                with st.expander(f"🔍 See who's being filtered out ({stage_total - stage_final} contacts)"):
+                    if not bulk_no_touch.empty:
+                        st.markdown(f"**🚫 No-Touch ({len(bulk_no_touch)}):**")
+                        st.dataframe(
+                            bulk_no_touch[["company", "person_name", "email"]].rename(
+                                columns={"company": "Company", "person_name": "Name", "email": "Email"}),
+                            use_container_width=True, hide_index=True, height=140)
+                    if not bulk_supp.empty:
+                        st.markdown(f"**🚷 Suppressed ({len(bulk_supp)}):**")
+                        st.dataframe(
+                            bulk_supp[["company", "person_name", "email"]].rename(
+                                columns={"company": "Company", "person_name": "Name", "email": "Email"}),
+                            use_container_width=True, hide_index=True, height=140)
+                    if not bulk_dedup.empty:
+                        st.markdown(f"**⏱️ Recently emailed ({len(bulk_dedup)}, within {get_dedup_days()}d):**")
+                        st.dataframe(
+                            bulk_dedup[["company", "person_name", "email"]].rename(
+                                columns={"company": "Company", "person_name": "Name", "email": "Email"}),
+                            use_container_width=True, hide_index=True, height=140)
+
+            # Preview of who WILL be sent to
+            if stage_final > 0:
+                with st.expander(f"📋 Preview the {stage_final} recipient(s) who WILL be sent to"):
+                    st.dataframe(
+                        after_dedup[["company", "person_name", "email", "playbook_bucket"]].rename(
+                            columns={"company": "Company", "person_name": "Name",
+                                     "email": "Email", "playbook_bucket": "Bucket"}),
+                        use_container_width=True, hide_index=True, height=300)
+
+            # Bulk send button — two-step confirm
+            bulk_confirm_key = "bulk_confirm_armed"
+            if bulk_confirm_key not in st.session_state:
+                st.session_state[bulk_confirm_key] = False
+
+            if bulk_blocked_reason:
+                st.error(f"⚠️ {bulk_blocked_reason}")
+
+            bcols = st.columns([2, 1, 1])
+            with bcols[0]:
+                if not bulk_blocked_reason:
+                    st.markdown(
+                        f"**Will send {stage_final} email(s) via:** {sender_display_name} `<{sender_reply_to}>`  \n"
+                        f"**Framework:** {template_name}  \n"
+                        f"**Cap impact:** {used}/{cap} → **{used + stage_final}/{cap}**"
+                    )
+            with bcols[1]:
+                if not st.session_state[bulk_confirm_key]:
+                    if st.button(f"📨 Send to all {stage_final}",
+                                 type="primary",
+                                 disabled=bool(bulk_blocked_reason),
+                                 use_container_width=True,
+                                 key="bulk_arm"):
+                        st.session_state[bulk_confirm_key] = True
+                        st.rerun()
+                else:
+                    if st.button(f"✅ Confirm send to {stage_final}",
+                                 type="primary",
+                                 use_container_width=True,
+                                 key="bulk_confirm"):
+                        # Run the send loop
+                        progress_bar = st.progress(0.0, text=f"Sending 0 of {stage_final}…")
+                        sent_n, failed_n = 0, 0
+                        failures = []
+                        for i, (_, row) in enumerate(after_dedup.iterrows(), start=1):
+                            r_full = str(row.get("person_name", "")).strip()
+                            r_first = r_full.split()[0] if r_full else r_full
+                            try:
+                                r_subj = subject.format(
+                                    company=row["company"], name=r_first, full_name=r_full,
+                                    vertical=row["vertical"], sender=sender_name,
+                                ) if "{" in subject else subject
+                            except Exception as e:
+                                failures.append((row["email"], f"Subject format error: {e}"))
+                                failed_n += 1
+                                progress_bar.progress(i / stage_final, text=f"Sending {i} of {stage_final}…")
+                                continue
+
+                            r_body = body
+                            for k, v in {
+                                "{company}":    row["company"],
+                                "{name}":       r_first,
+                                "{full_name}":  r_full,
+                                "{vertical}":   row["vertical"],
+                                "{sender}":     sender_name,
+                                "{designation}": row.get("designation", ""),
+                            }.items():
+                                r_body = r_body.replace(k, str(v))
+
+                            ok_b, msg_b = send_email(
+                                sender_label=sender_label,
+                                to_email=row["email"],
+                                to_name=r_full,
+                                company=row["company"],
+                                subject=r_subj,
+                                body=r_body,
+                                bucket=str(row.get("playbook_bucket", "")) or str(row.get("recency", "")),
+                                template=template_name,
+                                bypass_dedup=False,  # already pre-filtered, but keep guard active
+                            )
+                            if ok_b:
+                                sent_n += 1
+                            else:
+                                failed_n += 1
+                                failures.append((row["email"], msg_b))
+                            progress_bar.progress(i / stage_final, text=f"Sending {i} of {stage_final}…")
+
+                        progress_bar.empty()
+                        st.session_state[bulk_confirm_key] = False
+                        # Stash result for persistent banner
+                        st.session_state["last_bulk_result"] = (sent_n, failed_n, failures)
+                        st.rerun()
+
+            with bcols[2]:
+                if st.session_state[bulk_confirm_key]:
+                    if st.button("Cancel", use_container_width=True, key="bulk_cancel"):
+                        st.session_state[bulk_confirm_key] = False
+                        st.rerun()
+
+            # Show last bulk result if any
+            last_bulk = st.session_state.get("last_bulk_result")
+            if last_bulk:
+                bsent, bfail, bfailures = last_bulk
+                if bfail == 0:
+                    st.success(f"✅ Bulk send complete — **{bsent} sent**, 0 failed.")
+                else:
+                    st.warning(f"⚠️ Bulk send done — **{bsent} sent**, **{bfail} failed**.")
+                    with st.expander(f"View {bfail} failure(s)"):
+                        for em, why in bfailures:
+                            st.markdown(f"- `{em}` — {why}")
+                if st.button("Dismiss bulk result", key="dismiss_bulk_result"):
+                    del st.session_state["last_bulk_result"]
+                    st.rerun()
 
         st.caption("📊 Open the **Analytics** tab to see send history, volume by sender, and outreach metrics.")
 

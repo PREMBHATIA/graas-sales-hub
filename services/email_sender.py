@@ -63,6 +63,86 @@ def get_weekly_cap() -> int:
         return 50
 
 
+def get_dedup_days() -> int:
+    """Read dedup window from env, default 14 days."""
+    try:
+        return int(os.getenv("DEDUP_DAYS", "14"))
+    except ValueError:
+        return 14
+
+
+def recent_sent_emails(days: int = None) -> set:
+    """Return a set of lowercased emails sent successfully within the last N days.
+
+    Used by bulk send to filter recipients in one pass instead of N sheet reads.
+    """
+    if days is None:
+        days = get_dedup_days()
+    sheet_id = os.getenv("EMAIL_LOG_SHEET_ID", "")
+    if not sheet_id:
+        return set()
+    df = fetch_log_rows(sheet_id, LOG_TAB_NAME)
+    if df.empty or "to_email" not in df.columns or "timestamp_utc" not in df.columns:
+        return set()
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+
+    def _parse(ts):
+        try:
+            return datetime.fromisoformat(ts.replace("Z", "+00:00"))
+        except Exception:
+            return None
+
+    sent = df[df["status"] == "sent"].copy()
+    sent["_ts"] = sent["timestamp_utc"].apply(_parse)
+    sent = sent[(sent["_ts"].notna()) & (sent["_ts"] >= cutoff)]
+    return set(sent["to_email"].str.lower().str.strip().tolist())
+
+
+def suppressed_emails() -> set:
+    """Return a set of lowercased suppressed emails — used for bulk filtering."""
+    df = fetch_suppressions()
+    if df.empty or "email" not in df.columns:
+        return set()
+    return set(df["email"].str.lower().str.strip().tolist())
+
+
+def last_sent_to(email: str):
+    """Return (last_sent_datetime_utc, days_ago) for a recipient, or (None, None) if never sent.
+
+    Looks at successful sends only (status == 'sent'). Test sends count too —
+    composer-level bypass_dedup handles the test-mode case separately.
+    """
+    if not email:
+        return None, None
+    sheet_id = os.getenv("EMAIL_LOG_SHEET_ID", "")
+    if not sheet_id:
+        return None, None
+    df = fetch_log_rows(sheet_id, LOG_TAB_NAME)
+    if df.empty or "to_email" not in df.columns or "timestamp_utc" not in df.columns:
+        return None, None
+    target = email.lower().strip()
+    matches = df[
+        (df["to_email"].str.lower().str.strip() == target) &
+        (df["status"] == "sent")
+    ].copy()
+    if matches.empty:
+        return None, None
+
+    def _parse(ts):
+        try:
+            return datetime.fromisoformat(ts.replace("Z", "+00:00"))
+        except Exception:
+            return None
+
+    matches["_ts"] = matches["timestamp_utc"].apply(_parse)
+    matches = matches[matches["_ts"].notna()]
+    if matches.empty:
+        return None, None
+    latest = matches["_ts"].max()
+    days_ago = (datetime.now(timezone.utc) - latest).days
+    return latest, days_ago
+
+
 def get_sends_this_week() -> int:
     """Count successful sends in the trailing 7 days from the log sheet."""
     sheet_id = os.getenv("EMAIL_LOG_SHEET_ID", "")
@@ -109,6 +189,7 @@ def send_email(
     body: str,
     bucket: str = "",
     template: str = "",
+    bypass_dedup: bool = False,
 ) -> tuple[bool, str]:
     """Send a single email + log the result.
 
@@ -117,6 +198,10 @@ def send_email(
       - preflight config check
       - weekly cap (refuses send if cap reached)
       - sender_label must be a known sender
+      - suppression list (do-not-contact emails)
+      - dedup window (refuses if same email was sent within DEDUP_DAYS unless
+        bypass_dedup=True; bypass is meant for test mode + user-confirmed
+        overrides from the composer)
     """
     err = preflight_check()
     if err:
@@ -138,6 +223,18 @@ def send_email(
     suppressed, supp_reason = is_suppressed(to_email)
     if suppressed:
         return False, f"On suppression list: {supp_reason or 'no reason given'}"
+
+    # Dedup check — refuse to email the same recipient twice within DEDUP_DAYS
+    # unless bypass_dedup is explicitly True (test mode, or composer override).
+    if not bypass_dedup:
+        dedup_days = get_dedup_days()
+        last_sent, days_ago = last_sent_to(to_email)
+        if last_sent and days_ago is not None and days_ago < dedup_days:
+            return False, (
+                f"Recipient was emailed {days_ago} day(s) ago "
+                f"(dedup window = {dedup_days} days). "
+                f"To override, check 'Send anyway' in the composer."
+            )
 
     smtp_user = os.getenv("SMTP_USER")
     smtp_pass = os.getenv("SMTP_PASS")
