@@ -1104,18 +1104,22 @@ with tab_compose:
         preview_contacts = recipients[recipients['company'] == preview_co]
         if not preview_contacts.empty:
             pc = preview_contacts.iloc[0]
-            # Render template
+            # Render template — {name} = first name, {full_name} = full name
+            _pv_full = str(pc.get('person_name', '')).strip()
+            _pv_first = _pv_full.split()[0] if _pv_full else _pv_full
+
             rendered_subject = subject.format(
-                company=pc['company'], name=pc['person_name'],
+                company=pc['company'], name=_pv_first, full_name=_pv_full,
                 vertical=pc['vertical'], sender=sender_name,
             ) if '{' in subject else subject
 
             rendered_body = body
             for key, val in {
-                '{company}': pc['company'],
-                '{name}': pc['person_name'],
-                '{vertical}': pc['vertical'],
-                '{sender}': sender_name,
+                '{company}':    pc['company'],
+                '{name}':       _pv_first,
+                '{full_name}':  _pv_full,
+                '{vertical}':   pc['vertical'],
+                '{sender}':     sender_name,
                 '{designation}': pc['designation'],
             }.items():
                 rendered_body = rendered_body.replace(key, str(val))
@@ -1281,17 +1285,23 @@ with tab_compose:
 
                 # Render personalized subject + body for the chosen contact
                 # (personalization always uses the dropdown contact, even in test mode)
+                # {name} → first name only (matches how cold outreach is actually written)
+                # {full_name} → full name, kept as a backup for templates that need it
+                _full_name = str(send_target.get("person_name", "")).strip()
+                _first_name = _full_name.split()[0] if _full_name else _full_name
+
                 rendered_subject_send = subject.format(
-                    company=send_target["company"], name=send_target["person_name"],
+                    company=send_target["company"], name=_first_name, full_name=_full_name,
                     vertical=send_target["vertical"], sender=sender_name,
                 ) if "{" in subject else subject
 
                 rendered_body_send = body
                 for k, v in {
-                    "{company}": send_target["company"],
-                    "{name}": send_target["person_name"],
-                    "{vertical}": send_target["vertical"],
-                    "{sender}": sender_name,
+                    "{company}":    send_target["company"],
+                    "{name}":       _first_name,
+                    "{full_name}":  _full_name,
+                    "{vertical}":   send_target["vertical"],
+                    "{sender}":     sender_name,
                     "{designation}": send_target.get("designation", ""),
                 }.items():
                     rendered_body_send = rendered_body_send.replace(k, str(v))
