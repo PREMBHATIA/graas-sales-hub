@@ -49,6 +49,9 @@ LOG_HEADERS = [
     "subject", "body", "status", "error_msg",
 ]
 
+SUPPRESSION_TAB_NAME = "Suppressions"
+SUPPRESSION_HEADERS = ["email", "reason", "added_at_utc", "added_by"]
+
 
 # ── Public API ───────────────────────────────────────────────────────────────
 
@@ -128,6 +131,14 @@ def send_email(
     if not to_email or "@" not in to_email:
         return False, f"Invalid recipient: {to_email}"
 
+    # Suppression check — block if recipient is on the do-not-contact list.
+    # Test addresses can also be suppressed (e.g. someone typo'd them in by accident);
+    # if you really need to send to a suppressed address, remove it from the
+    # Suppressions tab in the Outreach Log sheet first.
+    suppressed, supp_reason = is_suppressed(to_email)
+    if suppressed:
+        return False, f"On suppression list: {supp_reason or 'no reason given'}"
+
     smtp_user = os.getenv("SMTP_USER")
     smtp_pass = os.getenv("SMTP_PASS")
     sender_name, reply_to = SENDERS[sender_label]
@@ -197,3 +208,47 @@ def recent_sends(limit: int = 20):
     if df.empty:
         return df
     return df.tail(limit).iloc[::-1].reset_index(drop=True)
+
+
+# ── Suppression list ─────────────────────────────────────────────────────────
+
+def fetch_suppressions():
+    """Return the suppression list as a DataFrame (email, reason, added_at_utc, added_by)."""
+    import pandas as pd
+    sheet_id = os.getenv("EMAIL_LOG_SHEET_ID", "")
+    if not sheet_id:
+        return pd.DataFrame()
+    return fetch_log_rows(sheet_id, SUPPRESSION_TAB_NAME)
+
+
+def is_suppressed(email: str) -> tuple[bool, str]:
+    """Check if an email is on the suppression list. Returns (is_suppressed, reason)."""
+    if not email:
+        return False, ""
+    df = fetch_suppressions()
+    if df.empty or "email" not in df.columns:
+        return False, ""
+    target = email.lower().strip()
+    matches = df[df["email"].str.lower().str.strip() == target]
+    if matches.empty:
+        return False, ""
+    return True, str(matches.iloc[0].get("reason", ""))
+
+
+def add_to_suppression(email: str, reason: str, added_by: str = "") -> bool:
+    """Add an email to the suppression list. Idempotent — duplicates are skipped."""
+    if not email or "@" not in email:
+        return False
+    sheet_id = os.getenv("EMAIL_LOG_SHEET_ID", "")
+    if not sheet_id:
+        return False
+    already, _ = is_suppressed(email)
+    if already:
+        return True  # nothing to do
+    row = [
+        email.lower().strip(),
+        reason or "",
+        datetime.now(timezone.utc).isoformat(),
+        added_by or "",
+    ]
+    return append_log_row(sheet_id, SUPPRESSION_TAB_NAME, row, headers=SUPPRESSION_HEADERS)

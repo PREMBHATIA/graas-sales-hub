@@ -899,113 +899,77 @@ with tab_segments:
 # TAB 3: EMAIL COMPOSER
 # ══════════════════════════════════════════════════════════════════════════════
 
+# 5 frameworks from Amruta's playbook (Building Agentic Frameworks).
+# Each maps 1:1 to a playbook bucket; the composer auto-suggests the right
+# framework based on which bucket the selected contact's company is in.
 EMAIL_TEMPLATES = {
-    "Follow-up (Active Leads)": {
-        "subject": "Following up — {company} x All-e",
+    "A — Market Signal (Timing-Paused)": {
+        "subject": "Quick thought on {company} + {vertical} shifts",
         "body": """Hi {name},
 
-Following up on our recent conversation about All-e for {company}. Wanted to check if you had any questions or needed anything specific from our side to move forward.
+Saw the recent moves in {vertical} around AI-native commerce — a few players are starting to operationalise agentic workflows for retailer ordering and trade promotion at scale.
 
-Happy to jump on a quick call whenever works for you.
+When we last spoke, timing wasn't right. Wanted to flag this shift because the gap between early adopters and the rest of the category is widening fast.
+
+Would a 20-min refresh on what's new at All-e since then be useful? No pressure — happy to just send a short note if easier.
 
 Best,
 {sender}""",
     },
-    "Hot Re-engagement (Recent)": {
-        "subject": "Quick follow-up — {company}",
+    "B — Outcome Reference (Evaluation Stalled)": {
+        "subject": "How a {vertical} peer cut order-cycle time by 40% with All-e",
         "body": """Hi {name},
 
-Good speaking recently about {company}. I wanted to circle back with something specific rather than a generic nudge.
+Following up on our earlier evaluation — wanted to share a concrete data point.
 
-Since we last spoke, we've rolled out a few things that map to what you were evaluating — happy to share a short walkthrough focused on your use case.
+A peer in {vertical} (similar size and channel mix to {company}) went live with All-e last quarter. Early numbers:
+• 40% faster order processing across distributors
+• 3× retailer engagement on key SKU campaigns
+• Single-pane visibility into trade promotion ROI
 
-Does a 20-min call this week work?
+The use case maps closely to what we discussed for {company}. Worth a 20-min walkthrough of what they did differently from your original evaluation?
 
 Best,
 {sender}""",
     },
-    "Warm Nudge": {
-        "subject": "Quick check-in — {company}",
+    "C — Adoption Gap (Competitor-Adjacent)": {
+        "subject": "{vertical} is moving on agentic AI — quick sync?",
         "body": """Hi {name},
 
-It's been a few weeks since we last spoke about All-e for {company}. I didn't want the conversation to go stale without giving you something concrete.
+A few players in {vertical} have started rolling out agentic AI for retailer ordering and trade promotion in the last 6–8 weeks. Won't name names — but enough that it's becoming a category-level shift, not an early-adopter experiment.
 
-A few things have shipped since — agentic ordering via WhatsApp, SKU-level performance root cause analysis, and affiliate analytics. If any of these are closer to what you need, happy to share a short demo.
+When we connected earlier, {company} wasn't ready to commit. Just wanted to make sure you have visibility into where the category is heading so the decision when you're ready is well-informed.
 
-Is this week good for a quick call?
+Happy to share a 15-min landscape view if useful.
 
 Best,
 {sender}""",
     },
-    "Cool Re-introduction": {
-        "subject": "An update from Graas — thought of {company}",
+    "D — Founder-Tone Strategic Note (Strategic Slow Movers)": {
+        "subject": "{name} — strategic angle worth a chat",
         "body": """Hi {name},
 
-It's been a few months since we last connected about All-e. Wanted to share a quick update on where we've taken things — especially because a few of the capabilities are directly relevant to {company} in {vertical}.
+Direct note — skipping the usual follow-up format.
 
-What's new:
-- Agentic ordering via WhatsApp for distributors and retailers (ERP-integrated, ~90 sec from invoice photo to order)
-- Root cause analytics — understand why sales declined by SKU × platform × market
-- Affiliate and creator analytics across Shopee, Lazada, TikTok
+{company} sits in a position where the {vertical} category is restructuring around agentic execution. We've spent the last 18 months building exactly for this shift, and the window to be the first mover in your sub-segment is real but narrow.
 
-Would you be open to a fresh 20-min conversation to see if timing is better now?
+20 minutes, leader-to-leader — what does the next 12 months look like for {company}, and where does AI-native execution fit?
 
 Best,
 {sender}""",
     },
-    "Cold Re-introduction": {
-        "subject": "Reconnecting — Graas All-e for {company}",
+    "E — Specific Trigger (Ghost Accounts)": {
+        "subject": "Saw the news on {company}",
         "body": """Hi {name},
 
-We connected some time back about All-e for {company}. A lot has changed on our side since then, so I wanted to reach out fresh rather than continue where we left off.
+Saw the recent {company} news — congrats on what's clearly a strong run.
 
-Short version: we've moved from building agents to running them in production for brands in {vertical}. Order processing is down from days to minutes, and we're seeing real conversion lift on the consumer side.
+When we last connected, the conversation paused mid-flow. Reaching back out because the trajectory you're on now actually makes the All-e use case more relevant, not less:
+• Faster order processing as you scale distribution
+• Retailer-level visibility on trade promotion spend
+• Agentic workflows that don't require headcount expansion
 
-If it's worth a fresh look, I'd be happy to do a 20-min walkthrough focused on where you are today — no assumptions from last time.
-
-Best,
-{sender}""",
-    },
-    "Re-engagement (Dropped Leads)": {
-        "subject": "Catching up — {company} x Graas All-e",
-        "body": """Hi {name},
-
-Hope you're doing well. We last connected regarding All-e for {company}, and I wanted to share some updates on what we've been building since then.
-
-We've recently launched agentic AI workflows for offline sales teams — AI agents that handle distributor ordering via WhatsApp, product discovery, and field force automation. A leading electronics major and a large agri major are already piloting these with strong early results.
-
-Would love to reconnect and explore if there's a fit now. Are you open to a quick 20-min call this week?
-
-Best,
-{sender}""",
-    },
-    "Product Update": {
-        "subject": "New capabilities in All-e — thought of {company}",
-        "body": """Hi {name},
-
-Quick update from our side — we've shipped some significant improvements to All-e that I thought would be relevant for {company}:
-
-- Agentic ordering via WhatsApp — distributors/retailers can place orders through a conversational AI agent
-- Product discovery agent — helps sales reps and end-customers find the right product from large catalogues (60K+ SKUs)
-- Field force automation — AI-powered visit planning, stock-taking, and order capture
-
-Would be great to walk you through a quick demo. Would any day this week work?
-
-Best,
-{sender}""",
-    },
-    "Meeting Request (Cold)": {
-        "subject": "Quick intro — Graas All-e for {company}",
-        "body": """Hi {name},
-
-I'm reaching out from Graas. We've built All-e — an AI agent platform purpose-built for e-commerce and offline sales teams.
-
-Given {company}'s focus on {vertical}, I think there could be a strong fit, particularly around:
-- AI-powered ordering for distributors/retailers
-- Product discovery and recommendation agents
-- Sales force automation
-
-Would you be open to a 20-minute call to explore?
+Worth a 20-min reset?
 
 Best,
 {sender}""",
@@ -1016,7 +980,37 @@ Best,
     },
 }
 
+# Bucket → framework auto-mapping (from Amruta's playbook)
+BUCKET_TO_FRAMEWORK = {
+    "Timing-Paused":            "A — Market Signal (Timing-Paused)",
+    "Evaluation Stalled":       "B — Outcome Reference (Evaluation Stalled)",
+    "Competitor-Adjacent":      "C — Adoption Gap (Competitor-Adjacent)",
+    "Strategic Slow Movers":    "D — Founder-Tone Strategic Note (Strategic Slow Movers)",
+    "Ghost Accounts":           "E — Specific Trigger (Ghost Accounts)",
+}
+
 with tab_compose:
+    # ── Auto-reset body/subject when template OR recipient changes ────────────
+    # Without this, a personal line like "Hope the golf is going well" stays in
+    # the body when you switch to a different recipient — and gets sent to the
+    # wrong person. We detect changes by comparing the previous-render values
+    # cached in session state to the current ones.
+    _prev_template = st.session_state.get("_last_template_name")
+    _prev_recipient = st.session_state.get("_last_recipient_label")
+    _curr_template = st.session_state.get("template_sel")
+    _curr_recipient = st.session_state.get("send_recipient")
+
+    if _curr_template and _curr_template in EMAIL_TEMPLATES:
+        _tmpl = EMAIL_TEMPLATES[_curr_template]
+        # Reset only if something *changed* — first render leaves both alone
+        if (_prev_template is not None and _prev_template != _curr_template) or \
+           (_prev_recipient is not None and _prev_recipient != _curr_recipient):
+            st.session_state["email_body"] = _tmpl["body"]
+            st.session_state["email_subject"] = _tmpl["subject"]
+
+    st.session_state["_last_template_name"] = _curr_template
+    st.session_state["_last_recipient_label"] = _curr_recipient
+
     st.markdown("### ✉️ Compose Outreach Email")
 
     # ── Step 1: Select recipients ─────────────────────────────────────────────
@@ -1048,23 +1042,17 @@ with tab_compose:
 
     st.caption(f"📬 {len(recipients)} contacts across {recipients['company'].nunique()} companies")
 
-    # Smart template suggestion based on recency filter
+    # Suggest a framework based on the dominant playbook bucket in the filtered set
+    # (real per-recipient suggestion happens in step 4 next to the recipient dropdown)
     suggested_template = None
-    if comp_recency == "🔥 Hot (<30d)" and comp_seg == "Active":
-        suggested_template = "Follow-up (Active Leads)"
-    elif comp_recency == "🔥 Hot (<30d)" and comp_seg == "Dropped":
-        suggested_template = "Hot Re-engagement (Recent)"
-    elif comp_recency == "☀️ Warm (30-90d)":
-        suggested_template = "Warm Nudge"
-    elif comp_recency == "❄️ Cool (90-180d)":
-        suggested_template = "Cool Re-introduction"
-    elif comp_recency == "🧊 Cold (180+d)":
-        suggested_template = "Cold Re-introduction"
-    elif comp_recency == "⚫ No date":
-        suggested_template = "Meeting Request (Cold)"
-
-    if suggested_template:
-        st.info(f"💡 Suggested template for this segment: **{suggested_template}**")
+    if not recipients.empty and "playbook_bucket" in recipients.columns:
+        bucket_counts = recipients["playbook_bucket"].value_counts()
+        bucket_counts = bucket_counts[bucket_counts.index.isin(BUCKET_TO_FRAMEWORK.keys())]
+        if not bucket_counts.empty:
+            top_bucket = bucket_counts.index[0]
+            suggested_template = BUCKET_TO_FRAMEWORK.get(top_bucket)
+            if suggested_template:
+                st.info(f"💡 Most contacts here are in **{top_bucket}** → suggested framework: **{suggested_template}**")
 
     with st.expander(f"View {len(recipients)} recipients"):
         if not recipients.empty:
@@ -1238,6 +1226,28 @@ with tab_compose:
                 )
                 send_target = dict(contact_options[[c[0] for c in contact_options].index(send_label)][1])
 
+                # Show the playbook bucket(s) for this contact + suggest the right framework
+                target_buckets = send_target.get("playbook_buckets_all") or []
+                if not isinstance(target_buckets, list):
+                    target_buckets = []
+                target_no_touch = send_target.get("playbook_no_touch")
+                target_note = send_target.get("playbook_note", "")
+
+                if target_buckets:
+                    suggested_for_recipient = BUCKET_TO_FRAMEWORK.get(target_buckets[0])
+                    bucket_str = " · ".join(target_buckets)
+                    if suggested_for_recipient and suggested_for_recipient != template_name:
+                        st.info(
+                            f"📋 **{send_target['company']}** is in playbook bucket(s): **{bucket_str}** → "
+                            f"suggested framework: **{suggested_for_recipient}** "
+                            f"(currently using {template_name})"
+                        )
+                    else:
+                        st.caption(f"📋 Playbook bucket(s): **{bucket_str}**")
+
+                if target_note:
+                    st.warning(f"{target_note}")
+
                 test_email = ""
                 if test_mode:
                     # Known internal testers — extend this list as needed.
@@ -1295,6 +1305,20 @@ with tab_compose:
                 if confirm_key not in st.session_state:
                     st.session_state[confirm_key] = False
 
+                # No-Touch enforcement — block real sends to companies on Amruta's
+                # No-Touch list. Test mode is allowed because it goes to internal
+                # addresses, never to the real (no-touch) recipient.
+                no_touch_block = False
+                if target_no_touch and not test_mode:
+                    no_touch_block = True
+                    st.error(
+                        f"🚫 **Cannot send to {send_target['company']}** — listed in playbook **No-Touch** "
+                        f"({target_no_touch.get('category', '')}).\n\n"
+                        f"**Reason:** _{target_no_touch.get('reason', '')}_\n\n"
+                        f"Override only by switching to test mode (which sends to an internal address, "
+                        f"never to {send_target['email']})."
+                    )
+
                 cols = st.columns([2, 1, 1])
                 with cols[0]:
                     test_badge = " 🧪 **TEST MODE**" if (test_mode and test_email) else ""
@@ -1305,7 +1329,7 @@ with tab_compose:
                         f"**Personalized for:** {send_target['person_name']} at {send_target['company']}"
                     )
                 with cols[1]:
-                    send_disabled = (left <= 0) or (test_mode and not test_email)
+                    send_disabled = (left <= 0) or (test_mode and not test_email) or no_touch_block
                     if not st.session_state[confirm_key]:
                         if st.button("📧 Send email", type="primary", disabled=send_disabled,
                                      use_container_width=True, key="send_arm"):
@@ -1372,6 +1396,8 @@ with tab_analytics:
         get_weekly_cap as _get_weekly_cap,
         get_sends_this_week as _get_sends_this_week,
         preflight_check as _preflight_check,
+        fetch_suppressions as _fetch_suppressions,
+        add_to_suppression as _add_to_suppression,
     )
 
     a_pre_err = _preflight_check()
@@ -1493,3 +1519,46 @@ with tab_analytics:
             ["timestamp_utc", "sender_label", "to_email", "company", "template", "subject", "status", "error_msg"]
             if c in recent_view.columns]
         st.dataframe(recent_view[cols_to_show], use_container_width=True, hide_index=True, height=420)
+
+    # ── Suppression list (always visible, even when no sends yet) ─────────────
+    st.markdown("---")
+    st.markdown("#### 🚫 Suppression list")
+    st.caption(
+        "Emails on this list are blocked from sending — used for people who've "
+        "asked to be removed, bounced repeatedly, or shouldn't be contacted for "
+        "any other reason. Stored in the **Suppressions** tab of the Outreach Log."
+    )
+
+    supp_df = _fetch_suppressions()
+
+    add_cols = st.columns([3, 4, 2, 1])
+    with add_cols[0]:
+        new_supp_email = st.text_input("Email to suppress", placeholder="someone@example.com",
+                                       key="supp_new_email").strip()
+    with add_cols[1]:
+        new_supp_reason = st.text_input("Reason", placeholder="e.g. asked to unsubscribe, bounced 3×",
+                                        key="supp_new_reason").strip()
+    with add_cols[2]:
+        new_supp_by = st.text_input("Added by", value="Prem", key="supp_new_by").strip()
+    with add_cols[3]:
+        st.markdown("&nbsp;")  # vertical alignment
+        if st.button("Add", type="primary", use_container_width=True, key="supp_add_btn"):
+            if not new_supp_email or "@" not in new_supp_email:
+                st.error("Enter a valid email.")
+            else:
+                with st.spinner("Adding to suppression list…"):
+                    ok = _add_to_suppression(new_supp_email, new_supp_reason, new_supp_by)
+                if ok:
+                    st.success(f"✅ {new_supp_email} added to suppression list.")
+                    st.rerun()
+                else:
+                    st.error("Failed to add — check sheet permissions.")
+
+    if supp_df.empty:
+        st.caption("No suppressed emails yet.")
+    else:
+        st.markdown(f"**{len(supp_df)} suppressed:**")
+        st.dataframe(supp_df, use_container_width=True, hide_index=True, height=240)
+        st.caption("To remove an email from suppression, edit the **Suppressions** tab "
+                   "in the [Outreach Log sheet](https://docs.google.com/spreadsheets/d/"
+                   "1Vcu7ZkAjGbzpKH2CUGoSuLUGIfwYBT-GlpNN0zMKJMY/edit) directly.")
