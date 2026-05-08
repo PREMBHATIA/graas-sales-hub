@@ -19,6 +19,12 @@ st.set_page_config(page_title="CRM & Outreach | Graas", page_icon="📧", layout
 st.markdown("## 📧 CRM & Email Outreach")
 st.caption("All-e Active + Dropped leads (team sheet, read-only) + local overlay (Prem's personal adds) — merged view")
 
+st.info(
+    "📖 **Email playbook** — Amruta & team's reference for segments + content. "
+    "[Open Google Doc ↗](https://docs.google.com/document/d/1kbDEjVTpVpFdrdtxhhEomdtss1f05O2Fm8ph4Y1TY1Y/edit?tab=t.0)",
+    icon="📖",
+)
+
 # ── Styling ──────────────────────────────────────────────────────────────────
 
 st.markdown("""
