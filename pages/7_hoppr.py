@@ -427,6 +427,60 @@ def score_prompt(q) -> dict:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# PROMPT INTENT CLASSIFICATION
+# ══════════════════════════════════════════════════════════════════════════════
+# Orthogonal to Prompt Q: classifies WHAT KIND of question the seller is asking.
+#   Factual    — what/when/how many · descriptive lookup
+#   Diagnostic — why/cause · explanatory
+#   Strategic  — should I / recommend / predict · prescriptive or forward-looking
+# Order matters: Strategic and Diagnostic checked first because phrases like
+# "what should I do" or "why is X dropping" would otherwise be caught by the
+# broader Factual "what/" / "what is" patterns.
+
+INTENT_STRATEGIC_PHRASES = [
+    "should i", "should we", "what should", "how should", "what to do",
+    "recommend", "recommendation", "suggest", "suggestion", "advise", "advice",
+    "best way", "best approach", "optimi", "improve", "grow ", "increase",
+    "predict", "forecast", "projection", "project ", "expected to",
+    "going to", "will reach", "will be", "next quarter", "next month",
+    "how can i", "how can we", "how do i grow", "how do we grow",
+    "how to grow", "how to improve", "how to fix", "how to increase",
+    "ways to", "strategy", "plan ", "action ", "next step", "next move",
+]
+INTENT_DIAGNOSTIC_PHRASES = [
+    "why ", "why is", "why are", "why did", "why does", "why has", "why have",
+    "reason", "cause", "caused", "because", "due to",
+    "what's driving", "what is driving", "what drove",
+    "root cause", "behind the", "explain", "explanation",
+    "what happened", "what went wrong",
+]
+INTENT_FACTUAL_PHRASES = [
+    "what is", "what was", "what are", "what were", "what's",
+    "when ", "where ", "who ",
+    "how many", "how much", "how often", "how long",
+    "list ", "show ", "give me", "tell me", "display",
+    "top ", "bottom ", "rank", "highest", "lowest",
+    " vs ", "versus", "compare", "comparison", "between",
+    "which ", "name ", "find ", "breakdown",
+]
+
+def classify_prompt_intent(q) -> str:
+    """Return 'Strategic' | 'Diagnostic' | 'Factual' | 'Unclear'."""
+    if q is None or (isinstance(q, float) and pd.isna(q)):
+        return "Unclear"
+    ql = str(q).strip().lower()
+    if ql in ("", "loading...", "loading", "nan"):
+        return "Unclear"
+    if any(p in ql for p in INTENT_STRATEGIC_PHRASES):
+        return "Strategic"
+    if any(p in ql for p in INTENT_DIAGNOSTIC_PHRASES):
+        return "Diagnostic"
+    if any(p in ql for p in INTENT_FACTUAL_PHRASES):
+        return "Factual"
+    return "Unclear"
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # PRE-PROCESS EVAL SHEET
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -497,6 +551,7 @@ if not raw_eval.empty:
         _scores = edf["_question"].apply(score_prompt)
         edf["_prompt_score"] = _scores.apply(lambda d: d["score"])
         edf["_prompt_tier"]  = _scores.apply(lambda d: d["tier"])
+        edf["_prompt_intent"] = edf["_question"].apply(classify_prompt_intent)
         eval_processed = edf
 
 
@@ -619,6 +674,25 @@ if not eval_processed.empty and sellers and "_email" in eval_processed.columns:
     _seller_avg = (_scored_only.groupby("_seller")["_prompt_score"]
                    .mean().round(0).astype(int).to_dict()) if not _scored_only.empty else {}
 
+    # Per-seller intent mix (excluding Unclear rows)
+    _intent_rows = (eval_processed[eval_processed["_prompt_intent"] != "Unclear"]
+                    if "_prompt_intent" in eval_processed.columns else pd.DataFrame())
+    _seller_intent = {}
+    if not _intent_rows.empty:
+        for sid, grp in _intent_rows.groupby("_seller"):
+            cnts = grp["_prompt_intent"].value_counts()
+            total = int(cnts.sum())
+            if total == 0:
+                continue
+            f = int(round(cnts.get("Factual", 0) / total * 100))
+            d = int(round(cnts.get("Diagnostic", 0) / total * 100))
+            s_pct = max(0, 100 - f - d)
+            _seller_intent[sid] = {
+                "mix": f"{f}F·{d}D·{s_pct}S",
+                "dominant": cnts.idxmax(),
+                "f_pct": f, "d_pct": d, "s_pct": s_pct,
+            }
+
     for s in sellers:
         sid = s["seller_id"]
         if sid in seller_users_map:
@@ -629,11 +703,16 @@ if not eval_processed.empty and sellers and "_email" in eval_processed.columns:
             s["user_count"] = 1
             s["all_emails"] = [s["email"]]
         s["prompt_quality"] = _seller_avg.get(sid, None)
+        _imix = _seller_intent.get(sid)
+        s["intent_mix"]      = _imix["mix"]      if _imix else "—"
+        s["intent_dominant"] = _imix["dominant"] if _imix else "—"
 else:
     for s in sellers:
         s.setdefault("user_count", 1)
         s.setdefault("all_emails", [s.get("email", "")])
         s.setdefault("prompt_quality", None)
+        s.setdefault("intent_mix", "—")
+        s.setdefault("intent_dominant", "—")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -917,12 +996,21 @@ with tab_accounts:
             if n >= 20: return "color:#F59E0B"                    # Weak
             return "color:#EF4444;font-weight:600"                # Vague
 
+        def intent_color(v):
+            return {"Strategic":  "color:#A78BFA;font-weight:600",
+                    "Diagnostic": "color:#F59E0B",
+                    "Factual":    "color:#9CA3AF"}.get(v, "")
+
         disp_cols = ["seller_id", "email", "user_count", "q_total", "q_recent",
-                     "prompt_quality",
+                     "prompt_quality", "intent_dominant", "intent_mix",
                      "last_active", "days_silent", "trend", "classification"]
         if "prompt_quality" not in filt.columns:
             filt = filt.copy()
             filt["prompt_quality"] = None
+        if "intent_dominant" not in filt.columns:
+            filt = filt.copy()
+            filt["intent_dominant"] = "—"
+            filt["intent_mix"] = "—"
         disp = filt[disp_cols].copy()
         disp = disp.sort_values("days_silent")
         def _pq_fmt(v):
@@ -937,15 +1025,19 @@ with tab_accounts:
                 "seller_id": "Seller", "email": "Email", "user_count": "Users",
                 "q_total": "Total Q", "q_recent": "Q (7d)",
                 "prompt_quality": "Prompt Q",
+                "intent_dominant": "Intent",
+                "intent_mix": "Mix (F·D·S)",
                 "last_active": "Last Active", "days_silent": "Days Silent",
                 "trend": "Trend", "classification": "Class",
             }).style.map(cls_color, subset=["Class"])
               .map(tr_color, subset=["Trend"])
               .map(pq_color, subset=["Prompt Q"])
+              .map(intent_color, subset=["Intent"])
               .format({"Prompt Q": _pq_fmt}),
             use_container_width=True, height=380, hide_index=True,
         )
         st.caption("**Prompt Q** is a 0–100 score per seller — Strong ≥70 (green) · Decent 45–69 · Weak 20–44 · Vague <20 (red). Based on whether prompts include a metric, timeframe, entity, and comparison.")
+        st.caption("**Intent** classifies what kind of question sellers ask: **Factual** (what/when/how many — descriptive lookup), **Diagnostic** (why/cause — explanatory), **Strategic** (should I/recommend/predict — prescriptive). Mix shows the % split. Strategic-heavy sellers are getting more value from Hoppr.")
 
         st.markdown("---")
         st.markdown("### 🔍 Account Detail")
@@ -1131,6 +1223,37 @@ with tab_accounts:
                                        margin=dict(l=20, r=20, t=10, b=20),
                                        showlegend=False)
                 st.plotly_chart(fig_tier, use_container_width=True)
+
+                # ── Intent breakdown (Factual / Diagnostic / Strategic) ───
+                if "_prompt_intent" in scored_acct.columns:
+                    intent_rows = scored_acct[scored_acct["_prompt_intent"] != "Unclear"]
+                    if not intent_rows.empty:
+                        ic = intent_rows["_prompt_intent"].value_counts()
+                        n_fact = int(ic.get("Factual", 0))
+                        n_diag = int(ic.get("Diagnostic", 0))
+                        n_strat = int(ic.get("Strategic", 0))
+                        n_i_total = n_fact + n_diag + n_strat
+                        st.markdown("**Question intent**")
+                        ic1, ic2, ic3 = st.columns(3)
+                        with ic1: st.metric("Factual",    n_fact,  f"{n_fact/n_i_total*100:.0f}%"  if n_i_total else "—")
+                        with ic2: st.metric("Diagnostic", n_diag,  f"{n_diag/n_i_total*100:.0f}%"  if n_i_total else "—")
+                        with ic3: st.metric("Strategic",  n_strat, f"{n_strat/n_i_total*100:.0f}%" if n_i_total else "—")
+                        intent_df = pd.DataFrame({
+                            "Intent": ["Factual", "Diagnostic", "Strategic"],
+                            "Count":  [n_fact, n_diag, n_strat],
+                        })
+                        fig_intent = px.bar(
+                            intent_df, x="Count", y="Intent", orientation="h",
+                            color="Intent",
+                            color_discrete_map={"Factual": "#9CA3AF",
+                                                "Diagnostic": "#F59E0B",
+                                                "Strategic": "#A78BFA"},
+                            labels={"Count": "Queries", "Intent": ""},
+                        )
+                        fig_intent.update_layout(height=160, template="plotly_dark",
+                                                 margin=dict(l=20, r=20, t=10, b=20),
+                                                 showlegend=False)
+                        st.plotly_chart(fig_intent, use_container_width=True)
 
                 # Examples — best + worst prompts (theme-adaptive colors)
                 def _score_md(score):
