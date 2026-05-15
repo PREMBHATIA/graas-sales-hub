@@ -1205,10 +1205,24 @@ with tab_compose:
             else:
                 # Default to first contact of preview_co if available
                 default_idx = 0
-                for i, (_, r) in enumerate(contact_options):
+                default_label_for_preview = None
+                for i, (lbl, r) in enumerate(contact_options):
                     if r["company"] == preview_co:
                         default_idx = i
+                        default_label_for_preview = lbl
                         break
+
+                # Force the recipient dropdown to follow the previewed company.
+                # Streamlit's selectbox ignores `index=` once it has a session-state
+                # value for `key`, so without this the dropdown gets stuck on whatever
+                # company was last selected — even if "Preview for" was changed.
+                # That divergence caused a previewed-for-Samsung email to be sent
+                # with HUL substituted, because send_target came from the stale row.
+                _last_pc_key = "_send_recipient_last_preview_co"
+                if (default_label_for_preview is not None
+                        and st.session_state.get(_last_pc_key) != preview_co):
+                    st.session_state["send_recipient"] = default_label_for_preview
+                    st.session_state[_last_pc_key] = preview_co
 
                 # Test-mode toggle goes FIRST so we can disable the recipient
                 # dropdown when test mode is on (cleaner UX: you're picking
@@ -1233,6 +1247,18 @@ with tab_compose:
                          if test_mode else None,
                 )
                 send_target = dict(contact_options[[c[0] for c in contact_options].index(send_label)][1])
+
+                # Defensive guard: if the chosen recipient's company doesn't match
+                # the previewed company, refuse to send. Prevents the preview/send
+                # divergence from ever shipping a wrong-company email.
+                preview_send_mismatch = (send_target["company"] != preview_co)
+                if preview_send_mismatch:
+                    st.error(
+                        f"⚠️ **Recipient mismatch:** preview shows **{preview_co}** "
+                        f"but the selected recipient is at **{send_target['company']}**. "
+                        f"Pick a {preview_co} contact, or change 'Preview for' to "
+                        f"{send_target['company']} so the substituted body matches who you're sending to."
+                    )
 
                 # Show the playbook bucket(s) for this contact + suggest the right framework
                 target_buckets = send_target.get("playbook_buckets_all") or []
@@ -1371,6 +1397,7 @@ with tab_compose:
                         or (test_mode and not test_email)
                         or no_touch_block
                         or (in_dedup_window and not dedup_override)
+                        or preview_send_mismatch
                     )
                     if not st.session_state[confirm_key]:
                         if st.button("📧 Send email", type="primary", disabled=send_disabled,
