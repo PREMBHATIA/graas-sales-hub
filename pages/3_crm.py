@@ -904,72 +904,140 @@ with tab_segments:
 # framework based on which bucket the selected contact's company is in.
 EMAIL_TEMPLATES = {
     "A — Market Signal (Timing-Paused)": {
-        "subject": "Quick thought on {company} + {vertical} shifts",
+        "subject": "Why ordering adoption stays stuck at 12% — and what changes it",
         "body": """Hi {name},
 
-Saw the recent moves in {vertical} around AI-native commerce — a few players are starting to operationalise agentic workflows for retailer ordering and trade promotion at scale.
+One pattern worth sharing as {company} heads into FY26 planning.
 
-When we last spoke, timing wasn't right. Wanted to flag this shift because the gap between early adopters and the rest of the category is widening fast.
+Brands with large retailer networks are finding a consistent gap: retailer apps and DMS tools sit at ~12% adoption even after years of investment. The ordering behavior doesn't change because the submission path is harder than a WhatsApp message to the FA.
 
-Would a 20-min refresh on what's new at All-e since then be useful? No pressure — happy to just send a short note if easier.
+The brands that moved retailer ordering to WhatsApp — without replacing their existing stack — are seeing two things happen:
+1. Adoption crosses 25–30% within two quarters because retailers are already on WhatsApp all day.
+2. Scheme communication, which was always supposed to drive volume, finally reaches the retailer in time to act on it.
+
+The second outcome is the one most brands didn't plan for. The scheme and trade promotion layer becomes useful only when the ordering layer is actually being used.
+
+Given the scale of {company}'s retailer network, this seemed worth flagging as FY26 priorities are being set.
+
+Happy to share a brief note on how a peer in {vertical} structured this.
 
 Best,
-{sender}""",
+{sender}
+
+P.S. — Schneider Electric, B2B retailer ordering (FMEG): https://www.youtube.com/watch?v=jDJfMnR3OYE""",
     },
     "B — Outcome Reference (Evaluation Stalled)": {
-        "subject": "How a {vertical} peer cut order-cycle time by 40% with All-e",
+        "subject": "Outcome from a {vertical} brand's distributor ordering deployment",
         "body": """Hi {name},
 
-Following up on our earlier evaluation — wanted to share a concrete data point.
+One brief reference that might be relevant to your internal discussion.
 
-A peer in {vertical} (similar size and channel mix to {company}) went live with All-e last quarter. Early numbers:
-• 40% faster order processing across distributors
-• 3× retailer engagement on key SKU campaigns
-• Single-pane visibility into trade promotion ROI
+A {vertical} brand we work with — distributor network of comparable scale — deployed WhatsApp-based ordering last quarter. The primary metric they tracked was not adoption rate (though that hit 28%+ within 8 weeks). It was ERP data completeness — the share of orders flowing directly into their system without manual re-entry.
 
-The use case maps closely to what we discussed for {company}. Worth a 20-min walkthrough of what they did differently from your original evaluation?
+That went from around 18% to over 45% within three months. The secondary benefit was reliable secondary sales data finally flowing in, which unlocked scheme tracking they'd been trying to operationalise for two years.
+
+Given the size of {company}'s distribution network, the same dynamics likely apply.
+
+Happy to walk through how the deployment was structured if the internal conversation is moving forward.
 
 Best,
-{sender}""",
+{sender}
+
+P.S. — References:
+• Schneider Electric — B2B retailer ordering (FMEG): https://www.youtube.com/watch?v=jDJfMnR3OYE
+• Distributor Agent — B2B distributor ordering: https://youtu.be/c0mnXe-MZeY""",
     },
     "C — Adoption Gap (Competitor-Adjacent)": {
-        "subject": "{vertical} is moving on agentic AI — quick sync?",
+        "subject": "Why the DMS you have and the data you get are two different things",
         "body": """Hi {name},
 
-A few players in {vertical} have started rolling out agentic AI for retailer ordering and trade promotion in the last 6–8 weeks. Won't name names — but enough that it's becoming a category-level shift, not an early-adopter experiment.
+One observation from brands in {vertical} that have been through the same evaluation.
 
-When we connected earlier, {company} wasn't ready to commit. Just wanted to make sure you have visibility into where the category is heading so the decision when you're ready is well-informed.
+Most brands with SAP, DMS, and SFA in place find that distributor and retailer adoption of those systems sits at 5–12% in traditional trade. The tools are there. The data isn't. The reason is consistent: any solution that requires a separate login or a new app competes with WhatsApp for the distributor's attention — and loses.
 
-Happy to share a 15-min landscape view if useful.
+The brands that closed this gap didn't replace their DMS. They added a WhatsApp ordering layer on top of it.
+
+The agent handles the conversation — order placement, scheme queries, stock checks — and the DMS gets the structured data it was always supposed to have. Adoption follows because distributors and retailers are already on WhatsApp all day.
+
+The investment question then shifts: not whether to digitize, but whether the WA layer pays for itself in data quality and order volume. For a network the size of {company}'s, the math tends to work differently than for a smaller deployment.
+
+Happy to share how one {vertical} brand with a similar stack structured this.
 
 Best,
 {sender}""",
     },
     "D — Founder-Tone Strategic Note (Strategic Slow Movers)": {
-        "subject": "{name} — strategic angle worth a chat",
+        "subject": "One observation on AI in {vertical} distribution",
         "body": """Hi {name},
 
-Direct note — skipping the usual follow-up format.
+One observation worth sharing as you plan FY26 priorities.
 
-{company} sits in a position where the {vertical} category is restructuring around agentic execution. We've spent the last 18 months building exactly for this shift, and the window to be the first mover in your sub-segment is real but narrow.
+The brands generating the most durable traction with AI in distribution are not the ones that started with the most ambitious deployments. They started with the narrowest, highest-friction workflow — typically order placement or invoice capture — and built outward.
 
-20 minutes, leader-to-leader — what does the next 12 months look like for {company}, and where does AI-native execution fit?
+The reason it works: a narrow deployment generates the behavioral data that makes the broader system intelligent. The brands that skipped this step found themselves with a capable system and no signal to act on.
+
+At the scale of {company}'s network, the sequencing question matters significantly.
+
+Happy to share how a couple of brands in {vertical} have approached this if the conversation is useful.
 
 Best,
 {sender}""",
     },
-    "E — Specific Trigger (Ghost Accounts)": {
-        "subject": "Saw the news on {company}",
+    "E1 — Specific Trigger / Distributor Ordering (Ghost)": {
+        "subject": "Why DMS sits at 15% in traditional trade and what the WhatsApp layer does differently",
         "body": """Hi {name},
 
-Saw the recent {company} news — congrats on what's clearly a strong run.
+One observation that may be worth {company}'s attention as you plan for FY26.
 
-When we last connected, the conversation paused mid-flow. Reaching back out because the trajectory you're on now actually makes the All-e use case more relevant, not less:
-• Faster order processing as you scale distribution
-• Retailer-level visibility on trade promotion spend
-• Agentic workflows that don't require headcount expansion
+In the last two quarters, a set of {vertical} brands have moved primary distributor ordering to WhatsApp as the main channel. The reason is straightforward: distributors already operate on WhatsApp, and any solution that requires a separate login sees single-digit adoption regardless of how well it is designed.
 
-Worth a 20-min reset?
+The brands that made this work connected the agent directly to their ERP / DMS systems so it knows real-time pricing, credit limits, and stock levels at the moment an order is placed. That is where a WhatsApp ordering interface becomes the data layer.
+
+Beyond ordering, the same agent handles delivery status updates, financial document retrieval, scheme nudges for utilisation and target achievement, restocking reminders, and ready-to-use personalised order lists based on past purchase history. And it is not just for distributors — the same setup extends to retailers as well.
+
+We have live deployments across agrochem (Agricon & PI Industries for distributor ordering) and electricals (Schneider Electric for contractor ordering). The setup and go-live runs 6–8 weeks.
+
+We had spoken some months ago about this for {company}. If the timing is better now, I am happy to walk through how a comparable brand in {vertical} set this up.
+
+Best,
+{sender}
+
+P.S. — Here is a short video of PI Industries using this for distributor ordering: https://drive.google.com/file/d/14eyziI1N1Yt0AFKfVho4WM5WmbzwumMW/view""",
+    },
+    "E2 — Specific Trigger / D2C Discovery (Ghost)": {
+        "subject": "Why product discovery fails on D2C sites and what the knowledge layer fixes",
+        "body": """Hi {name},
+
+A brief observation that may be relevant to where {company}'s D2C roadmap sits right now.
+
+In the last quarter, a few {vertical} brands have moved away from rule-based chat widgets toward agents that genuinely understand the product catalog — the kind that answers not just "which model should I buy" but "how does this compare to what I already own and what I specifically need." The gap between those two is the gap between a chatbot and an agent.
+
+What makes the difference is not the model. It is the knowledge layer underneath — a Brand Knowledge Graph built on your enriched catalog and customer purchase history. When a shopper asks a complex query, the agent maps intent to the right product, accounts for brand affinity, past purchases, and price preference, and surfaces a matched recommendation with explained trade-offs. No disambiguation loop, no wrong SKU, no generic answer.
+
+The same layer also handles basket growth — cross-sell suggestions driven by purchase signals from your own transaction history, not generic recommendations — and lifecycle nudges for restocking and repurchase.
+
+Two ways to deploy this: use our chat SDK and go live end-to-end, or plug our API and knowledge graph into your own agent interface. Available on cloud or on-premise.
+
+We are doing this for Puma and Canon. If this is back on the table at {company}, happy to show you exactly how the knowledge graph is built for your catalog.
+
+Best,
+{sender}
+
+P.S. — Here is Puma's agent in action: https://drive.google.com/file/d/119yh5D5m-0Z3opQEQtK_j-JiaVGcKcgH/view""",
+    },
+    "F — Voice Warm-Up (Voice-Waiting)": {
+        "subject": "One thing we observed from WA ordering deployments in {vertical} — relevant to what you mentioned",
+        "body": """Hi {name},
+
+Sharing one observation while we work on something we think will be directly relevant to the direction you mentioned.
+
+Across {vertical} brands, the ordering problem consistently splits into two parts: the conversation layer (getting the dealer to place an order at all) and the intelligence layer (knowing which SKU, which scheme, which depot, what credit limit applies).
+
+Voice handles the first part reasonably well. Where it consistently falls short is the second — when a dealer asks a specific product or scheme question, the agent either escalates or gives a generic answer, because it doesn't have the product and channel context to respond accurately.
+
+The brands that have gotten real traction built the intelligence layer first — so whatever interaction surface they use, the answers are right.
+
+We're working on something we hope to share a first look at in June that we think will be relevant to what you mentioned. Will be in touch then.
 
 Best,
 {sender}""",
@@ -980,13 +1048,17 @@ Best,
     },
 }
 
-# Bucket → framework auto-mapping (from Amruta's playbook)
+# Bucket → framework auto-mapping (from Amruta's playbook).
+# Ghost Accounts split: E1 (distributor ordering) is the default since most
+# ghost accounts in the tracker are B2B distribution; pick E2 manually for
+# D2C/discovery-driven accounts (Wakefit, Samsung, KLF Nirmal, etc.).
 BUCKET_TO_FRAMEWORK = {
     "Timing-Paused":            "A — Market Signal (Timing-Paused)",
     "Evaluation Stalled":       "B — Outcome Reference (Evaluation Stalled)",
     "Competitor-Adjacent":      "C — Adoption Gap (Competitor-Adjacent)",
     "Strategic Slow Movers":    "D — Founder-Tone Strategic Note (Strategic Slow Movers)",
-    "Ghost Accounts":           "E — Specific Trigger (Ghost Accounts)",
+    "Ghost Accounts":           "E1 — Specific Trigger / Distributor Ordering (Ghost)",
+    "Voice-Waiting":            "F — Voice Warm-Up (Voice-Waiting)",
 }
 
 with tab_compose:
