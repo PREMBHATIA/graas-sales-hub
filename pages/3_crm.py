@@ -1126,18 +1126,46 @@ with tab_compose:
             if suggested_template:
                 st.info(f"💡 Most contacts here are in **{top_bucket}** → suggested framework: **{suggested_template}**")
 
-    with st.expander(f"View {len(recipients)} recipients"):
+    # Names are guessed from the email prefix (e.g. dsp@voltas.com -> "Dsp"),
+    # so let the user correct them. Overrides are keyed by email and persist
+    # across filter/template changes, and feed both the preview and sends.
+    if "crm_name_overrides" not in st.session_state:
+        st.session_state["crm_name_overrides"] = {}
+    overrides = st.session_state["crm_name_overrides"]
+    if not recipients.empty:
+        recipients['person_name'] = recipients.apply(
+            lambda r: overrides.get(r['email'], r['person_name']), axis=1)
+
+    with st.expander(f"View / edit {len(recipients)} recipients", expanded=False):
         if not recipients.empty:
-            r_display = recipients[['company', 'person_name', 'email', 'designation', 'segment', 'recency', 'last_contact']].copy()
-            r_display = r_display.reset_index(drop=True)
-            r_display['last_contact'] = r_display['last_contact'].apply(
+            st.caption(
+                "✏️ Edit the **Name** column to fix how each contact is greeted in `{name}`. "
+                "Names are guessed from the email address and usually need correcting — "
+                "edits stick as you change filters or templates and apply to sends."
+            )
+            editor_df = recipients[['company', 'person_name', 'email', 'designation', 'last_contact']].copy()
+            editor_df = editor_df.reset_index(drop=True)
+            editor_df['last_contact'] = editor_df['last_contact'].apply(
                 lambda x: x.strftime('%d %b %Y') if pd.notna(x) else '—')
-            r_display.insert(0, '#', range(1, len(r_display) + 1))
-            st.dataframe(r_display.rename(columns={
+            editor_df = editor_df.rename(columns={
                 'company': 'Company', 'person_name': 'Name', 'email': 'Email',
-                'designation': 'Title', 'segment': 'Segment',
-                'recency': 'Recency', 'last_contact': 'Last Contact',
-            }), use_container_width=True, hide_index=True, height=300)
+                'designation': 'Title', 'last_contact': 'Last Contact',
+            })
+            ed_key = f"recipient_editor_{hash(tuple(sorted(recipients['email'])))}"
+            edited = st.data_editor(
+                editor_df, use_container_width=True, hide_index=True, height=300, key=ed_key,
+                column_config={
+                    'Name': st.column_config.TextColumn(
+                        'Name ✏️', help="How this contact is greeted in the email — editable"),
+                },
+                disabled=['Company', 'Email', 'Title', 'Last Contact'],
+            )
+            for _, erow in edited.iterrows():
+                nm = str(erow['Name'] or '').strip()
+                if nm:
+                    overrides[erow['Email']] = nm
+            recipients['person_name'] = recipients.apply(
+                lambda r: overrides.get(r['email'], r['person_name']), axis=1)
 
     st.markdown("---")
 
