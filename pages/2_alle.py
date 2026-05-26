@@ -474,34 +474,68 @@ with tab_gtm:
 
     st.caption("Assumption: 13 Paid Pilots → 10 Customers in Production = $195K + $148K = **$343K invoiced revenue in 2026**")
 
-    # ── Pipeline Heatmap — Stage × Vertical (active leads) ────────────────────
+    # ── Pipeline Heatmap — Meetings + Stage × Vertical ────────────────────────
     st.markdown("---")
-    st.markdown("### 🔥 Active Pipeline — Stage × Vertical")
-    st.caption("Count of currently-active leads per vertical, by funnel stage.")
+    st.markdown("### 🔥 Active Pipeline — Meetings + Stage × Vertical")
+    st.caption("Meetings = leads with a first conversation in 2026 (active + dropped). Stage columns = currently-active leads only.")
     if 'status' in df.columns and 'vertical' in df.columns:
         _stage_order = ['4-TOF', '2-POC', '3-Proposal sent', '1-Pilot']
         _stage_labels = {'4-TOF': 'TOF', '2-POC': 'POC',
                          '3-Proposal sent': 'Proposal Sent', '1-Pilot': 'Pilot'}
-        _heat_df = df[df['status'].isin(_stage_order) & df['vertical'].notna()].copy()
-        if not _heat_df.empty:
-            cross = pd.crosstab(_heat_df['vertical'], _heat_df['status'])
-            cross = cross.reindex(columns=[s for s in _stage_order if s in cross.columns])
-            cross.columns = [_stage_labels[c] for c in cross.columns]
-            cross = cross.loc[cross.sum(axis=1).sort_values(ascending=False).index]
-            fig_heat = px.imshow(
-                cross, text_auto=True, aspect='auto',
-                color_continuous_scale=['#1a1a2e', '#4F46E5', '#10B981'],
-                labels=dict(x="Stage", y="Vertical", color="Count"),
-            )
-            fig_heat.update_layout(
-                height=max(320, 36 * len(cross.index) + 80),
-                template="plotly_dark",
-                margin=dict(l=20, r=20, t=20, b=40),
-                xaxis=dict(side='bottom', tickfont=dict(size=12)),
-                yaxis=dict(tickfont=dict(size=12)),
-                coloraxis_showscale=False,
-            )
-            st.plotly_chart(fig_heat, use_container_width=True)
+
+        def _vert(s):
+            v = str(s or '').strip()
+            return v if v and v.lower() != 'nan' else 'Other'
+
+        _active = df[df['status'].isin(_stage_order)].copy()
+        _active['_vert'] = _active['vertical'].apply(_vert)
+        cross = pd.crosstab(_active['_vert'], _active['status'])
+        cross = cross.reindex(columns=[s for s in _stage_order if s in cross.columns], fill_value=0)
+        cross.columns = [_stage_labels[c] for c in cross.columns]
+
+        _meet = df_all[
+            df_all['first_conv'].notna()
+            & (df_all['first_conv'].dt.year == 2026)
+        ].copy() if 'first_conv' in df_all.columns else df_all.iloc[0:0].copy()
+        if not _meet.empty:
+            _meet['_vert'] = _meet['vertical'].apply(_vert)
+            meetings_by_vert = _meet.groupby('_vert').size()
+        else:
+            meetings_by_vert = pd.Series(dtype=int)
+
+        for v in meetings_by_vert.index:
+            if v not in cross.index:
+                cross.loc[v] = 0
+        cross.insert(0, 'Meetings', [int(meetings_by_vert.get(v, 0)) for v in cross.index])
+
+        sort_idx = cross.drop(index=['Other'], errors='ignore').sort_values('Meetings', ascending=False).index.tolist()
+        if 'Other' in cross.index:
+            sort_idx.append('Other')
+        cross = cross.loc[sort_idx]
+
+        _zmax = max(int(cross.iloc[:, 1:].max().max()) if cross.shape[1] > 1 else 1, 1) + 1
+
+        fig_heat = px.imshow(
+            cross, text_auto=True, aspect='auto',
+            color_continuous_scale=[
+                [0.0,  '#0F172A'],
+                [0.25, '#1E3A8A'],
+                [0.6,  '#3B82F6'],
+                [1.0,  '#93C5FD'],
+            ],
+            zmin=0, zmax=_zmax,
+            labels=dict(x="Stage", y="Vertical", color="Count"),
+        )
+        fig_heat.update_traces(textfont=dict(color='white', size=14))
+        fig_heat.update_layout(
+            height=max(340, 38 * len(cross.index) + 90),
+            template="plotly_dark",
+            margin=dict(l=20, r=20, t=20, b=40),
+            xaxis=dict(side='bottom', tickfont=dict(size=12, color='#E5E7EB'), title=None),
+            yaxis=dict(tickfont=dict(size=12, color='#E5E7EB'), title=None),
+            coloraxis_showscale=False,
+        )
+        st.plotly_chart(fig_heat, use_container_width=True)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
