@@ -227,7 +227,7 @@ if meetings_data:
 
                 st.markdown(
                     f'<div style="text-align:center; padding:8px 4px; background:#1E1E2E; '
-                    f'border-radius:6px; border-top:2px solid {color}; min-height:120px; '
+                    f'border-radius:6px; border-top:2px solid {color}; min-height:70px; '
                     f'display:flex; flex-direction:column;">'
                     f'<div style="font-size:0.7rem; color:#9CA3AF;">{m}</div>'
                     f'<div style="font-size:1.3rem; font-weight:700; color:{color};">{count}</div>'
@@ -266,7 +266,7 @@ if meetings_data:
         label_col, *month_cols = st.columns([1.2] + [1] * len(_MONTHS))
         with label_col:
             st.markdown(
-                f'<div style="padding:10px 6px; min-height:120px; display:flex; '
+                f'<div style="padding:10px 6px; min-height:70px; display:flex; '
                 f'align-items:center; border-top:2px solid #374151;">'
                 f'<div>'
                 f'<div style="font-size:0.8rem; font-weight:700; color:{color};">{label}</div>'
@@ -281,7 +281,7 @@ if meetings_data:
                 names_str = " · ".join(names) if names else "—"
                 st.markdown(
                     f'<div style="text-align:center; padding:8px 4px; background:#1E1E2E; '
-                    f'border-radius:6px; border-top:2px solid {color}; min-height:120px; '
+                    f'border-radius:6px; border-top:2px solid {color}; min-height:70px; '
                     f'display:flex; flex-direction:column;">'
                     f'<div style="font-size:0.7rem; color:#9CA3AF;">{m}</div>'
                     f'<div style="font-size:1.3rem; font-weight:700; color:{color};">{actual}</div>'
