@@ -513,6 +513,9 @@ with tab_gtm:
             sort_idx.append('Other')
         cross = cross.loc[sort_idx]
 
+        # Append a Total row summing every column
+        cross.loc['Total'] = cross.sum(axis=0).astype(int)
+
         _zmax = max(int(cross.iloc[:, 1:].max().max()) if cross.shape[1] > 1 else 1, 1) + 1
 
         fig_heat = px.imshow(
