@@ -239,6 +239,20 @@ if 'proposal_sent_date' in df_all.columns:
 
 # Build actuals dataframe
 months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+# Partner-sourced meetings (Greentern + Cartlyst website) — shades the chart
+_PARTNER_SOURCES = {"greentern", "cartlyst website"}
+partner_new_mtgs = [0] * 12
+if "source" in df_all.columns and "first_conv" in df_all.columns:
+    _partner_df = df_all[
+        df_all["source"].fillna("").astype(str).str.strip().str.lower().isin(_PARTNER_SOURCES)
+        & df_all["first_conv"].notna()
+        & (df_all["first_conv"].dt.year == 2026)
+    ]
+    for m_num, grp in _partner_df.groupby(_partner_df["first_conv"].dt.month):
+        if 1 <= int(m_num) <= 12:
+            partner_new_mtgs[int(m_num) - 1] = len(grp)
+
 actual_new_mtgs = []
 actual_cumul_mtgs = []
 actual_proposals = []
@@ -396,27 +410,40 @@ with tab_gtm:
     if _pre2026_meetings:
         st.caption(f"ℹ️ {len(_pre2026_meetings)} leads from pre-2026 not shown: {', '.join(_pre2026_meetings[:8])}{'…' if len(_pre2026_meetings) > 8 else ''}")
 
+    _chart_partner = partner_new_mtgs[:current_month_idx + 1]
+    actual_bars  = [v if v is not None else 0 for v in _chart_actuals]
+    partner_bars = list(_chart_partner)
+    graas_bars   = [max(a - p, 0) for a, p in zip(actual_bars, partner_bars)]
+    graas_colors = []
+    for i, (a, t) in enumerate(zip(actual_bars, _chart_targets)):
+        if _chart_actuals[i] is None:
+            graas_colors.append("#1a1a2e")
+        elif a >= t:
+            graas_colors.append("#10B981")
+        else:
+            graas_colors.append("#EF4444")
+    _PARTNER_COLOR = "#A78BFA"  # lavender
+
     fig_mtgs = go.Figure()
     fig_mtgs.add_trace(go.Bar(
         x=_chart_months, y=_chart_targets,
         name="Target", marker_color="#374151",
+        offsetgroup="target",
     ))
-    actual_bars = [v if v is not None else 0 for v in _chart_actuals]
-    colors = []
-    for i, (a, t) in enumerate(zip(actual_bars, _chart_targets)):
-        if _chart_actuals[i] is None:
-            colors.append("#1a1a2e")
-        elif a >= t:
-            colors.append("#10B981")  # met target
-        else:
-            colors.append("#EF4444")  # missed
     fig_mtgs.add_trace(go.Bar(
-        x=_chart_months, y=actual_bars,
-        name="Actual", marker_color=colors,
+        x=_chart_months, y=partner_bars,
+        name="Partner Meetings", marker_color=_PARTNER_COLOR,
+        offsetgroup="actual",
+    ))
+    fig_mtgs.add_trace(go.Bar(
+        x=_chart_months, y=graas_bars,
+        name="Graas Network Meetings", marker_color=graas_colors,
+        offsetgroup="actual",
     ))
     fig_mtgs.update_layout(
-        barmode="group", height=350, template="plotly_dark",
+        barmode="stack", height=350, template="plotly_dark",
         margin=dict(l=20, r=20, t=20, b=20),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02),
     )
     st.plotly_chart(fig_mtgs, use_container_width=True)
 
