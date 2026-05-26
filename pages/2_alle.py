@@ -414,16 +414,14 @@ with tab_gtm:
     actual_bars  = [v if v is not None else 0 for v in _chart_actuals]
     partner_bars = list(_chart_partner)
     graas_bars   = [max(a - p, 0) for a, p in zip(actual_bars, partner_bars)]
-    # Split the Graas segment by target attainment so each color gets its
-    # own legend entry. For a given month only one of these is non-zero.
-    graas_met  = [g if a >= t else 0 for g, a, t in zip(graas_bars, actual_bars, _chart_targets)]
-    graas_miss = [g if a <  t else 0 for g, a, t in zip(graas_bars, actual_bars, _chart_targets)]
     _PARTNER_COLOR = "#A78BFA"  # lavender
+    _GRAAS_COLOR   = "#10B981"  # green
+    _TARGET_COLOR  = "#374151"  # dark gray
 
     fig_mtgs = go.Figure()
     fig_mtgs.add_trace(go.Bar(
         x=_chart_months, y=_chart_targets,
-        name="Target", marker_color="#374151",
+        name="Target", marker_color=_TARGET_COLOR,
         offsetgroup="target",
     ))
     fig_mtgs.add_trace(go.Bar(
@@ -432,13 +430,8 @@ with tab_gtm:
         offsetgroup="actual",
     ))
     fig_mtgs.add_trace(go.Bar(
-        x=_chart_months, y=graas_met,
-        name="Graas Network (≥ Target)", marker_color="#10B981",
-        offsetgroup="actual",
-    ))
-    fig_mtgs.add_trace(go.Bar(
-        x=_chart_months, y=graas_miss,
-        name="Graas Network (< Target)", marker_color="#EF4444",
+        x=_chart_months, y=graas_bars,
+        name="Graas Network Meetings", marker_color=_GRAAS_COLOR,
         offsetgroup="actual",
     ))
     fig_mtgs.update_layout(
