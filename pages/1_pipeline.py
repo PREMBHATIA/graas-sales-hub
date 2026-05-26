@@ -223,56 +223,70 @@ if meetings_data:
                 names_raw = mtg_info.get(m, {}).get("companies", "")
                 names = [n.strip() for n in names_raw.split(",") if n.strip()] if names_raw and names_raw != "nan" else []
 
-                # Compact: join names with " · " separator instead of line breaks
                 names_str = " · ".join(names) if names else "—"
 
                 st.markdown(
                     f'<div style="text-align:center; padding:8px 4px; background:#1E1E2E; '
-                    f'border-radius:6px; border-top:2px solid {color};">'
+                    f'border-radius:6px; border-top:2px solid {color}; min-height:120px; '
+                    f'display:flex; flex-direction:column;">'
                     f'<div style="font-size:0.7rem; color:#9CA3AF;">{m}</div>'
                     f'<div style="font-size:1.3rem; font-weight:700; color:{color};">{count}</div>'
-                    f'<div style="font-size:0.6rem; color:#E5E7EB; line-height:1.3; margin-top:4px;">'
-                    f'{names_str}</div>'
+                    f'<div style="font-size:0.5rem; color:#E5E7EB; line-height:1.25; '
+                    f'margin-top:4px; flex:1;">{names_str}</div>'
                     f'</div>',
                     unsafe_allow_html=True,
                 )
 
     # ── Per-region + Grand Total rows ─────────────────────────────────────────
+    def _names_for_sources(src_keys, month):
+        names = []
+        seen = set()
+        for sk in src_keys:
+            raw = sources.get(sk, {}).get("meetings", {}).get(month, {}).get("companies", "")
+            for n in (raw.split(",") if raw else []):
+                n = n.strip()
+                if n and n.lower() != "nan" and n not in seen:
+                    seen.add(n)
+                    names.append(n)
+        return names
+
     _TOTAL_COLOR = "#E5E7EB"
     _TOTAL_ROWS = [
-        ("Total India", ov_in.get("meetings", {}), _INDIA_COLOR),
-        ("Total SEA",   ov_sea.get("meetings", {}), _SEA_COLOR),
-        ("Total",       None,                       _TOTAL_COLOR),  # grand total — sentinel
+        ("Total India", ["Graas Network India", "Partner India"], _INDIA_COLOR),
+        ("Total SEA",   ["Graas Network SEA",   "Partner SEA"],   _SEA_COLOR),
+        ("Total",       ["Graas Network India", "Partner India",
+                         "Graas Network SEA",   "Partner SEA"],   _TOTAL_COLOR),
     ]
-    for label, mtg, color in _TOTAL_ROWS:
-        if mtg is None:
-            in_mtg = ov_in.get("meetings", {})
-            sea_mtg = ov_sea.get("meetings", {})
-            monthly = {m: in_mtg.get(m, {}).get("actual", 0) + sea_mtg.get(m, {}).get("actual", 0)
-                       for m in _MONTHS}
-        else:
-            monthly = {m: mtg.get(m, {}).get("actual", 0) for m in _MONTHS}
+    for label, src_keys, color in _TOTAL_ROWS:
+        monthly = {m: sum(sources.get(sk, {}).get("meetings", {}).get(m, {}).get("count", 0)
+                          for sk in src_keys)
+                   for m in _MONTHS}
         ytd_actual = sum(monthly.values())
 
         label_col, *month_cols = st.columns([1.2] + [1] * len(_MONTHS))
         with label_col:
             st.markdown(
-                f'<div style="padding:10px 6px; min-height:60px; display:flex; '
-                f'align-items:center; border-top:1px solid #374151;">'
+                f'<div style="padding:10px 6px; min-height:120px; display:flex; '
+                f'align-items:center; border-top:2px solid #374151;">'
                 f'<div>'
                 f'<div style="font-size:0.8rem; font-weight:700; color:{color};">{label}</div>'
-                f'<div style="font-size:1.2rem; font-weight:700; color:{color};">{ytd_actual}</div>'
+                f'<div style="font-size:1.3rem; font-weight:700; color:{color};">{ytd_actual}</div>'
                 f'</div></div>',
                 unsafe_allow_html=True,
             )
         for col, m in zip(month_cols, _MONTHS):
             with col:
                 actual = monthly[m]
+                names = _names_for_sources(src_keys, m)
+                names_str = " · ".join(names) if names else "—"
                 st.markdown(
                     f'<div style="text-align:center; padding:8px 4px; background:#1E1E2E; '
-                    f'border-radius:6px; border-top:2px solid {color}; min-height:60px;">'
+                    f'border-radius:6px; border-top:2px solid {color}; min-height:120px; '
+                    f'display:flex; flex-direction:column;">'
                     f'<div style="font-size:0.7rem; color:#9CA3AF;">{m}</div>'
-                    f'<div style="font-size:1.2rem; font-weight:700; color:{color};">{actual}</div>'
+                    f'<div style="font-size:1.3rem; font-weight:700; color:{color};">{actual}</div>'
+                    f'<div style="font-size:0.5rem; color:#E5E7EB; line-height:1.25; '
+                    f'margin-top:4px; flex:1;">{names_str}</div>'
                     f'</div>',
                     unsafe_allow_html=True,
                 )
