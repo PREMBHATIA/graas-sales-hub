@@ -476,7 +476,7 @@ with tab_gtm:
 
     # ── Pipeline Heatmap — Milestones × Vertical (2026 YTD) ───────────────────
     st.markdown("---")
-    st.markdown("### 🔥 2026 Pipeline — Milestones × Vertical")
+    st.markdown("### 🌐 2026 Vertical Overview")
     st.caption("All counts are 2026 milestones. Meetings = first conv this year. POC / Proposal Sent / Pilot = leads that hit that milestone date in 2026. TOF = had first conv but no further milestone yet (still at top of funnel).")
     if 'vertical' in df_all.columns and 'first_conv' in df_all.columns:
 
