@@ -518,21 +518,26 @@ with tab_gtm:
         fig_heat = px.imshow(
             cross, text_auto=True, aspect='auto',
             color_continuous_scale=[
-                [0.0,  '#0F172A'],
-                [0.25, '#1E3A8A'],
-                [0.6,  '#3B82F6'],
-                [1.0,  '#93C5FD'],
+                [0.0,  '#F1F5F9'],
+                [0.15, '#BFDBFE'],
+                [0.5,  '#3B82F6'],
+                [1.0,  '#1E3A8A'],
             ],
             zmin=0, zmax=_zmax,
             labels=dict(x="Stage", y="Vertical", color="Count"),
         )
-        fig_heat.update_traces(textfont=dict(color='white', size=14))
+        fig_heat.update_traces(
+            texttemplate="%{z}",
+            textfont=dict(size=14),
+        )
         fig_heat.update_layout(
             height=max(340, 38 * len(cross.index) + 90),
-            template="plotly_dark",
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            font=dict(color='#374151'),
             margin=dict(l=20, r=20, t=20, b=40),
-            xaxis=dict(side='bottom', tickfont=dict(size=12, color='#E5E7EB'), title=None),
-            yaxis=dict(tickfont=dict(size=12, color='#E5E7EB'), title=None),
+            xaxis=dict(side='bottom', tickfont=dict(size=13, color='#374151'), title=None, showgrid=False),
+            yaxis=dict(tickfont=dict(size=13, color='#374151'), title=None, showgrid=False),
             coloraxis_showscale=False,
         )
         st.plotly_chart(fig_heat, use_container_width=True)
