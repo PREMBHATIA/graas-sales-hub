@@ -274,6 +274,32 @@ gtm_target["A_Proposals"] = actual_proposals
 
 with tab_gtm:
     # ── Leads Table (operational view) ────────────────────────────────────────
+    st.markdown("""
+    <style>
+    /* Compact multiselect chips for the GTM filter row */
+    div[data-testid="stMultiSelect"] [data-baseweb="tag"] {
+        background-color: #374151 !important;
+        color: #E5E7EB !important;
+        font-size: 0.7rem !important;
+        padding: 1px 6px !important;
+        height: auto !important;
+        line-height: 1.4 !important;
+        border-radius: 4px !important;
+    }
+    div[data-testid="stMultiSelect"] [data-baseweb="tag"] svg {
+        fill: #9CA3AF !important;
+        width: 12px !important;
+        height: 12px !important;
+    }
+    div[data-testid="stMultiSelect"] label,
+    div[data-testid="stTextInput"] label {
+        font-size: 0.78rem !important;
+        font-weight: 500 !important;
+        color: #9CA3AF !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
     st.markdown("### All Active Leads")
 
     col_status, col_vertical, col_source, col_search = st.columns(4)
