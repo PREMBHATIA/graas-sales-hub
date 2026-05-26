@@ -538,8 +538,8 @@ with tab_gtm:
             paper_bgcolor='rgba(0,0,0,0)',
             plot_bgcolor='rgba(0,0,0,0)',
             font=dict(color='#374151'),
-            margin=dict(l=20, r=20, t=20, b=40),
-            xaxis=dict(side='bottom', tickfont=dict(size=13, color='#374151'), title=None, showgrid=False),
+            margin=dict(l=20, r=20, t=40, b=20),
+            xaxis=dict(side='top', tickfont=dict(size=13, color='#374151'), title=None, showgrid=False),
             yaxis=dict(tickfont=dict(size=13, color='#374151'), title=None, showgrid=False),
             coloraxis_showscale=False,
         )
