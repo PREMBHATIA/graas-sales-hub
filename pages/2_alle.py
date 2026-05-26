@@ -474,39 +474,48 @@ with tab_gtm:
 
     st.caption("Assumption: 13 Paid Pilots → 10 Customers in Production = $195K + $148K = **$343K invoiced revenue in 2026**")
 
-    # ── Pipeline Heatmap — Meetings + Stage × Vertical ────────────────────────
+    # ── Pipeline Heatmap — Milestones × Vertical (2026 YTD) ───────────────────
     st.markdown("---")
-    st.markdown("### 🔥 Active Pipeline — Meetings + Stage × Vertical")
-    st.caption("Meetings = leads with a first conversation in 2026 (active + dropped). Stage columns = currently-active leads only.")
-    if 'status' in df.columns and 'vertical' in df.columns:
-        _stage_order = ['4-TOF', '2-POC', '3-Proposal sent', '1-Pilot']
-        _stage_labels = {'4-TOF': 'TOF', '2-POC': 'POC',
-                         '3-Proposal sent': 'Proposal Sent', '1-Pilot': 'Pilot'}
+    st.markdown("### 🔥 2026 Pipeline — Milestones × Vertical")
+    st.caption("All counts are 2026 milestones. Meetings = first conv this year. POC / Proposal Sent / Pilot = leads that hit that milestone date in 2026. TOF = had first conv but no further milestone yet (still at top of funnel).")
+    if 'vertical' in df_all.columns and 'first_conv' in df_all.columns:
 
         def _vert(s):
             v = str(s or '').strip()
             return v if v and v.lower() != 'nan' else 'Other'
 
-        _active = df[df['status'].isin(_stage_order)].copy()
-        _active['_vert'] = _active['vertical'].apply(_vert)
-        cross = pd.crosstab(_active['_vert'], _active['status'])
-        cross = cross.reindex(columns=[s for s in _stage_order if s in cross.columns], fill_value=0)
-        cross.columns = [_stage_labels[c] for c in cross.columns]
+        def _in_year(col):
+            if col not in df_all.columns:
+                return pd.Series(False, index=df_all.index)
+            return df_all[col].notna() & (df_all[col].dt.year == 2026)
 
-        _meet = df_all[
-            df_all['first_conv'].notna()
-            & (df_all['first_conv'].dt.year == 2026)
-        ].copy() if 'first_conv' in df_all.columns else df_all.iloc[0:0].copy()
-        if not _meet.empty:
-            _meet['_vert'] = _meet['vertical'].apply(_vert)
-            meetings_by_vert = _meet.groupby('_vert').size()
-        else:
-            meetings_by_vert = pd.Series(dtype=int)
+        first_2026     = _in_year('first_conv')
+        poc_2026       = _in_year('poc_delivery_date')
+        proposal_2026  = _in_year('proposal_sent_date')
+        pilot_2026     = _in_year('pilot_start_date')
+        tof_2026 = first_2026 & ~poc_2026 & ~proposal_2026 & ~pilot_2026
 
-        for v in meetings_by_vert.index:
-            if v not in cross.index:
-                cross.loc[v] = 0
-        cross.insert(0, 'Meetings', [int(meetings_by_vert.get(v, 0)) for v in cross.index])
+        _vert_series = df_all['vertical'].apply(_vert)
+
+        def _counts(mask):
+            return _vert_series[mask].value_counts()
+
+        meetings_by_vert  = _counts(first_2026)
+        tof_by_vert       = _counts(tof_2026)
+        poc_by_vert       = _counts(poc_2026)
+        proposal_by_vert  = _counts(proposal_2026)
+        pilot_by_vert     = _counts(pilot_2026)
+
+        all_verts = sorted(set(meetings_by_vert.index) | set(tof_by_vert.index)
+                           | set(poc_by_vert.index) | set(proposal_by_vert.index)
+                           | set(pilot_by_vert.index))
+        cross = pd.DataFrame({
+            'Meetings':      [int(meetings_by_vert.get(v, 0))  for v in all_verts],
+            'TOF':           [int(tof_by_vert.get(v, 0))       for v in all_verts],
+            'POC':           [int(poc_by_vert.get(v, 0))       for v in all_verts],
+            'Proposal Sent': [int(proposal_by_vert.get(v, 0))  for v in all_verts],
+            'Pilot':         [int(pilot_by_vert.get(v, 0))     for v in all_verts],
+        }, index=all_verts)
 
         sort_idx = cross.drop(index=['Other'], errors='ignore').sort_values('Meetings', ascending=False).index.tolist()
         if 'Other' in cross.index:
