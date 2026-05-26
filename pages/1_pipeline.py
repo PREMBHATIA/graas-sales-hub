@@ -46,118 +46,121 @@ def load_current_pipeline():
 
 @st.cache_data(ttl=1800)
 def load_meetings_summary():
-    """Load Revised - Summary of Meetings tab from All-e sheet."""
+    """Derive meetings summary from 'Overall Pipeline for IN and SEA' tab.
+
+    Maps each lead's First conv date to a (region, source-bucket) cell:
+      - Partner       = Greentern or Cartlyst website
+      - Graas Network = any other source (GG, Ashwin, Amruta, Prem, Sahil, …)
+    POCs / Pilots / Production derived from their respective date columns.
+    """
     from services.sheets_client import fetch_sheet_tab
     sheet_id = os.getenv("ALLE_SHEET_ID", "")
     if not sheet_id:
         return {}
     try:
-        df = fetch_sheet_tab(sheet_id, "Revised - Summary of Meetings")
+        df = fetch_sheet_tab(sheet_id, "Overall Pipeline for IN and SEA")
     except Exception as e:
         import streamlit as _st
-        _st.warning(f"Meetings load error: {e}")
+        _st.warning(f"Pipeline load error: {e}")
         return {}
     if df.empty:
         return {}
 
-    months = ["Jan", "Feb", "Mar", "Apr", "May"]
+    import pandas as _pd
 
-    def _safe_int(v):
-        try:
-            return int(str(v).strip())
-        except (ValueError, TypeError):
-            return 0
+    YEAR = 2026
+    MONTHS_ALL = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
-    def _parse_section(df, row_start, col_start):
-        """Parse a source block (9 cols wide) starting at given row/col."""
-        result = {}
-        funnel_keys = {
-            "meetings completed": "meetings",
-            "- positive interest": "positive",
-            "-others (interest yet to confirm)": "others",
-            "pocs completed": "pocs",
-            "pilots started": "pilots",
-            "in production": "production",
+    for c in ["First conv date", "POC Delivery Date",
+              "Proposal Sent Date", "Pilot Start Date",
+              "Production Start Date"]:
+        if c in df.columns:
+            df[c] = _pd.to_datetime(df[c], format="mixed", errors="coerce")
+
+    if "Lead name" not in df.columns:
+        return {}
+    df = df[df["Lead name"].astype(str).str.strip() != ""].copy()
+
+    def _bucket(src: str) -> str:
+        s = str(src).strip().lower()
+        return "partner" if s in ("greentern", "cartlyst website") else "graas"
+
+    def _region_key(r: str) -> str:
+        r = str(r).strip().lower()
+        if r == "india": return "india"
+        if r == "sea":   return "sea"
+        return ""
+
+    df["_region"] = df.get("Region", "").apply(_region_key)
+    df["_bucket"] = df.get("Source of lead", "").apply(_bucket)
+
+    # Positive interest proxy: leads that progressed past TOF
+    if "Lead status" in df.columns:
+        df["_positive"] = ~df["Lead status"].astype(str).str.strip().str.lower().isin(["", "4-tof"])
+    else:
+        df["_positive"] = False
+
+    def _by_month(sub_df, date_col, positive_only=False):
+        out = {m: {"count": 0, "companies": ""} for m in MONTHS_ALL}
+        if date_col not in sub_df.columns or sub_df.empty:
+            return out
+        mask = sub_df[date_col].notna() & (sub_df[date_col].dt.year == YEAR)
+        if positive_only:
+            mask = mask & sub_df["_positive"]
+        valid = sub_df[mask]
+        for m_num, grp in valid.groupby(valid[date_col].dt.month):
+            mn = int(m_num)
+            if 1 <= mn <= 12:
+                names = grp["Lead name"].dropna().astype(str).tolist()
+                out[MONTHS_ALL[mn - 1]] = {"count": len(grp), "companies": ", ".join(names)}
+        return out
+
+    def _slice(region_key, bucket_key=None):
+        s = df[df["_region"] == region_key]
+        if bucket_key is not None:
+            s = s[s["_bucket"] == bucket_key]
+        return s
+
+    def _build_source(region_key, bucket_key):
+        sub = _slice(region_key, bucket_key)
+        return {
+            "meetings":   _by_month(sub, "First conv date"),
+            "positive":   _by_month(sub, "First conv date", positive_only=True),
+            "others":     {m: {"count": 0, "companies": ""} for m in MONTHS_ALL},
+            "pocs":       _by_month(sub, "POC Delivery Date"),
+            "pilots":     _by_month(sub, "Pilot Start Date"),
+            "production": _by_month(sub, "Production Start Date"),
         }
-        for i in range(row_start + 2, min(row_start + 8, len(df))):
-            row = df.iloc[i]
-            label = str(row.iloc[col_start]).strip().lower()
-            for key, name in funnel_keys.items():
-                if label == key:
-                    result[name] = {}
-                    for mi, month in enumerate(months):
-                        count_col = col_start + 1 + mi * 2
-                        names_col = col_start + 2 + mi * 2
-                        if count_col < len(row):
-                            result[name][month] = {
-                                "count": _safe_int(row.iloc[count_col]),
-                                "companies": str(row.iloc[names_col]).strip() if names_col < len(row) else "",
-                            }
-                    break
-        return result
 
-    def _parse_overall(df, row_start, col_start):
-        """Parse the Overall section with Actual/Target columns."""
-        result = {}
-        funnel_keys = {
-            "meetings completed": "meetings",
-            "- positive interest": "positive",
-            "-others (interest yet to confirm)": "others",
+    def _build_overall_region(region_key):
+        sub = _slice(region_key)
+        mtg = _by_month(sub, "First conv date")
+        pos = _by_month(sub, "First conv date", positive_only=True)
+        return {
+            "meetings": {m: {"actual": mtg[m]["count"], "target": 0} for m in MONTHS_ALL},
+            "positive": {m: {"actual": pos[m]["count"], "target": 0} for m in MONTHS_ALL},
+            "others":   {m: {"actual": 0, "target": 0} for m in MONTHS_ALL},
         }
-        for i in range(row_start + 2, min(row_start + 5, len(df))):
-            row = df.iloc[i]
-            label = str(row.iloc[col_start]).strip().lower()
-            for key, name in funnel_keys.items():
-                if label == key:
-                    result[name] = {}
-                    for mi, month in enumerate(months):
-                        actual_col = col_start + 1 + mi * 2
-                        target_col = col_start + 2 + mi * 2
-                        if actual_col < len(row):
-                            result[name][month] = {
-                                "actual": _safe_int(row.iloc[actual_col]),
-                                "target": _safe_int(row.iloc[target_col]),
-                            }
-                    break
-        return result
 
-    def _parse_overall_funnel(df, row_start, col_start):
-        """Parse the Overall Graas funnel (POCs, Pilots, Production) with Actual/Target."""
-        result = {}
-        funnel_keys = {
-            "pocs completed": "pocs",
-            "pilots started": "pilots",
-            "in production": "production",
+    def _build_overall_funnel():
+        return {
+            "pocs":       {m: {"actual": _by_month(df, "POC Delivery Date")[m]["count"],     "target": 0} for m in MONTHS_ALL},
+            "pilots":     {m: {"actual": _by_month(df, "Pilot Start Date")[m]["count"],      "target": 0} for m in MONTHS_ALL},
+            "production": {m: {"actual": _by_month(df, "Production Start Date")[m]["count"], "target": 0} for m in MONTHS_ALL},
         }
-        for i in range(row_start, min(row_start + 4, len(df))):
-            row = df.iloc[i]
-            label = str(row.iloc[col_start]).strip().lower()
-            for key, name in funnel_keys.items():
-                if label == key:
-                    result[name] = {}
-                    for mi, month in enumerate(months):
-                        actual_col = col_start + 1 + mi * 2
-                        target_col = col_start + 2 + mi * 2
-                        if actual_col < len(row):
-                            result[name][month] = {
-                                "actual": _safe_int(row.iloc[actual_col]),
-                                "target": _safe_int(row.iloc[target_col]),
-                            }
-                    break
-        return result
 
-    data = {
+    return {
         "sources": {
-            "Partner India": _parse_section(df, 0, 0),
-            "Partner SEA": _parse_section(df, 0, 10),
-            "Graas Network India": _parse_section(df, 9, 0),
-            "Graas Network SEA": _parse_section(df, 9, 10),
+            "Partner India":       _build_source("india", "partner"),
+            "Partner SEA":         _build_source("sea",   "partner"),
+            "Graas Network India": _build_source("india", "graas"),
+            "Graas Network SEA":   _build_source("sea",   "graas"),
         },
-        "overall_india": _parse_overall(df, 18, 0),
-        "overall_sea": _parse_overall(df, 18, 10),
-        "overall_funnel": _parse_overall_funnel(df, 24, 0),
+        "overall_india":  _build_overall_region("india"),
+        "overall_sea":    _build_overall_region("sea"),
+        "overall_funnel": _build_overall_funnel(),
     }
-    return data
 
 raw = load_proposals()
 pipeline_raw = load_current_pipeline()
@@ -170,11 +173,15 @@ if st.button("🔄 Refresh"):
 # ══════════════════════════════════════════════════════════════════════════════
 # 1. MEETINGS — Q1+ VIEW (from "Revised - Summary of Meetings" tab)
 # ══════════════════════════════════════════════════════════════════════════════
-st.markdown("### 🤝 Meetings — YTD 2026")
-st.caption("All products — source: All-e 'Revised - Summary of Meetings' tab")
+_ALL_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+               "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+_YTD_MONTHS = _ALL_MONTHS[:datetime.now().month]
+
+st.markdown(f"### 🤝 Meetings — YTD 2026 (through {_YTD_MONTHS[-1]})")
+st.caption("All products — source: All-e 'Overall Pipeline for IN and SEA' tab (derived from First conv date)")
 
 if meetings_data:
-    _MONTHS = ["Jan", "Feb", "Mar", "Apr", "May"]
+    _MONTHS = _YTD_MONTHS
     ov_in = meetings_data.get("overall_india", {})
     ov_sea = meetings_data.get("overall_sea", {})
     ov_funnel = meetings_data.get("overall_funnel", {})
