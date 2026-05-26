@@ -184,49 +184,6 @@ if meetings_data:
     _MONTHS = _YTD_MONTHS
     ov_in = meetings_data.get("overall_india", {})
     ov_sea = meetings_data.get("overall_sea", {})
-    ov_funnel = meetings_data.get("overall_funnel", {})
-
-    # ── Helper: sum a metric across months ────────────────────────────────────
-    def _sum_metric(overall, metric, field, month_list):
-        total = 0
-        for m in month_list:
-            total += overall.get(metric, {}).get(m, {}).get(field, 0)
-        return total
-
-    # ── Grand totals ──────────────────────────────────────────────────────────
-    q1 = ["Jan", "Feb", "Mar"]
-    india_q1 = _sum_metric(ov_in, "meetings", "actual", q1)
-    sea_q1 = _sum_metric(ov_sea, "meetings", "actual", q1)
-    india_apr = _sum_metric(ov_in, "meetings", "actual", ["Apr"])
-    sea_apr = _sum_metric(ov_sea, "meetings", "actual", ["Apr"])
-    total_q1 = india_q1 + sea_q1
-    total_apr = india_apr + sea_apr
-    total_ytd = total_q1 + total_apr
-
-    target_q1 = _sum_metric(ov_in, "meetings", "target", q1) + _sum_metric(ov_sea, "meetings", "target", q1)
-    target_apr = _sum_metric(ov_in, "meetings", "target", ["Apr"]) + _sum_metric(ov_sea, "meetings", "target", ["Apr"])
-    target_ytd = target_q1 + target_apr
-
-    positive_ytd = (
-        _sum_metric(ov_in, "positive", "actual", _MONTHS) +
-        _sum_metric(ov_sea, "positive", "actual", _MONTHS)
-    )
-
-    pocs_ytd = _sum_metric(ov_funnel, "pocs", "actual", _MONTHS)
-    pilots_ytd = _sum_metric(ov_funnel, "pilots", "actual", _MONTHS)
-
-    # ── Top-line KPIs ────────────────────────────────────────────────────────
-    mk1, mk2, mk3, mk4 = st.columns(4)
-    with mk1:
-        pct = f"{total_ytd/target_ytd*100:.0f}%" if target_ytd else "—"
-        st.metric("Meetings (YTD)", total_ytd, f"vs {target_ytd} target ({pct})")
-    with mk2:
-        conv = f"{positive_ytd/total_ytd*100:.0f}%" if total_ytd else "—"
-        st.metric("Positive Interest", positive_ytd, conv)
-    with mk3:
-        st.metric("POCs Done", pocs_ytd)
-    with mk4:
-        st.metric("Pilots Started", pilots_ytd)
 
     # ── Companies Met — by source × month ─────────────────────────────────────
     sources = meetings_data.get("sources", {})
@@ -281,16 +238,22 @@ if meetings_data:
                     unsafe_allow_html=True,
                 )
 
-    # ── India & SEA totals vs target ──────────────────────────────────────────
-    _REGION_ROWS = [
-        ("India", ov_in, _INDIA_COLOR),
-        ("SEA", ov_sea, _SEA_COLOR),
+    # ── Per-region + Grand Total rows ─────────────────────────────────────────
+    _TOTAL_COLOR = "#E5E7EB"
+    _TOTAL_ROWS = [
+        ("Total India", ov_in.get("meetings", {}), _INDIA_COLOR),
+        ("Total SEA",   ov_sea.get("meetings", {}), _SEA_COLOR),
+        ("Total",       None,                       _TOTAL_COLOR),  # grand total — sentinel
     ]
-    for region, ov_data, color in _REGION_ROWS:
-        mtg = ov_data.get("meetings", {})
-        ytd_actual = sum(mtg.get(m, {}).get("actual", 0) for m in _MONTHS)
-        ytd_target = sum(mtg.get(m, {}).get("target", 0) for m in _MONTHS)
-        ytd_pct = f"{ytd_actual/ytd_target*100:.0f}%" if ytd_target else "—"
+    for label, mtg, color in _TOTAL_ROWS:
+        if mtg is None:
+            in_mtg = ov_in.get("meetings", {})
+            sea_mtg = ov_sea.get("meetings", {})
+            monthly = {m: in_mtg.get(m, {}).get("actual", 0) + sea_mtg.get(m, {}).get("actual", 0)
+                       for m in _MONTHS}
+        else:
+            monthly = {m: mtg.get(m, {}).get("actual", 0) for m in _MONTHS}
+        ytd_actual = sum(monthly.values())
 
         label_col, *month_cols = st.columns([1.2] + [1] * len(_MONTHS))
         with label_col:
@@ -298,26 +261,19 @@ if meetings_data:
                 f'<div style="padding:10px 6px; min-height:60px; display:flex; '
                 f'align-items:center; border-top:1px solid #374151;">'
                 f'<div>'
-                f'<div style="font-size:0.8rem; font-weight:700; color:{color};">Total {region}</div>'
-                f'<div style="font-size:1rem; font-weight:700; color:{color};">'
-                f'{ytd_actual} / {ytd_target} ({ytd_pct})</div>'
+                f'<div style="font-size:0.8rem; font-weight:700; color:{color};">{label}</div>'
+                f'<div style="font-size:1.2rem; font-weight:700; color:{color};">{ytd_actual}</div>'
                 f'</div></div>',
                 unsafe_allow_html=True,
             )
         for col, m in zip(month_cols, _MONTHS):
             with col:
-                actual = mtg.get(m, {}).get("actual", 0)
-                target = mtg.get(m, {}).get("target", 0)
-                pct = actual / target * 100 if target else 0
-                pct_color = "#10B981" if pct >= 90 else "#F59E0B" if pct >= 60 else "#EF4444"
-
+                actual = monthly[m]
                 st.markdown(
                     f'<div style="text-align:center; padding:8px 4px; background:#1E1E2E; '
                     f'border-radius:6px; border-top:2px solid {color}; min-height:60px;">'
                     f'<div style="font-size:0.7rem; color:#9CA3AF;">{m}</div>'
-                    f'<div style="font-size:1.1rem; font-weight:700; color:{color};">'
-                    f'{actual} <span style="font-size:0.75rem; color:#6B7280;">/ {target}</span></div>'
-                    f'<div style="font-size:0.7rem; font-weight:600; color:{pct_color};">{pct:.0f}%</div>'
+                    f'<div style="font-size:1.2rem; font-weight:700; color:{color};">{actual}</div>'
                     f'</div>',
                     unsafe_allow_html=True,
                 )
