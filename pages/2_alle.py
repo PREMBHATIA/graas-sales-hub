@@ -1,5 +1,6 @@
 """All-e — Foundry Presales Pipeline & CRM."""
 
+import os
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -23,19 +24,21 @@ st.markdown("[Open Source Sheet →](https://docs.google.com/spreadsheets/d/1lK9
 
 @st.cache_data(ttl=3600)
 def load_alle_data():
-    """Load All-e data — try Sheets API first, then CSV fallback."""
+    """Load All-e leads from 'Overall Pipeline for IN and SEA' tab."""
     try:
-        from services.sheets_client import fetch_alle_active_presales
-        df = fetch_alle_active_presales()
-        if not df.empty:
-            return df
-        else:
-            st.info("All-e API returned empty DataFrame")
+        from services.sheets_client import fetch_sheet_tab
+        sheet_id = os.getenv("ALLE_SHEET_ID", "")
+        if sheet_id:
+            df = fetch_sheet_tab(sheet_id, "Overall Pipeline for IN and SEA")
+            if not df.empty:
+                return df
+            else:
+                st.info("All-e API returned empty DataFrame")
     except Exception as e:
         st.warning(f"All-e load error: {e}")
     # CSV fallback
     candidates = [
-        "All-e - Foundry Presales Tracker - Active presales (1).csv",
+        "All-e - Foundry Presales Tracker - Overall Pipeline for IN and SEA.csv",
         "All-e - Foundry Presales Tracker - Active presales.csv",
     ]
     for name in candidates:
@@ -66,6 +69,10 @@ for col in df.columns:
         col_map[col] = 'lead_name'
     elif 'vertical' in cl:
         col_map[col] = 'vertical'
+    elif cl == 'region':
+        col_map[col] = 'region'
+    elif 'active' in cl and 'dropped' in cl:
+        col_map[col] = 'active_status'
     elif 'source' in cl:
         col_map[col] = 'source'
     elif 'agents of interest' in cl:
@@ -78,6 +85,14 @@ for col in df.columns:
         col_map[col] = 'latest_conv'
     elif 'latest conv detail' in cl:
         col_map[col] = 'conv_details'
+    elif 'poc delivery' in cl:
+        col_map[col] = 'poc_delivery_date'
+    elif 'proposal sent' in cl:
+        col_map[col] = 'proposal_sent_date'
+    elif 'pilot start' in cl:
+        col_map[col] = 'pilot_start_date'
+    elif 'production start' in cl:
+        col_map[col] = 'production_start_date'
     elif 'nda' in cl:
         col_map[col] = 'nda'
     elif 'poc required' in cl:
@@ -108,10 +123,18 @@ else:
     st.warning("Could not find 'Lead name' column in the data.")
     st.stop()
 
-# Parse dates
-for date_col in ['first_conv', 'latest_conv']:
+# Parse dates (mixed formats: "11 Dec 2025", "Apr 15, 2026", "May 15 2026", etc.)
+for date_col in ['first_conv', 'latest_conv', 'poc_delivery_date',
+                 'proposal_sent_date', 'pilot_start_date', 'production_start_date']:
     if date_col in df.columns:
         df[date_col] = pd.to_datetime(df[date_col], format='mixed', errors='coerce')
+
+# Keep full dataset (Active + Dropped) for historical monthly metrics
+df_all = df.copy()
+
+# Filter to Active leads for pipeline / deal / follow-up views
+if 'active_status' in df.columns:
+    df = df[df['active_status'].astype(str).str.strip().str.lower() == 'active'].copy()
 
 # Calculate days since last contact
 if 'latest_conv' in df.columns:
@@ -175,14 +198,15 @@ gtm_actual_mtgs = {
     },
 }
 
-# Auto-detect meetings from Active presales sheet by first_conv date
-# Only count 2026 meetings — older ones go into a pre-2026 bucket
+# Auto-detect meetings from Overall Pipeline by first_conv date
+# Uses df_all (Active + Dropped) so dropped leads' historical meetings still count.
+# Proposals derived from Proposal Sent Date column directly (more accurate than status).
 MONTH_ABBR = {1: "Jan", 2: "Feb", 3: "Mar", 4: "Apr", 5: "May", 6: "Jun",
               7: "Jul", 8: "Aug", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dec"}
 
 _pre2026_meetings = []
-if 'first_conv' in df.columns:
-    for _, row in df.iterrows():
+if 'first_conv' in df_all.columns:
+    for _, row in df_all.iterrows():
         if pd.notna(row.get('first_conv')):
             conv_date = row['first_conv']
             lead = str(row.get('lead_name', '')).strip()
@@ -198,9 +222,20 @@ if 'first_conv' in df.columns:
             if m_abbr:
                 if lead not in gtm_actual_mtgs[m_abbr]["meetings"]:
                     gtm_actual_mtgs[m_abbr]["meetings"].append(lead)
-                status = str(row.get('status', '')).lower()
-                if 'proposal' in status and lead not in gtm_actual_mtgs[m_abbr]["proposals"]:
-                    gtm_actual_mtgs[m_abbr]["proposals"].append(lead)
+
+# Proposals derived from Proposal Sent Date column (all leads, by month)
+if 'proposal_sent_date' in df_all.columns:
+    for _, row in df_all.iterrows():
+        psd = row.get('proposal_sent_date')
+        if pd.notna(psd) and psd.year == 2026:
+            lead = str(row.get('lead_name', '')).strip()
+            if not lead:
+                continue
+            m_abbr = MONTH_ABBR.get(psd.month)
+            if m_abbr and m_abbr not in gtm_actual_mtgs:
+                gtm_actual_mtgs[m_abbr] = {"meetings": [], "proposals": []}
+            if m_abbr and lead not in gtm_actual_mtgs[m_abbr]["proposals"]:
+                gtm_actual_mtgs[m_abbr]["proposals"].append(lead)
 
 # Build actuals dataframe
 months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
