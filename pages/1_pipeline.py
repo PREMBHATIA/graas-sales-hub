@@ -203,8 +203,7 @@ if meetings_data:
         src_data = sources.get(src_key, {})
         mtg_info = src_data.get("meetings", {})
         row_total = sum(mtg_info.get(m, {}).get("count", 0) for m in _MONTHS)
-        if row_total == 0:
-            continue
+        # Always show every source row (even at 0) — visibility = accountability.
 
         # Label column + month columns
         label_col, *month_cols = st.columns([1.2] + [1] * len(_MONTHS))
