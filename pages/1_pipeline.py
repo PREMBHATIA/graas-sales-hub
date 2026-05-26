@@ -322,36 +322,8 @@ if meetings_data:
                     unsafe_allow_html=True,
                 )
 
-    # ── Funnel progression ────────────────────────────────────────────────────
-    st.markdown("#### 📊 Funnel Progression (YTD)")
-    funnel_stages = [
-        ("Meetings", total_ytd, "#3B82F6"),
-        ("Positive Interest", positive_ytd, "#10B981"),
-        ("POCs", pocs_ytd, "#F59E0B"),
-        ("Pilots", pilots_ytd, "#A855F7"),
-    ]
-    fc = st.columns(len(funnel_stages))
-    for col, (label, val, color) in zip(fc, funnel_stages):
-        with col:
-            st.markdown(
-                f'<div style="text-align:center; padding:15px; background:#1E1E2E; '
-                f'border-radius:8px; border-top:3px solid {color};">'
-                f'<div style="font-size:2rem; font-weight:700; color:{color};">{val}</div>'
-                f'<div style="font-size:0.85rem; color:#9CA3AF;">{label}</div>'
-                f'</div>',
-                unsafe_allow_html=True,
-            )
-    # Conversion rates
-    conv_parts = []
-    if total_ytd > 0:
-        conv_parts.append(f"Meeting → Positive: **{positive_ytd/total_ytd*100:.0f}%**")
-    if positive_ytd > 0:
-        conv_parts.append(f"Positive → POC: **{pocs_ytd/positive_ytd*100:.0f}%**")
-    if conv_parts:
-        st.caption(" &nbsp;|&nbsp; ".join(conv_parts))
-
 else:
-    st.info("Meetings summary not available — check 'Revised - Summary of Meetings' tab in the All-e sheet.")
+    st.info("Meetings summary not available — check 'Overall Pipeline for IN and SEA' tab in the All-e sheet.")
 
 st.markdown("---")
 
