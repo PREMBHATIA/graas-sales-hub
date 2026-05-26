@@ -21,10 +21,6 @@ st.caption("Meetings (all products, from All-e Summary of Meetings) → Proposal
 
 # ── Data Loading ─────────────────────────────────────────────────────────────
 
-MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
-               "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-CURRENT_MONTH = MONTH_NAMES[datetime.now().month - 1]
-
 @st.cache_data(ttl=1800)
 def load_proposals():
     from services.sheets_client import fetch_sheet_tab
@@ -38,14 +34,13 @@ def load_proposals():
 
 @st.cache_data(ttl=1800)
 def load_current_pipeline():
-    """Load the current month All-e pipeline tab."""
+    """Load the unified IN+SEA All-e pipeline tab."""
     from services.sheets_client import fetch_sheet_tab
     sheet_id = os.getenv("ALLE_SHEET_ID", "")
     if not sheet_id:
         return pd.DataFrame()
-    tab_name = f"All-e Pipeline (IN) - {CURRENT_MONTH}"
     try:
-        return fetch_sheet_tab(sheet_id, tab_name)
+        return fetch_sheet_tab(sheet_id, "Overall Pipeline for IN and SEA")
     except Exception:
         return pd.DataFrame()
 
@@ -704,11 +699,11 @@ st.plotly_chart(fig_pg, use_container_width=True)
 st.markdown("---")
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 4. LIVE PIPELINE — CURRENT MONTH (operational view)
+# 4. ALL-E PIPELINE STATUS — IN + SEA (from "Overall Pipeline for IN and SEA" tab)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-st.markdown(f"### 🗓️ {CURRENT_MONTH} Live Pipeline")
-st.caption("What's in play right now — meetings being set, MOF, BOF | Source: All-e Pipeline tab")
+st.markdown("### 🗓️ All-e Pipeline — IN + SEA")
+st.caption("Active leads by stage | Source: All-e 'Overall Pipeline for IN and SEA' tab")
 
 # ── CSS for pipeline cards ──
 st.markdown("""
@@ -716,64 +711,71 @@ st.markdown("""
 .pipeline-item {
     background: #1E1E2E;
     border-radius: 6px;
-    padding: 6px 10px;
-    margin-bottom: 4px;
+    padding: 8px 10px;
+    margin-bottom: 5px;
     border-left: 3px solid;
+}
+.pipeline-row1 {
     display: flex;
     justify-content: space-between;
     align-items: baseline;
 }
-.pipeline-name { font-weight: 600; font-size: 0.85rem; color: #E2E8F0; }
-.pipeline-detail { font-size: 0.75rem; color: #9CA3AF; background: rgba(255,255,255,0.08); border-radius: 4px; padding: 2px 6px; }
-.pipeline-notes { font-size: 0.78rem; margin-top: 1px; }
+.pipeline-name { font-weight: 600; font-size: 0.88rem; color: #E2E8F0; }
+.pipeline-region-in { font-size: 0.65rem; font-weight: 700; color: #3B82F6; background: rgba(59,130,246,0.15); padding: 2px 6px; border-radius: 4px; }
+.pipeline-region-sea { font-size: 0.65rem; font-weight: 700; color: #A855F7; background: rgba(168,85,247,0.15); padding: 2px 6px; border-radius: 4px; }
+.pipeline-meta { font-size: 0.7rem; color: #9CA3AF; margin-top: 2px; }
+.pipeline-notes { font-size: 0.72rem; color: #CBD5E1; margin-top: 4px; line-height: 1.3; }
 </style>
 """, unsafe_allow_html=True)
 
-# ── All-e India pipeline from sheet ──
-alle_sections = {}
+# ── All-e pipeline from sheet (IN + SEA combined) ──
+# Stage order: funnel progression earliest → latest
+STAGE_ORDER = [
+    ("4-TOF", "TOF", "#3B82F6", "🔵"),
+    ("2-POC", "POC", "#F59E0B", "🟡"),
+    ("3-Proposal sent", "Proposal Sent", "#A855F7", "🟣"),
+    ("1-Pilot", "Pilot", "#10B981", "✅"),
+]
+
+alle_sections = {label: {"color": color, "icon": icon, "items": []}
+                  for _, label, color, icon in STAGE_ORDER}
+
 if not pipeline_raw.empty:
-    SECTION_KEYS = {
-        "meetings already set": ("Meetings Set", "#10B981", "✅"),
-        "meetings in the process": ("Meetings Being Set", "#3B82F6", "🔵"),
-        "mof": ("MOF — Met, No Proposal Yet", "#F59E0B", "🟡"),
-        "bof": ("BOF — Proposal Sent, In Play", "#A855F7", "🟣"),
-    }
+    df_p = pipeline_raw.copy()
+    if "Active / Dropped" in df_p.columns:
+        df_p = df_p[df_p["Active / Dropped"].astype(str).str.strip().str.lower() == "active"]
 
-    current_section = None
-    for i in range(len(pipeline_raw)):
-        row = pipeline_raw.iloc[i]
-        first_cell = str(row.iloc[0]).strip().lower() if len(row) > 0 else ""
+    def _truncate(s, n=140):
+        s = str(s or "").strip()
+        if s in ("", "nan"):
+            return ""
+        s = s.split("\n")[0].strip()
+        return s if len(s) <= n else s[:n].rstrip() + "…"
 
-        matched = False
-        for key, val in SECTION_KEYS.items():
-            if key in first_cell:
-                current_section = val[0]
-                alle_sections[current_section] = {"color": val[1], "icon": val[2], "items": []}
-                matched = True
-                break
-
-        if matched or current_section is None:
+    for _, row in df_p.iterrows():
+        status = str(row.get("Lead status", "")).strip()
+        match_key = next((k for k, *_ in STAGE_ORDER if k.lower() == status.lower()), None)
+        if not match_key:
             continue
-
-        name = str(row.iloc[0]).strip() if len(row) > 0 else ""
-        if not name or name.lower() in ("name", ""):
-            continue
-        source = str(row.iloc[1]).strip() if len(row) > 1 else ""
-        notes = str(row.iloc[2]).strip() if len(row) > 2 else ""
-        if notes == "nan":
-            notes = ""
-        alle_sections[current_section]["items"].append({"name": name, "source": source, "notes": notes})
+        label = next(lbl for k, lbl, *_ in STAGE_ORDER if k == match_key)
+        alle_sections[label]["items"].append({
+            "name": str(row.get("Lead name", "")).strip(),
+            "owner": str(row.get("Source of lead", "")).strip(),
+            "region": str(row.get("Region", "")).strip(),
+            "vertical": str(row.get("Vertical", "")).strip(),
+            "notes": _truncate(row.get("Latest Conv details", "")),
+        })
 
 # ── Hoppr / Extract pipeline (manual for now) ──
 hoppr_extract_sections = {
     "MOF — Meeting Done": {
         "color": "#F59E0B", "icon": "🟡",
         "items": [
-            {"name": "Hitachi Thailand", "source": "Hoppr", "notes": ""},
-            {"name": "Rinse", "source": "Hoppr", "notes": ""},
-            {"name": "Estée Lauder", "source": "Extract", "notes": ""},
-            {"name": "Beacon Mart", "source": "Hoppr", "notes": ""},
-            {"name": "Bata", "source": "Hoppr", "notes": ""},
+            {"name": "Hitachi Thailand", "owner": "Hoppr", "region": "", "vertical": "", "notes": ""},
+            {"name": "Rinse", "owner": "Hoppr", "region": "", "vertical": "", "notes": ""},
+            {"name": "Estée Lauder", "owner": "Extract", "region": "", "vertical": "", "notes": ""},
+            {"name": "Beacon Mart", "owner": "Hoppr", "region": "", "vertical": "", "notes": ""},
+            {"name": "Bata", "owner": "Hoppr", "region": "", "vertical": "", "notes": ""},
         ],
     },
 }
@@ -797,18 +799,30 @@ def render_kanban_row(label, sections_dict):
                 unsafe_allow_html=True,
             )
             for item in sec_data["items"]:
-                notes_html = f'<div class="pipeline-notes" style="color:{color};">{item["notes"]}</div>' if item["notes"] else ""
+                region = item.get("region", "")
+                region_cls = "pipeline-region-sea" if region.lower() == "sea" else "pipeline-region-in"
+                region_html = f'<span class="{region_cls}">{region}</span>' if region else ""
+                meta_parts = [p for p in [item.get("owner", ""), item.get("vertical", "")] if p]
+                meta_html = (
+                    f'<div class="pipeline-meta">{" · ".join(meta_parts)}</div>'
+                    if meta_parts else ""
+                )
+                notes_html = (
+                    f'<div class="pipeline-notes">{item["notes"]}</div>'
+                    if item.get("notes") else ""
+                )
                 st.markdown(
                     f'<div class="pipeline-item" style="border-color:{color};">'
-                    f'<div>'
+                    f'<div class="pipeline-row1">'
                     f'<span class="pipeline-name">{item["name"]}</span>'
-                    f'{notes_html}'
+                    f'{region_html}'
                     f'</div>'
-                    f'<span class="pipeline-detail">{item["source"]}</span>'
+                    f'{meta_html}'
+                    f'{notes_html}'
                     f'</div>',
                     unsafe_allow_html=True,
                 )
 
-render_kanban_row("All-e India", alle_sections)
+render_kanban_row("All-e (IN + SEA)", alle_sections)
 st.markdown("")
 render_kanban_row("Hoppr / Extract", hoppr_extract_sections)

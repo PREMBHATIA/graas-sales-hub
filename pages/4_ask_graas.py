@@ -368,10 +368,6 @@ Ask: "What back-end systems does it connect to? Can it place orders or check cre
 
 # ── Data Loaders ─────────────────────────────────────────────────────────────
 
-MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
-               "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-CURRENT_MONTH = MONTH_NAMES[datetime.now().month - 1]
-
 
 @st.cache_data(ttl=1800)
 def load_sales_data():
@@ -446,14 +442,14 @@ def load_sales_data():
         from services.sheets_client import fetch_sheet_tab
         sheet_id = os.getenv("ALLE_SHEET_ID", "")
         if sheet_id:
-            tab_name = f"All-e Pipeline (IN) - {CURRENT_MONTH}"
-            df = fetch_sheet_tab(sheet_id, tab_name)
+            df = fetch_sheet_tab(sheet_id, "Overall Pipeline for IN and SEA")
             if not df.empty:
+                if "Active / Dropped" in df.columns:
+                    df = df[df["Active / Dropped"].astype(str).str.strip().str.lower() == "active"]
                 summaries["current_pipeline"] = {
-                    "month": CURRENT_MONTH,
                     "rows": len(df),
-                    "raw_data": df.head(40).to_dict("records"),
-                    "note": f"This is the {CURRENT_MONTH} pipeline with sections: Meetings Already Set, Meetings In Process, MOF (Met, No Proposal), BOF (Proposal Sent).",
+                    "raw_data": df.head(60).to_dict("records"),
+                    "note": "Unified IN + SEA pipeline. 'Lead status' values: 4-TOF (top of funnel), 2-POC, 3-Proposal sent, 1-Pilot. 'Region' = India or SEA. 'Source of lead' = owner.",
                 }
     except Exception as e:
         summaries["current_pipeline"] = f"Error: {e}"
