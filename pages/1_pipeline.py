@@ -199,6 +199,16 @@ if meetings_data:
         ("Partner SEA", _SEA_COLOR),
     ]
 
+    # ── Month header row ──────────────────────────────────────────────────────
+    hdr_label, *hdr_months = st.columns([1.2] + [1] * len(_MONTHS))
+    for col, m in zip(hdr_months, _MONTHS):
+        with col:
+            st.markdown(
+                f'<div style="text-align:center; font-size:0.8rem; font-weight:600; '
+                f'color:#9CA3AF; padding:4px 0;">{m}</div>',
+                unsafe_allow_html=True,
+            )
+
     for src_key, color in _SOURCE_ROWS:
         src_data = sources.get(src_key, {})
         mtg_info = src_data.get("meetings", {})
@@ -220,19 +230,10 @@ if meetings_data:
         for col, m in zip(month_cols, _MONTHS):
             with col:
                 count = mtg_info.get(m, {}).get("count", 0)
-                names_raw = mtg_info.get(m, {}).get("companies", "")
-                names = [n.strip() for n in names_raw.split(",") if n.strip()] if names_raw and names_raw != "nan" else []
-
-                names_str = " · ".join(names) if names else "—"
-
                 st.markdown(
-                    f'<div style="text-align:center; padding:8px 4px; background:#1E1E2E; '
-                    f'border-radius:6px; border-top:2px solid {color}; min-height:70px; '
-                    f'display:flex; flex-direction:column;">'
-                    f'<div style="font-size:0.7rem; color:#9CA3AF;">{m}</div>'
+                    f'<div style="text-align:center; padding:10px 4px; background:#1E1E2E; '
+                    f'border-radius:6px; border-top:2px solid {color}; min-height:42px;">'
                     f'<div style="font-size:1.3rem; font-weight:700; color:{color};">{count}</div>'
-                    f'<div style="font-size:0.5rem; color:#E5E7EB; line-height:1.25; '
-                    f'margin-top:4px; flex:1;">{names_str}</div>'
                     f'</div>',
                     unsafe_allow_html=True,
                 )
@@ -250,12 +251,9 @@ if meetings_data:
                     names.append(n)
         return names
 
-    _TOTAL_COLOR = "#E5E7EB"
     _TOTAL_ROWS = [
         ("Total India", ["Graas Network India", "Partner India"], _INDIA_COLOR),
         ("Total SEA",   ["Graas Network SEA",   "Partner SEA"],   _SEA_COLOR),
-        ("Total",       ["Graas Network India", "Partner India",
-                         "Graas Network SEA",   "Partner SEA"],   _TOTAL_COLOR),
     ]
     for label, src_keys, color in _TOTAL_ROWS:
         monthly = {m: sum(sources.get(sk, {}).get("meetings", {}).get(m, {}).get("count", 0)
@@ -283,7 +281,6 @@ if meetings_data:
                     f'<div style="text-align:center; padding:8px 4px; background:#1E1E2E; '
                     f'border-radius:6px; border-top:2px solid {color}; min-height:70px; '
                     f'display:flex; flex-direction:column;">'
-                    f'<div style="font-size:0.7rem; color:#9CA3AF;">{m}</div>'
                     f'<div style="font-size:1.3rem; font-weight:700; color:{color};">{actual}</div>'
                     f'<div style="font-size:0.5rem; color:#E5E7EB; line-height:1.25; '
                     f'margin-top:4px; flex:1;">{names_str}</div>'
