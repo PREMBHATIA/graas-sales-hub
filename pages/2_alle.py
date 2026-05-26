@@ -181,22 +181,10 @@ gtm_target = pd.DataFrame({
     "T_Monthly_MRR": [0, 0, 0, 0, 0, 4000, 8000, 12000, 20000, 28000, 36000, 40000],
 })
 
-# Actuals — update these as new months complete
-gtm_actual_mtgs = {
-    "Jan": {
-        "meetings": ["Syngenta", "TTK", "Cello", "Rich", "Samsung", "Orient Bell", "MHR Dubai"],
-        "proposals": ["Canon"],
-    },
-    "Feb": {
-        "meetings": ["Nippon", "Prince", "Anmol", "Siyaram", "RR Cable", "Wipro", "Kajaria",
-                      "Dell", "Reebok", "Wakefit", "Versuni", "BBW", "Mondelez", "Frisian Flag", "Wipro"],
-        "proposals": ["Agricon", "Nippon", "Schneider"],
-    },
-    "Mar": {
-        "meetings": ["Crompton", "Eureka", "SRMB Steel", "Tata Consumer Prod", "Liberty Steel", "Makson", "Sunway"],
-        "proposals": ["Orient Bell"],
-    },
-}
+# Actuals — derived 100% from df_all (Overall Pipeline tab) below. Previously
+# Jan/Feb/Mar had hardcoded meeting names; those duplicated/diverged from the
+# sheet and broke parity with the Pipeline page Companies Met section.
+gtm_actual_mtgs = {}
 
 # Auto-detect meetings from Overall Pipeline by first_conv date
 # Uses df_all (Active + Dropped) so dropped leads' historical meetings still count.
