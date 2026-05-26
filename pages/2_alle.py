@@ -273,6 +273,62 @@ gtm_target["A_Proposals"] = actual_proposals
 # ══════════════════════════════════════════════════════════════════════════════
 
 with tab_gtm:
+    # ── Leads Table (operational view) ────────────────────────────────────────
+    st.markdown("### All Active Leads")
+
+    col_status, col_vertical, col_source, col_search = st.columns(4)
+    with col_status:
+        _statuses = sorted(df['status'].dropna().unique().tolist()) if 'status' in df.columns else []
+        _sel_status = st.multiselect("Status", _statuses, default=_statuses, key="gtm_alle_status")
+    with col_vertical:
+        _verticals = sorted(df['vertical'].dropna().unique().tolist()) if 'vertical' in df.columns else []
+        _sel_verticals = st.multiselect("Vertical", _verticals, default=_verticals, key="gtm_alle_vert")
+    with col_source:
+        _src_vals = sorted(df['source'].dropna().unique().tolist()) if 'source' in df.columns else []
+        _sel_sources = st.multiselect("Source", _src_vals, default=_src_vals, key="gtm_alle_src")
+    with col_search:
+        _search = st.text_input("Search lead", "", key="gtm_alle_search")
+
+    _gtm_filtered = df.copy()
+    if 'status' in _gtm_filtered.columns:
+        _gtm_filtered = _gtm_filtered[_gtm_filtered['status'].isin(_sel_status)]
+    if 'vertical' in _gtm_filtered.columns:
+        _gtm_filtered = _gtm_filtered[_gtm_filtered['vertical'].isin(_sel_verticals)]
+    if 'source' in _gtm_filtered.columns:
+        _gtm_filtered = _gtm_filtered[_gtm_filtered['source'].isin(_sel_sources)]
+    if _search:
+        _gtm_filtered = _gtm_filtered[_gtm_filtered['lead_name'].str.contains(_search, case=False, na=False)]
+    _gtm_filtered = _gtm_filtered.sort_values('status_rank')
+
+    _display_cols = ['lead_name', 'vertical', 'source', 'agents', 'status', 'first_conv', 'latest_conv']
+    _available_cols = [c for c in _display_cols if c in _gtm_filtered.columns]
+    _gtm_display = _gtm_filtered[_available_cols].copy().reset_index(drop=True)
+    _gtm_display.insert(0, '#', range(1, len(_gtm_display) + 1))
+    for dc in ['first_conv', 'latest_conv']:
+        if dc in _gtm_display.columns:
+            _gtm_display[dc] = _gtm_display[dc].dt.strftime('%d %b %Y').fillna('—')
+    _gtm_display = _gtm_display.rename(columns={
+        'lead_name': 'Lead', 'vertical': 'Vertical', 'source': 'Source',
+        'agents': 'Product Interest', 'status': 'Status',
+        'first_conv': 'First Contact', 'latest_conv': 'Last Contact',
+    })
+
+    def _gtm_status_color(val):
+        return {
+            '1-Pilot': 'background-color: #065F46; color: white',
+            '2-POC': 'background-color: #1E40AF; color: white',
+            '3-Proposal sent': 'background-color: #92400E; color: white',
+            '4-TOF': 'background-color: #374151; color: white',
+        }.get(val, '')
+
+    _gtm_style = _gtm_display.style
+    if 'Status' in _gtm_display.columns:
+        _gtm_style = _gtm_style.map(_gtm_status_color, subset=['Status'])
+    st.dataframe(_gtm_style, use_container_width=True, height=600, hide_index=True)
+
+    st.markdown("---")
+
+    # ── 2026 Execution & Revenue Roadmap ──────────────────────────────────────
     st.markdown("### 2026 Execution & Revenue Roadmap")
     st.caption("Tracking against AOP targets — cumulative figures, pilot revenue recognized at month of start")
 
@@ -682,88 +738,10 @@ with tab_pipeline:
 # ══════════════════════════════════════════════════════════════════════════════
 
 with tab_deals:
-    st.markdown("### All Active Deals")
-
-    # Filters
-    col_status, col_vertical, col_source, col_search = st.columns(4)
-
-    with col_status:
-        statuses = sorted(df['status'].dropna().unique().tolist()) if 'status' in df.columns else []
-        sel_status = st.multiselect("Status", statuses, default=statuses, key="alle_status")
-    with col_vertical:
-        verticals = sorted(df['vertical'].dropna().unique().tolist()) if 'vertical' in df.columns else []
-        sel_verticals = st.multiselect("Vertical", verticals, default=verticals, key="alle_vert")
-    with col_source:
-        sources = sorted(df['source'].dropna().unique().tolist()) if 'source' in df.columns else []
-        sel_sources = st.multiselect("Source", sources, default=sources, key="alle_src")
-    with col_search:
-        search = st.text_input("Search lead", "", key="alle_search")
-
-    filtered = df.copy()
-    if 'status' in filtered.columns:
-        filtered = filtered[filtered['status'].isin(sel_status)]
-    if 'vertical' in filtered.columns:
-        filtered = filtered[filtered['vertical'].isin(sel_verticals)]
-    if 'source' in filtered.columns:
-        filtered = filtered[filtered['source'].isin(sel_sources)]
-    if search:
-        filtered = filtered[filtered['lead_name'].str.contains(search, case=False, na=False)]
-
-    filtered = filtered.sort_values('status_rank')
-
-    # Build display table
-    display_cols = ['lead_name', 'vertical', 'source', 'agents', 'status', 'first_conv', 'latest_conv']
-    available_cols = [c for c in display_cols if c in filtered.columns]
-
-    display = filtered[available_cols].copy()
-
-    # Add row numbers
-    display = display.reset_index(drop=True)
-    display.insert(0, '#', range(1, len(display) + 1))
-
-    # Format dates
-    for dc in ['first_conv', 'latest_conv']:
-        if dc in display.columns:
-            display[dc] = display[dc].dt.strftime('%d %b %Y').fillna('—')
-
-    rename_map = {
-        'lead_name': 'Lead', 'vertical': 'Vertical', 'source': 'Source',
-        'agents': 'Product Interest', 'status': 'Status',
-        'first_conv': 'First Contact', 'latest_conv': 'Last Contact',
-    }
-    display = display.rename(columns={k: v for k, v in rename_map.items() if k in display.columns})
-
-    def status_color(val):
-        colors = {
-            '1-Pilot': 'background-color: #065F46; color: white',
-            '2-POC': 'background-color: #1E40AF; color: white',
-            '3-Proposal sent': 'background-color: #92400E; color: white',
-            '4-TOF': 'background-color: #374151; color: white',
-        }
-        return colors.get(val, '')
-
-    def days_color(val):
-        try:
-            v = float(val)
-            if v > 21:
-                return 'background-color: #7F1D1D; color: white'
-            elif v > 14:
-                return 'background-color: #92400E; color: white'
-            return ''
-        except:
-            return ''
-
-    style = display.style
-    if 'Status' in display.columns:
-        style = style.map(status_color, subset=['Status'])
-    if 'Days Silent' in display.columns:
-        style = style.map(days_color, subset=['Days Silent'])
-
-    st.dataframe(style, use_container_width=True, height=600, hide_index=True)
-
-    # ── Deal Detail ───────────────────────────────────────────────────────────
     st.markdown("### Deal Detail")
-    deal_names = filtered['lead_name'].tolist()
+    st.caption("Pick a lead to see its full meeting + status history. The full leads table moved to the GTM Tracker tab.")
+
+    deal_names = sorted(df['lead_name'].dropna().tolist()) if 'lead_name' in df.columns else []
     selected_deal = st.selectbox("Select lead", deal_names, key="alle_detail")
 
     if selected_deal:
