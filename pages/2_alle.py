@@ -155,13 +155,11 @@ else:
 
 # ══════════════════════════════════════════════════════════════════════════════
 
-tab_gtm, tab_notes, tab_pipeline, tab_deals, tab_stale, tab_analytics = st.tabs([
+tab_gtm, tab_notes, tab_pipeline, tab_deals = st.tabs([
     "🎯 GTM Tracker",
     "📝 Meeting Notes",
     "🔄 Pipeline",
     "📋 Active Deals",
-    "⏰ Needs Follow-up",
-    "📊 Analytics",
 ])
 
 
@@ -476,6 +474,34 @@ with tab_gtm:
 
     st.caption("Assumption: 13 Paid Pilots → 10 Customers in Production = $195K + $148K = **$343K invoiced revenue in 2026**")
 
+    # ── Pipeline Heatmap — Stage × Vertical (active leads) ────────────────────
+    st.markdown("---")
+    st.markdown("### 🔥 Active Pipeline — Stage × Vertical")
+    st.caption("Count of currently-active leads per vertical, by funnel stage.")
+    if 'status' in df.columns and 'vertical' in df.columns:
+        _stage_order = ['4-TOF', '2-POC', '3-Proposal sent', '1-Pilot']
+        _stage_labels = {'4-TOF': 'TOF', '2-POC': 'POC',
+                         '3-Proposal sent': 'Proposal Sent', '1-Pilot': 'Pilot'}
+        _heat_df = df[df['status'].isin(_stage_order) & df['vertical'].notna()].copy()
+        if not _heat_df.empty:
+            cross = pd.crosstab(_heat_df['vertical'], _heat_df['status'])
+            cross = cross.reindex(columns=[s for s in _stage_order if s in cross.columns])
+            cross.columns = [_stage_labels[c] for c in cross.columns]
+            cross = cross.loc[cross.sum(axis=1).sort_values(ascending=False).index]
+            fig_heat = px.imshow(
+                cross, text_auto=True, aspect='auto',
+                color_continuous_scale=['#1a1a2e', '#4F46E5', '#10B981'],
+                labels=dict(x="Stage", y="Vertical", color="Count"),
+            )
+            fig_heat.update_layout(
+                height=max(320, 36 * len(cross.index) + 80),
+                template="plotly_dark",
+                margin=dict(l=20, r=20, t=20, b=40),
+                xaxis=dict(side='bottom', tickfont=dict(size=12)),
+                yaxis=dict(tickfont=dict(size=12)),
+                coloraxis_showscale=False,
+            )
+            st.plotly_chart(fig_heat, use_container_width=True)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -806,123 +832,3 @@ with tab_deals:
                 st.markdown(str(deal['comments'])[:2000])
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# TAB 3: NEEDS FOLLOW-UP
-# ══════════════════════════════════════════════════════════════════════════════
-
-with tab_stale:
-
-    # ── Proposals Needing Chasers ─────────────────────────────────────────────
-    st.markdown("### 📨 Proposals Needing a Chaser")
-    st.caption("Proposals sent 14+ days ago that may need a follow-up")
-
-    if 'days_since_contact' in df.columns and 'status' in df.columns:
-        proposals_sent = df[df['status'] == '3-Proposal sent'].copy()
-
-        overdue = proposals_sent[proposals_sent['days_since_contact'] > 30].sort_values('days_since_contact', ascending=False)
-        upcoming = proposals_sent[(proposals_sent['days_since_contact'] > 14) & (proposals_sent['days_since_contact'] <= 30)].sort_values('days_since_contact', ascending=False)
-
-        if not overdue.empty:
-            st.markdown(f"#### 🔴 Overdue — Proposal sent 30+ days ago ({len(overdue)})")
-            for _, deal in overdue.iterrows():
-                days = int(deal['days_since_contact'])
-                source = deal.get('source', '')
-                st.markdown(f"- **{deal['lead_name']}** — {days} days since last update — Owner: {source}")
-
-        if not upcoming.empty:
-            st.markdown(f"#### 🟡 Coming Due — Proposal sent 14-30 days ago ({len(upcoming)})")
-            for _, deal in upcoming.iterrows():
-                days = int(deal['days_since_contact'])
-                source = deal.get('source', '')
-                st.markdown(f"- **{deal['lead_name']}** — {days} days since last update — Owner: {source}")
-
-        if overdue.empty and upcoming.empty:
-            st.success("All proposals are fresh — no chasers needed right now.")
-
-    # ── POC / Pilot Check-ins ─────────────────────────────────────────────────
-    st.markdown("---")
-    st.markdown("### 🔄 POC & Pilot Check-ins")
-    st.caption("Active POCs and Pilots — are they progressing?")
-
-    if 'days_since_contact' in df.columns and 'status' in df.columns:
-        active = df[df['status'].isin(['1-Pilot', '2-POC'])].sort_values('days_since_contact', ascending=False).copy()
-
-        if not active.empty:
-            for _, deal in active.iterrows():
-                days = int(deal['days_since_contact']) if pd.notna(deal['days_since_contact']) else 0
-                source = deal.get('source', '')
-                icon = "🟢" if days < 14 else "🟡" if days < 30 else "🔴"
-                st.markdown(f"- {icon} **{deal['lead_name']}** ({deal['status']}) — last update {days}d ago — Owner: {source}")
-        else:
-            st.info("No active POCs or Pilots.")
-
-    else:
-        st.info("No date data available.")
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# TAB 4: ANALYTICS
-# ══════════════════════════════════════════════════════════════════════════════
-
-with tab_analytics:
-    st.markdown("### Pipeline Analytics")
-
-    col_left, col_right = st.columns(2)
-
-    # By Vertical
-    with col_left:
-        st.markdown("#### By Vertical")
-        if 'vertical' in df.columns:
-            vert_counts = df['vertical'].value_counts().reset_index()
-            vert_counts.columns = ['Vertical', 'Count']
-            fig_vert = px.bar(vert_counts.sort_values('Count', ascending=True),
-                              x='Count', y='Vertical', orientation='h',
-                              color_discrete_sequence=['#4F46E5'])
-            fig_vert.update_layout(height=350, template="plotly_dark", margin=dict(l=20, r=20, t=20, b=20))
-            st.plotly_chart(fig_vert, use_container_width=True)
-
-    # By Source
-    with col_right:
-        st.markdown("#### By Lead Source")
-        if 'source' in df.columns:
-            source_counts = df['source'].value_counts().reset_index()
-            source_counts.columns = ['Source', 'Count']
-            fig_src = px.pie(source_counts, names='Source', values='Count',
-                             color_discrete_sequence=px.colors.qualitative.Set2)
-            fig_src.update_layout(height=350, template="plotly_dark")
-            st.plotly_chart(fig_src, use_container_width=True)
-
-    # By Status × Vertical heatmap
-    st.markdown("#### Pipeline Heatmap — Stage × Vertical")
-    if 'status' in df.columns and 'vertical' in df.columns:
-        cross = pd.crosstab(df['vertical'], df['status'])
-        # Reorder columns: funnel flow (TOF → Proposal → POC → Pilot)
-        stage_order = ['4-TOF', '3-Proposal sent', '2-POC', '1-Pilot']
-        ordered_cols = [c for c in stage_order if c in cross.columns]
-        remaining = [c for c in cross.columns if c not in ordered_cols]
-        cross = cross[ordered_cols + remaining]
-        # Friendly labels
-        label_map = {'4-TOF': 'Top of Funnel', '3-Proposal sent': 'Proposal Sent',
-                     '2-POC': 'POC', '1-Pilot': 'Pilot'}
-        cross.columns = [label_map.get(c, c) for c in cross.columns]
-        fig_heat = px.imshow(
-            cross, text_auto=True,
-            color_continuous_scale=['#1a1a2e', '#4F46E5', '#10B981'],
-            labels=dict(x="Stage", y="Vertical", color="Count"),
-        )
-        fig_heat.update_layout(
-            height=450, template="plotly_dark",
-            xaxis=dict(tickangle=0, side="bottom"),
-            margin=dict(l=20, r=20, t=20, b=20),
-        )
-        st.plotly_chart(fig_heat, use_container_width=True)
-
-    # Timeline — deals by first contact month
-    st.markdown("#### Pipeline Growth — Deals by First Contact Month")
-    if 'first_conv' in df.columns:
-        timeline = df[df['first_conv'].notna()].copy()
-        timeline['month'] = timeline['first_conv'].dt.to_period('M').astype(str)
-        monthly = timeline.groupby('month').size().reset_index(name='New Leads')
-        fig_time = px.bar(monthly, x='month', y='New Leads', color_discrete_sequence=['#7C3AED'])
-        fig_time.update_layout(height=300, template="plotly_dark", xaxis_title="Month", margin=dict(l=20, r=20, t=20, b=20))
-        st.plotly_chart(fig_time, use_container_width=True)
