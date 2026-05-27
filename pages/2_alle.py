@@ -566,6 +566,46 @@ with tab_gtm:
         )
         st.plotly_chart(fig_heat, use_container_width=True)
 
+        # ── Audit list — every 2026 lead grouped by vertical ─────────────────
+        with st.expander(f"📋 Audit — all {int(cross.loc['Total', 'Meetings'])} lead names (2026)"):
+            st.caption("Open this to verify nothing is missing. Each lead shows its current state.")
+            _audit = df_all[first_2026].copy()
+            _audit['_vert'] = _audit['vertical'].apply(_vert)
+            _audit['_lead'] = _lead_series[first_2026]
+            _audit = _audit[_audit['_lead'] != ''].drop_duplicates(subset=['_vert', '_lead'])
+
+            def _state(row):
+                if _dropped_flag.loc[row.name]:
+                    return ('Dropped', '#9CA3AF')
+                if pilot_2026.loc[row.name]:
+                    return ('Pilot', '#10B981')
+                if proposal_2026.loc[row.name]:
+                    return ('Proposal', '#3B82F6')
+                if poc_2026.loc[row.name]:
+                    return ('POC', '#A78BFA')
+                return ('TOF', '#F59E0B')
+
+            for vert in cross.index.drop(['Total'], errors='ignore'):
+                if vert == 'Total':
+                    continue
+                rows = _audit[_audit['_vert'] == vert].sort_values('_lead')
+                if rows.empty:
+                    continue
+                tags = []
+                for _, r in rows.iterrows():
+                    label, color = _state(r)
+                    tags.append(
+                        f'<span style="display:inline-block;font-size:0.65rem;padding:1px 6px;'
+                        f'margin:1px 3px 1px 0;border-radius:3px;background:rgba(255,255,255,0.04);'
+                        f'border-left:2px solid {color};color:#374151;">'
+                        f'{r["_lead"]} <span style="color:{color};font-weight:600;">· {label}</span></span>'
+                    )
+                st.markdown(
+                    f'<div style="margin:6px 0;"><span style="font-size:0.75rem;font-weight:600;color:#374151;">'
+                    f'{vert} ({len(rows)})</span><br>{"".join(tags)}</div>',
+                    unsafe_allow_html=True,
+                )
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB: MEETING NOTES  (pulled from Slack channels via Granola shares)
