@@ -564,7 +564,7 @@ with tab_gtm:
             yaxis=dict(tickfont=dict(size=13, color='#374151'), title=None, showgrid=False),
             coloraxis_showscale=False,
         )
-        col_heat, col_audit = st.columns([3, 1])
+        col_heat, col_audit = st.columns([2, 1])
         with col_heat:
             st.plotly_chart(fig_heat, use_container_width=True)
 
@@ -597,8 +597,12 @@ with tab_gtm:
                 rows = _audit[_audit['_vert'] == vert].sort_values('_lead')
                 if rows.empty:
                     continue
+
+                active_rows  = rows[~_dropped_flag.reindex(rows.index, fill_value=False)]
+                dropped_rows = rows[ _dropped_flag.reindex(rows.index, fill_value=False)]
+
                 lead_lines = []
-                for _, r in rows.iterrows():
+                for _, r in active_rows.iterrows():
                     label, color = _state(r)
                     lead_lines.append(
                         f'<div style="font-size:0.62rem;color:#374151;line-height:1.35;'
@@ -606,6 +610,14 @@ with tab_gtm:
                         f'{r["_lead"]} '
                         f'<span style="color:{color};font-weight:600;">· {label}</span></div>'
                     )
+                if not dropped_rows.empty:
+                    names = " · ".join(dropped_rows['_lead'].tolist())
+                    lead_lines.append(
+                        f'<div style="font-size:0.62rem;color:#9CA3AF;line-height:1.35;'
+                        f'border-left:2px solid #9CA3AF;padding-left:5px;margin:1px 0;">'
+                        f'<span style="font-weight:600;">Dropped ({len(dropped_rows)}):</span> {names}</div>'
+                    )
+
                 audit_blocks.append(
                     f'<div style="margin:0 0 6px 0;">'
                     f'<div style="font-size:0.68rem;font-weight:700;color:#1F2937;margin-bottom:2px;">'
