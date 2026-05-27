@@ -496,9 +496,15 @@ with tab_gtm:
         tof_2026 = first_2026 & ~poc_2026 & ~proposal_2026 & ~pilot_2026
 
         _vert_series = df_all['vertical'].apply(_vert)
+        _lead_series = df_all.get('lead_name', pd.Series('', index=df_all.index)).fillna('').astype(str).str.strip()
 
+        # Dedup by lead_name within each cell — the sheet has duplicate rows for
+        # some leads; the Roadmap KPIs already dedupe, so this keeps row totals
+        # reconciled.
         def _counts(mask):
-            return _vert_series[mask].value_counts()
+            sub = pd.DataFrame({'_vert': _vert_series[mask], '_lead': _lead_series[mask]})
+            sub = sub[sub['_lead'] != ''].drop_duplicates(subset=['_vert', '_lead'])
+            return sub['_vert'].value_counts()
 
         meetings_by_vert  = _counts(first_2026)
         tof_by_vert       = _counts(tof_2026)
