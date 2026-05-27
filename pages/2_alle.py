@@ -477,7 +477,7 @@ with tab_gtm:
     # ── Pipeline Heatmap — Milestones × Vertical (2026 YTD) ───────────────────
     st.markdown("---")
     st.markdown("### 🌐 2026 Vertical Overview")
-    st.caption("All counts are 2026 milestones. Meetings = first conv this year. POC / Proposal Sent / Pilot = leads that hit that milestone date in 2026. TOF = had first conv but no further milestone yet (still at top of funnel).")
+    st.caption("All counts are 2026 milestones, deduped by lead name. Meetings = first conv this year (= Dropped + still-active). Dropped = leads now marked Dropped. TOF = active, no milestone yet. POC / Proposal Sent / Pilot = leads that hit that milestone date in 2026.")
     if 'vertical' in df_all.columns and 'first_conv' in df_all.columns:
 
         def _vert(s):
@@ -495,28 +495,34 @@ with tab_gtm:
         pilot_2026     = _in_year('pilot_start_date')
         tof_2026 = first_2026 & ~poc_2026 & ~proposal_2026 & ~pilot_2026
 
+        # Dropped leads — for triangulation
+        if 'active_status' in df_all.columns:
+            _dropped_flag = df_all['active_status'].fillna('').astype(str).str.strip().str.lower() == 'dropped'
+        else:
+            _dropped_flag = pd.Series(False, index=df_all.index)
+        dropped_2026 = first_2026 & _dropped_flag
+
         _vert_series = df_all['vertical'].apply(_vert)
         _lead_series = df_all.get('lead_name', pd.Series('', index=df_all.index)).fillna('').astype(str).str.strip()
 
-        # Dedup by lead_name within each cell — the sheet has duplicate rows for
-        # some leads; the Roadmap KPIs already dedupe, so this keeps row totals
-        # reconciled.
         def _counts(mask):
             sub = pd.DataFrame({'_vert': _vert_series[mask], '_lead': _lead_series[mask]})
             sub = sub[sub['_lead'] != ''].drop_duplicates(subset=['_vert', '_lead'])
             return sub['_vert'].value_counts()
 
         meetings_by_vert  = _counts(first_2026)
-        tof_by_vert       = _counts(tof_2026)
+        dropped_by_vert   = _counts(dropped_2026)
+        tof_by_vert       = _counts(tof_2026 & ~_dropped_flag)
         poc_by_vert       = _counts(poc_2026)
         proposal_by_vert  = _counts(proposal_2026)
         pilot_by_vert     = _counts(pilot_2026)
 
-        all_verts = sorted(set(meetings_by_vert.index) | set(tof_by_vert.index)
-                           | set(poc_by_vert.index) | set(proposal_by_vert.index)
-                           | set(pilot_by_vert.index))
+        all_verts = sorted(set(meetings_by_vert.index) | set(dropped_by_vert.index)
+                           | set(tof_by_vert.index) | set(poc_by_vert.index)
+                           | set(proposal_by_vert.index) | set(pilot_by_vert.index))
         cross = pd.DataFrame({
             'Meetings':      [int(meetings_by_vert.get(v, 0))  for v in all_verts],
+            'Dropped':       [int(dropped_by_vert.get(v, 0))   for v in all_verts],
             'TOF':           [int(tof_by_vert.get(v, 0))       for v in all_verts],
             'POC':           [int(poc_by_vert.get(v, 0))       for v in all_verts],
             'Proposal Sent': [int(proposal_by_vert.get(v, 0))  for v in all_verts],
