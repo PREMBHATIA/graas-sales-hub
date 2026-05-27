@@ -50,7 +50,7 @@ def load_alle_data():
 raw = load_alle_data()
 
 if raw.empty:
-    st.warning("No All-e data found. Download the 'Active presales' tab from the All-e Foundry Presales Tracker sheet.")
+    st.warning("No All-e data found. Check the 'Overall Pipeline for IN and SEA' tab in the All-e Foundry Presales Tracker sheet.")
     st.stop()
 
 if st.button("🔄 Refresh Data"):

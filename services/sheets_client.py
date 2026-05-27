@@ -297,16 +297,41 @@ def fetch_revenue_proposals(force_refresh: bool = False) -> pd.DataFrame:
     return fetch_sheet_tab(sheet_id, "Proposals", force_refresh)
 
 
-def fetch_alle_active_presales(force_refresh: bool = False) -> pd.DataFrame:
-    """Fetch All-e Active Presales data."""
+def fetch_alle_pipeline(force_refresh: bool = False) -> pd.DataFrame:
+    """Fetch unified All-e pipeline (IN + SEA).
+
+    Source of truth as of May 2026. Replaces the per-segment 'Active presales'
+    and 'Dropped leads' tabs which are being archived. The 'Active / Dropped'
+    column on each row tells you which segment a lead is in.
+    """
     sheet_id = os.getenv("ALLE_SHEET_ID", "")
-    return fetch_sheet_tab(sheet_id, "Active presales", force_refresh)
+    return fetch_sheet_tab(sheet_id, "Overall Pipeline for IN and SEA", force_refresh)
+
+
+def _split_pipeline(df: pd.DataFrame, segment: str) -> pd.DataFrame:
+    """Filter the unified pipeline by the 'Active / Dropped' column."""
+    if df.empty or "Active / Dropped" not in df.columns:
+        return df
+    target = segment.strip().lower()
+    return df[df["Active / Dropped"].astype(str).str.strip().str.lower() == target].copy()
+
+
+def fetch_alle_active_presales(force_refresh: bool = False) -> pd.DataFrame:
+    """Active leads from the unified pipeline.
+
+    Shim — was its own tab pre-May 2026. Returns the same shape as before
+    so callers (CRM, Ask Graas) don't need to change.
+    """
+    return _split_pipeline(fetch_alle_pipeline(force_refresh), "active")
 
 
 def fetch_alle_dropped_leads(force_refresh: bool = False) -> pd.DataFrame:
-    """Fetch All-e Dropped Leads data."""
-    sheet_id = os.getenv("ALLE_SHEET_ID", "")
-    return fetch_sheet_tab(sheet_id, "Dropped leads", force_refresh)
+    """Dropped leads from the unified pipeline.
+
+    Shim — was its own tab pre-May 2026. Returns the same shape as before
+    so callers (CRM, Ask Graas) don't need to change.
+    """
+    return _split_pipeline(fetch_alle_pipeline(force_refresh), "dropped")
 
 
 def fetch_alle_gtm_india(force_refresh: bool = False) -> pd.DataFrame:
