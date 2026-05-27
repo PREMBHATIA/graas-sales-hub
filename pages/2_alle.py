@@ -564,11 +564,18 @@ with tab_gtm:
             yaxis=dict(tickfont=dict(size=13, color='#374151'), title=None, showgrid=False),
             coloraxis_showscale=False,
         )
-        st.plotly_chart(fig_heat, use_container_width=True)
+        col_heat, col_audit = st.columns([3, 1])
+        with col_heat:
+            st.plotly_chart(fig_heat, use_container_width=True)
 
-        # ── Audit list — every 2026 lead grouped by vertical ─────────────────
-        with st.expander(f"📋 Audit — all {int(cross.loc['Total', 'Meetings'])} lead names (2026)"):
-            st.caption("Open this to verify nothing is missing. Each lead shows its current state.")
+        with col_audit:
+            st.markdown(
+                f'<div style="font-size:0.7rem;font-weight:700;color:#6B7280;'
+                f'text-transform:uppercase;letter-spacing:0.05em;margin:6px 0 4px 0;">'
+                f'Lead audit · {int(cross.loc["Total", "Meetings"])} total</div>',
+                unsafe_allow_html=True,
+            )
+
             _audit = df_all[first_2026].copy()
             _audit['_vert'] = _audit['vertical'].apply(_vert)
             _audit['_lead'] = _lead_series[first_2026]
@@ -585,26 +592,27 @@ with tab_gtm:
                     return ('POC', '#A78BFA')
                 return ('TOF', '#F59E0B')
 
+            audit_blocks = []
             for vert in cross.index.drop(['Total'], errors='ignore'):
-                if vert == 'Total':
-                    continue
                 rows = _audit[_audit['_vert'] == vert].sort_values('_lead')
                 if rows.empty:
                     continue
-                tags = []
+                lead_lines = []
                 for _, r in rows.iterrows():
                     label, color = _state(r)
-                    tags.append(
-                        f'<span style="display:inline-block;font-size:0.65rem;padding:1px 6px;'
-                        f'margin:1px 3px 1px 0;border-radius:3px;background:rgba(255,255,255,0.04);'
-                        f'border-left:2px solid {color};color:#374151;">'
-                        f'{r["_lead"]} <span style="color:{color};font-weight:600;">· {label}</span></span>'
+                    lead_lines.append(
+                        f'<div style="font-size:0.62rem;color:#374151;line-height:1.35;'
+                        f'border-left:2px solid {color};padding-left:5px;margin:1px 0;">'
+                        f'{r["_lead"]} '
+                        f'<span style="color:{color};font-weight:600;">· {label}</span></div>'
                     )
-                st.markdown(
-                    f'<div style="margin:6px 0;"><span style="font-size:0.75rem;font-weight:600;color:#374151;">'
-                    f'{vert} ({len(rows)})</span><br>{"".join(tags)}</div>',
-                    unsafe_allow_html=True,
+                audit_blocks.append(
+                    f'<div style="margin:0 0 6px 0;">'
+                    f'<div style="font-size:0.68rem;font-weight:700;color:#1F2937;margin-bottom:2px;">'
+                    f'{vert} <span style="color:#9CA3AF;font-weight:500;">({len(rows)})</span></div>'
+                    f'{"".join(lead_lines)}</div>'
                 )
+            st.markdown("".join(audit_blocks), unsafe_allow_html=True)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
