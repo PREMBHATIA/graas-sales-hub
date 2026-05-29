@@ -1048,6 +1048,29 @@ Best,
     },
 }
 
+def _substitute(text: str, subs: dict) -> str:
+    """Replace {key} placeholders case-insensitively.
+
+    Dhanashree hit a bug where typing {Sender} (capital S) wasn't replaced
+    because the old code only matched lowercase {sender}. This handles
+    {sender}, {Sender}, {SENDER}, {name}, {Name}, {NAME}, etc. uniformly.
+
+    Unknown placeholders pass through unchanged (so typos like {senderr}
+    stay visible instead of being silently dropped).
+    """
+    if not text:
+        return text
+    keys_lower = {k.lower(): v for k, v in subs.items()}
+
+    def _repl(match):
+        key = match.group(1).lower()
+        if key in keys_lower:
+            return str(keys_lower[key])
+        return match.group(0)  # unknown — leave as-is
+
+    return re.sub(r"\{([a-zA-Z_]+)\}", _repl, text)
+
+
 # Bucket → framework auto-mapping (from Amruta's playbook).
 # Ghost Accounts split: E1 (distributor ordering) is the default since most
 # ghost accounts in the tracker are B2B distribution; pick E2 manually for
@@ -1062,26 +1085,31 @@ BUCKET_TO_FRAMEWORK = {
 }
 
 with tab_compose:
-    # ── Auto-reset body/subject when template OR recipient changes ────────────
-    # Without this, a personal line like "Hope the golf is going well" stays in
-    # the body when you switch to a different recipient — and gets sent to the
-    # wrong person. We detect changes by comparing the previous-render values
-    # cached in session state to the current ones.
+    # ── Auto-reset body/subject when template changes ─────────────────────────
+    # IMPORTANT history of this code:
+    # - Originally also reset on recipient change, to prevent personal lines
+    #   ("Hope golf is going well") leaking to the wrong person.
+    # - BUT: 7034da5 added auto-recipient-reset when the preview company changes.
+    #   Combined with this reset, switching preview company → recipient changes →
+    #   body+subject wiped to template defaults. For the "Custom" template
+    #   (defaults are empty strings), the user's typed content disappeared
+    #   silently — Dhanashree hit this and sent empty emails.
+    # - Fix: only reset on TEMPLATE change, never on recipient change. Also skip
+    #   reset when the new template has empty defaults (Custom), so switching to
+    #   Custom preserves whatever the user is currently working on.
     _prev_template = st.session_state.get("_last_template_name")
-    _prev_recipient = st.session_state.get("_last_recipient_label")
     _curr_template = st.session_state.get("template_sel")
-    _curr_recipient = st.session_state.get("send_recipient")
 
     if _curr_template and _curr_template in EMAIL_TEMPLATES:
         _tmpl = EMAIL_TEMPLATES[_curr_template]
-        # Reset only if something *changed* — first render leaves both alone
-        if (_prev_template is not None and _prev_template != _curr_template) or \
-           (_prev_recipient is not None and _prev_recipient != _curr_recipient):
-            st.session_state["email_body"] = _tmpl["body"]
-            st.session_state["email_subject"] = _tmpl["subject"]
+        if _prev_template is not None and _prev_template != _curr_template:
+            # Only reset to non-empty defaults — empty defaults (Custom) would
+            # wipe user content with nothing useful.
+            if _tmpl.get("body") or _tmpl.get("subject"):
+                st.session_state["email_body"] = _tmpl["body"]
+                st.session_state["email_subject"] = _tmpl["subject"]
 
     st.session_state["_last_template_name"] = _curr_template
-    st.session_state["_last_recipient_label"] = _curr_recipient
 
     st.markdown("### ✉️ Compose Outreach Email")
 
@@ -1205,24 +1233,20 @@ with tab_compose:
         if not preview_contacts.empty:
             pc = preview_contacts.iloc[0]
             # Render template — {name} = first name, {full_name} = full name
+            # Case-insensitive: {Sender} / {sender} / {SENDER} all work.
             _pv_full = str(pc.get('person_name', '')).strip()
             _pv_first = _pv_full.split()[0] if _pv_full else _pv_full
 
-            rendered_subject = subject.format(
-                company=pc['company'], name=_pv_first, full_name=_pv_full,
-                vertical=pc['vertical'], sender=sender_name,
-            ) if '{' in subject else subject
-
-            rendered_body = body
-            for key, val in {
-                '{company}':    pc['company'],
-                '{name}':       _pv_first,
-                '{full_name}':  _pv_full,
-                '{vertical}':   pc['vertical'],
-                '{sender}':     sender_name,
-                '{designation}': pc['designation'],
-            }.items():
-                rendered_body = rendered_body.replace(key, str(val))
+            _pv_subs = {
+                "company":    pc['company'],
+                "name":       _pv_first,
+                "full_name":  _pv_full,
+                "vertical":   pc['vertical'],
+                "sender":     sender_name,
+                "designation": pc['designation'],
+            }
+            rendered_subject = _substitute(subject, _pv_subs)
+            rendered_body = _substitute(body, _pv_subs)
 
             to_list = ', '.join(preview_contacts['email'].tolist())
 
@@ -1422,21 +1446,16 @@ with tab_compose:
                 _full_name = str(send_target.get("person_name", "")).strip()
                 _first_name = _full_name.split()[0] if _full_name else _full_name
 
-                rendered_subject_send = subject.format(
-                    company=send_target["company"], name=_first_name, full_name=_full_name,
-                    vertical=send_target["vertical"], sender=sender_name,
-                ) if "{" in subject else subject
-
-                rendered_body_send = body
-                for k, v in {
-                    "{company}":    send_target["company"],
-                    "{name}":       _first_name,
-                    "{full_name}":  _full_name,
-                    "{vertical}":   send_target["vertical"],
-                    "{sender}":     sender_name,
-                    "{designation}": send_target.get("designation", ""),
-                }.items():
-                    rendered_body_send = rendered_body_send.replace(k, str(v))
+                _send_subs = {
+                    "company":    send_target["company"],
+                    "name":       _first_name,
+                    "full_name":  _full_name,
+                    "vertical":   send_target["vertical"],
+                    "sender":     sender_name,
+                    "designation": send_target.get("designation", ""),
+                }
+                rendered_subject_send = _substitute(subject, _send_subs)
+                rendered_body_send = _substitute(body, _send_subs)
 
                 # Resolve the actual To: address (test override or real recipient)
                 effective_to_email = test_email if (test_mode and test_email) else send_target["email"]
@@ -1681,27 +1700,16 @@ with tab_compose:
                         for i, (_, row) in enumerate(after_dedup.iterrows(), start=1):
                             r_full = str(row.get("person_name", "")).strip()
                             r_first = r_full.split()[0] if r_full else r_full
-                            try:
-                                r_subj = subject.format(
-                                    company=row["company"], name=r_first, full_name=r_full,
-                                    vertical=row["vertical"], sender=sender_name,
-                                ) if "{" in subject else subject
-                            except Exception as e:
-                                failures.append((row["email"], f"Subject format error: {e}"))
-                                failed_n += 1
-                                progress_bar.progress(i / stage_final, text=f"Sending {i} of {stage_final}…")
-                                continue
-
-                            r_body = body
-                            for k, v in {
-                                "{company}":    row["company"],
-                                "{name}":       r_first,
-                                "{full_name}":  r_full,
-                                "{vertical}":   row["vertical"],
-                                "{sender}":     sender_name,
-                                "{designation}": row.get("designation", ""),
-                            }.items():
-                                r_body = r_body.replace(k, str(v))
+                            _r_subs = {
+                                "company":    row["company"],
+                                "name":       r_first,
+                                "full_name":  r_full,
+                                "vertical":   row["vertical"],
+                                "sender":     sender_name,
+                                "designation": row.get("designation", ""),
+                            }
+                            r_subj = _substitute(subject, _r_subs)
+                            r_body = _substitute(body, _r_subs)
 
                             ok_b, msg_b = send_email(
                                 sender_label=sender_label,
