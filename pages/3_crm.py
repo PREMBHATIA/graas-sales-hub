@@ -1589,9 +1589,16 @@ with tab_compose:
             stage_total = len(bulk_pool)
 
             # Stage 2: remove No-Touch companies
+            # bool() wrap is critical: v.get("category") returns the category STRING
+            # when truthy, not True. Without the wrap, .apply() returns a Series of
+            # mixed str/False values; pandas then treats it as label-indexing and
+            # crashes with KeyError. Symptom is the whole page failing to render
+            # (Streamlit runs every tab body regardless of which tab is visible),
+            # so the Analytics tab dies too. Hit when the new unified pipeline tab
+            # contains any NO_TOUCH company (Hindware, Growsari, etc.).
             def _is_no_touch(v):
-                return isinstance(v, dict) and v.get("category")
-            no_touch_mask = bulk_pool.get("playbook_no_touch", pd.Series([None]*len(bulk_pool))).apply(_is_no_touch)
+                return bool(isinstance(v, dict) and v.get("category"))
+            no_touch_mask = bulk_pool.get("playbook_no_touch", pd.Series([False]*len(bulk_pool))).apply(_is_no_touch)
             bulk_no_touch = bulk_pool[no_touch_mask]
             after_no_touch = bulk_pool[~no_touch_mask]
             stage_after_nt = len(after_no_touch)
