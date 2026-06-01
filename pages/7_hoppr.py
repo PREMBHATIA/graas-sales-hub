@@ -1049,10 +1049,16 @@ with tab_accounts:
             # eval_processed, so they would otherwise vanish from the picker.
             sq = (eval_processed["_seller"].value_counts().to_dict()
                   if not eval_processed.empty else {})
+            # Sort: most recently active first (days_silent ascending — 0 = today).
+            # Tiebreaker: higher query volume first so equally-recent accounts
+            # surface the more-engaged one. Accounts with no last_active default
+            # to days_silent=999, so they naturally sink to the bottom.
             dd_opts = []
             for s in sorted(sellers,
-                            key=lambda x: -(sq.get(x["seller_id"], 0)
-                                            or x.get("q_total", 0))):
+                            key=lambda x: (
+                                x.get("days_silent", 999),
+                                -(sq.get(x["seller_id"], 0) or x.get("q_total", 0)),
+                            )):
                 sid = s["seller_id"]
                 eval_q = sq.get(sid, 0)
                 total_q = s.get("q_total", 0)
