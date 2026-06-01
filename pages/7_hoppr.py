@@ -1020,7 +1020,10 @@ with tab_accounts:
             except Exception:
                 return "—"
 
-        st.dataframe(
+        # Click any row → Account Detail section below jumps to that seller.
+        # selection.rows is indexed into the dataframe we pass (positional, not
+        # post-user-sort), so disp.iloc[i] always gives the right seller.
+        table_event = st.dataframe(
             disp.rename(columns={
                 "seller_id": "Seller", "email": "Email", "user_count": "Users",
                 "q_total": "Total Q", "q_recent": "Q (7d)",
@@ -1035,9 +1038,24 @@ with tab_accounts:
               .map(intent_color, subset=["Intent"])
               .format({"Prompt Q": _pq_fmt}),
             use_container_width=True, height=380, hide_index=True,
+            on_select="rerun", selection_mode="single-row",
+            key="sellers_table",
         )
+        st.caption("👆 **Tip:** click any row to jump the Account Detail section below to that seller.")
         st.caption("**Prompt Q** is a 0–100 score per seller — Strong ≥70 (green) · Decent 45–69 · Weak 20–44 · Vague <20 (red). Based on whether prompts include a metric, timeframe, entity, and comparison.")
         st.caption("**Intent** classifies what kind of question sellers ask: **Factual** (what/when/how many — descriptive lookup), **Diagnostic** (why/cause — explanatory), **Strategic** (should I/recommend/predict — prescriptive). Mix shows the % split. Strategic-heavy sellers are getting more value from Hoppr.")
+
+        # Stash the clicked seller_id so the Account Detail dropdown picks it up
+        # on the next render. Two-step (set + rerun) is needed because the
+        # dropdown is built later in the page — we can't write to its session
+        # state after it's already rendered.
+        if table_event and getattr(table_event, "selection", None):
+            clicked_rows = list(table_event.selection.get("rows", []))
+            if clicked_rows:
+                _clicked_sid = str(disp.iloc[clicked_rows[0]]["seller_id"])
+                if st.session_state.get("_jump_to_seller") != _clicked_sid:
+                    st.session_state["_jump_to_seller"] = _clicked_sid
+                    st.rerun()
 
         st.markdown("---")
         st.markdown("### 🔍 Account Detail")
@@ -1072,6 +1090,18 @@ with tab_accounts:
                 # Fallback if sellers list was empty
                 dd_opts = [f"{sid} ({sq[sid]}Q)"
                            for sid in sorted(sq, key=lambda x: -sq[x])]
+
+            # If the user just clicked a row in the table above, override the
+            # dropdown's session state to that seller BEFORE rendering it.
+            # Setting session_state["dd_seller"] after the widget has rendered
+            # would have no effect — the override must happen first.
+            _jump = st.session_state.pop("_jump_to_seller", None)
+            if _jump:
+                for _opt in dd_opts:
+                    if _opt.startswith(_jump + " ") or _opt == _jump:
+                        st.session_state["dd_seller"] = _opt
+                        break
+
             sel_dd = st.selectbox("Select account", dd_opts, key="dd_seller")
         with dd_col2:
             dd_period = st.radio("Usage period", ["1W", "1M", "3M", "All"], index=2,
