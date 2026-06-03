@@ -46,24 +46,29 @@ def load_current_pipeline():
 
 @st.cache_data(ttl=1800)
 def load_meetings_summary():
-    """Derive meetings summary from 'Overall Pipeline for IN and SEA' tab.
+    """Derive meetings summary.
 
-    Maps each lead's First conv date to a (region, source-bucket) cell:
-      - Partner       = Greentern or Cartlyst website
-      - Graas Network = any other source (GG, Ashwin, Amruta, Prem, Sahil, …)
-    POCs / Pilots / Production derived from their respective date columns.
+    SOURCE OF TRUTH per metric:
+      • Meetings count (Companies Met) → OLD tabs 'Active presales' + 'Dropped
+        leads' — these still have a populated 'First conv date' column, which
+        is the correct semantic for "when did we first meet this company".
+      • POCs / Pilots / Production → NEW 'Overall Pipeline for IN and SEA' tab
+        which carries the pipeline-progression date columns.
+
+    Why split: the team is migrating to the unified tab but dropped
+    'First conv date' along the way, and many rows have no 'Latest conv date'
+    either. Reading meetings from the new tab under-counts (only 26 of 79
+    rows have any date) and using Latest conv date is semantically wrong
+    (over-counts late months for leads we met months ago).
+
+    TODO when 'Active presales' + 'Dropped leads' tabs are archived:
+      - Either ask Dhanashree to restore 'First conv date' on the unified
+        tab, or move this calc to use the unified tab's Latest conv date
+        and accept the over-counting tradeoff.
     """
     from services.sheets_client import fetch_sheet_tab
     sheet_id = os.getenv("ALLE_SHEET_ID", "")
     if not sheet_id:
-        return {}
-    try:
-        df = fetch_sheet_tab(sheet_id, "Overall Pipeline for IN and SEA")
-    except Exception as e:
-        import streamlit as _st
-        _st.warning(f"Pipeline load error: {e}")
-        return {}
-    if df.empty:
         return {}
 
     import pandas as _pd
@@ -72,22 +77,48 @@ def load_meetings_summary():
     MONTHS_ALL = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
                   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
-    for c in ["First conv date", "Latest conv date", "POC Delivery Date",
-              "Proposal Sent Date", "Pilot Start Date",
-              "Production Start Date"]:
-        if c in df.columns:
-            df[c] = _pd.to_datetime(df[c], format="mixed", errors="coerce")
+    # ── Load: old tabs (for meetings) + unified tab (for pipeline progression) ──
+    df_active = pd.DataFrame()
+    df_dropped = pd.DataFrame()
+    df_unified = pd.DataFrame()
+    try:
+        df_active  = fetch_sheet_tab(sheet_id, "Active presales")
+        df_dropped = fetch_sheet_tab(sheet_id, "Dropped leads")
+        df_unified = fetch_sheet_tab(sheet_id, "Overall Pipeline for IN and SEA")
+    except Exception as e:
+        import streamlit as _st
+        _st.warning(f"Pipeline load error: {e}")
 
-    if "Lead name" not in df.columns:
+    # Normalize the region column name — Active presales uses 'Country',
+    # Dropped leads uses 'Region'. Standardize to 'Region' for both.
+    if not df_active.empty and "Country" in df_active.columns and "Region" not in df_active.columns:
+        df_active = df_active.rename(columns={"Country": "Region"})
+
+    # Concat old tabs into a single meetings dataframe
+    if not df_active.empty or not df_dropped.empty:
+        df_mtg = _pd.concat([df_active, df_dropped], ignore_index=True, sort=False)
+    else:
+        # Fallback if old tabs are gone (archived) — use unified tab with whatever
+        # date column it has
+        df_mtg = df_unified.copy()
+
+    if df_mtg.empty or "Lead name" not in df_mtg.columns:
         return {}
-    df = df[df["Lead name"].astype(str).str.strip() != ""].copy()
 
-    # 'First conv date' was dropped from the unified pipeline tab at some point.
-    # For the "Companies Met" breakdown the right semantic is first-meeting-date,
-    # but if it's gone, latest-meeting-date is the closest proxy. Note: this
-    # over-counts in late months for leads with multiple conversations across
-    # months. Ask Dhanashree to add 'First conv date' back for accuracy.
-    _MTG_COL = "First conv date" if "First conv date" in df.columns else "Latest conv date"
+    # Parse all date columns we might use
+    for _df in (df_mtg, df_unified):
+        if _df.empty:
+            continue
+        for c in ["First conv date", "Latest conv date", "POC Delivery Date",
+                  "Proposal Sent Date", "Pilot Start Date",
+                  "Production Start Date"]:
+            if c in _df.columns:
+                _df[c] = _pd.to_datetime(_df[c], format="mixed", errors="coerce")
+
+    df_mtg = df_mtg[df_mtg["Lead name"].astype(str).str.strip() != ""].copy()
+
+    # If the old tabs disappear, we have to live with Latest conv date
+    _MTG_COL = "First conv date" if "First conv date" in df_mtg.columns else "Latest conv date"
     _using_fallback = (_MTG_COL == "Latest conv date")
 
     def _bucket(src: str) -> str:
@@ -98,10 +129,24 @@ def load_meetings_summary():
         r = str(r).strip().lower()
         if r == "india": return "india"
         if r == "sea":   return "sea"
+        # Dropped-leads rows often have an empty Region (~20 of them — AB Inbev,
+        # Samsung, Wipro, Kajaria, TTK Prestige, etc.). All are Indian accounts,
+        # so default empty → india instead of dropping them from every count.
+        # If anything starts coming through that's actually SEA-but-blank, flag
+        # and revisit.
+        if r in ("", "nan", "none"):
+            return "india"
         return ""
 
-    df["_region"] = df.get("Region", "").apply(_region_key)
-    df["_bucket"] = df.get("Source of lead", "").apply(_bucket)
+    df_mtg["_region"] = df_mtg.get("Region", "").apply(_region_key)
+    df_mtg["_bucket"] = df_mtg.get("Source of lead", "").apply(_bucket)
+    # For the pipeline-progression dataframe, do the same so POC/Pilot/Production
+    # slicing works on the same region×bucket grid as meetings.
+    if not df_unified.empty:
+        df_unified["_region"] = df_unified.get("Region", "").apply(_region_key)
+        df_unified["_bucket"] = df_unified.get("Source of lead", "").apply(_bucket)
+    # Keep the meetings dataframe as the primary `df` for the existing helpers below
+    df = df_mtg
 
     # Positive interest proxy: leads that progressed past TOF
     if "Lead status" in df.columns:
@@ -130,15 +175,24 @@ def load_meetings_summary():
             s = s[s["_bucket"] == bucket_key]
         return s
 
+    def _slice_unified(region_key, bucket_key=None):
+        if df_unified.empty or "_region" not in df_unified.columns:
+            return df_unified
+        s = df_unified[df_unified["_region"] == region_key]
+        if bucket_key is not None:
+            s = s[s["_bucket"] == bucket_key]
+        return s
+
     def _build_source(region_key, bucket_key):
-        sub = _slice(region_key, bucket_key)
+        sub_m = _slice(region_key, bucket_key)
+        sub_p = _slice_unified(region_key, bucket_key)
         return {
-            "meetings":   _by_month(sub, _MTG_COL),
-            "positive":   _by_month(sub, _MTG_COL, positive_only=True),
+            "meetings":   _by_month(sub_m, _MTG_COL),
+            "positive":   _by_month(sub_m, _MTG_COL, positive_only=True),
             "others":     {m: {"count": 0, "companies": ""} for m in MONTHS_ALL},
-            "pocs":       _by_month(sub, "POC Delivery Date"),
-            "pilots":     _by_month(sub, "Pilot Start Date"),
-            "production": _by_month(sub, "Production Start Date"),
+            "pocs":       _by_month(sub_p, "POC Delivery Date"),
+            "pilots":     _by_month(sub_p, "Pilot Start Date"),
+            "production": _by_month(sub_p, "Production Start Date"),
         }
 
     def _build_overall_region(region_key):
@@ -152,10 +206,11 @@ def load_meetings_summary():
         }
 
     def _build_overall_funnel():
+        # Pipeline-progression dates live only on the unified tab, not the old tabs
         return {
-            "pocs":       {m: {"actual": _by_month(df, "POC Delivery Date")[m]["count"],     "target": 0} for m in MONTHS_ALL},
-            "pilots":     {m: {"actual": _by_month(df, "Pilot Start Date")[m]["count"],      "target": 0} for m in MONTHS_ALL},
-            "production": {m: {"actual": _by_month(df, "Production Start Date")[m]["count"], "target": 0} for m in MONTHS_ALL},
+            "pocs":       {m: {"actual": _by_month(df_unified, "POC Delivery Date")[m]["count"],     "target": 0} for m in MONTHS_ALL},
+            "pilots":     {m: {"actual": _by_month(df_unified, "Pilot Start Date")[m]["count"],      "target": 0} for m in MONTHS_ALL},
+            "production": {m: {"actual": _by_month(df_unified, "Production Start Date")[m]["count"], "target": 0} for m in MONTHS_ALL},
         }
 
     return {
@@ -191,11 +246,11 @@ st.markdown(f"### 🤝 Meetings — YTD 2026 (through {_YTD_MONTHS[-1]})")
 _mtg_col_used = (meetings_data or {}).get("_mtg_col_used", "First conv date")
 _using_fallback = (meetings_data or {}).get("_using_fallback", False)
 st.caption(
-    f"All products — source: All-e 'Overall Pipeline for IN and SEA' tab "
-    f"(derived from **{_mtg_col_used}**)"
-    + (" ⚠️ First conv date column is missing from the sheet — using Latest conv date "
-       "as a fallback. Ask Dhanashree to add 'First conv date' back for accurate "
-       "first-meeting attribution." if _using_fallback else "")
+    f"All products — meetings from **Active presales + Dropped leads** tabs "
+    f"(derived from **{_mtg_col_used}**); pipeline progression (POC / Pilot / "
+    f"Production) from the unified 'Overall Pipeline for IN and SEA' tab."
+    + (" ⚠️ Old tabs unavailable — falling back to unified tab's Latest conv date "
+       "(over-counts late months)." if _using_fallback else "")
 )
 
 if meetings_data:
