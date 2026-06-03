@@ -61,11 +61,16 @@ EXPECTED_SCHEMAS: dict = {
     "Active presales": {
         "required": ["Lead name", "First conv date", "Source of lead"],
         "expected_optional": [
-            "Vertical", "Country", "Region", "Lead status", "Latest conv date",
+            "Vertical", "Country", "Lead status", "Latest conv date",
             "Email of Key Personnel ",
         ],
+        # NOTE: this tab uses "Country" while the unified tab + Dropped leads
+        # use "Region" — pages that read it normalize via rename. Don't add
+        # "Region" to the optional list here or the sentry will spuriously
+        # flag it as missing every render.
         "note": ("Source of truth for Meetings YTD attribution until "
-                 "'First conv date' is restored on the unified tab."),
+                 "'First conv date' is restored on the unified tab. "
+                 "Uses 'Country' column (legacy); pages normalize to 'Region'."),
     },
     "Dropped leads": {
         "required": ["Lead name", "First conv date", "Source of lead"],
