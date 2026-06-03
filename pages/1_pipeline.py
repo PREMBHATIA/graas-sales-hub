@@ -72,7 +72,7 @@ def load_meetings_summary():
     MONTHS_ALL = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
                   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
-    for c in ["First conv date", "POC Delivery Date",
+    for c in ["First conv date", "Latest conv date", "POC Delivery Date",
               "Proposal Sent Date", "Pilot Start Date",
               "Production Start Date"]:
         if c in df.columns:
@@ -81,6 +81,14 @@ def load_meetings_summary():
     if "Lead name" not in df.columns:
         return {}
     df = df[df["Lead name"].astype(str).str.strip() != ""].copy()
+
+    # 'First conv date' was dropped from the unified pipeline tab at some point.
+    # For the "Companies Met" breakdown the right semantic is first-meeting-date,
+    # but if it's gone, latest-meeting-date is the closest proxy. Note: this
+    # over-counts in late months for leads with multiple conversations across
+    # months. Ask Dhanashree to add 'First conv date' back for accuracy.
+    _MTG_COL = "First conv date" if "First conv date" in df.columns else "Latest conv date"
+    _using_fallback = (_MTG_COL == "Latest conv date")
 
     def _bucket(src: str) -> str:
         s = str(src).strip().lower()
@@ -125,8 +133,8 @@ def load_meetings_summary():
     def _build_source(region_key, bucket_key):
         sub = _slice(region_key, bucket_key)
         return {
-            "meetings":   _by_month(sub, "First conv date"),
-            "positive":   _by_month(sub, "First conv date", positive_only=True),
+            "meetings":   _by_month(sub, _MTG_COL),
+            "positive":   _by_month(sub, _MTG_COL, positive_only=True),
             "others":     {m: {"count": 0, "companies": ""} for m in MONTHS_ALL},
             "pocs":       _by_month(sub, "POC Delivery Date"),
             "pilots":     _by_month(sub, "Pilot Start Date"),
@@ -135,8 +143,8 @@ def load_meetings_summary():
 
     def _build_overall_region(region_key):
         sub = _slice(region_key)
-        mtg = _by_month(sub, "First conv date")
-        pos = _by_month(sub, "First conv date", positive_only=True)
+        mtg = _by_month(sub, _MTG_COL)
+        pos = _by_month(sub, _MTG_COL, positive_only=True)
         return {
             "meetings": {m: {"actual": mtg[m]["count"], "target": 0} for m in MONTHS_ALL},
             "positive": {m: {"actual": pos[m]["count"], "target": 0} for m in MONTHS_ALL},
@@ -151,6 +159,8 @@ def load_meetings_summary():
         }
 
     return {
+        "_mtg_col_used":   _MTG_COL,
+        "_using_fallback": _using_fallback,
         "sources": {
             "Partner India":       _build_source("india", "partner"),
             "Partner SEA":         _build_source("sea",   "partner"),
@@ -178,7 +188,15 @@ _ALL_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
 _YTD_MONTHS = _ALL_MONTHS[:datetime.now().month]
 
 st.markdown(f"### 🤝 Meetings — YTD 2026 (through {_YTD_MONTHS[-1]})")
-st.caption("All products — source: All-e 'Overall Pipeline for IN and SEA' tab (derived from First conv date)")
+_mtg_col_used = (meetings_data or {}).get("_mtg_col_used", "First conv date")
+_using_fallback = (meetings_data or {}).get("_using_fallback", False)
+st.caption(
+    f"All products — source: All-e 'Overall Pipeline for IN and SEA' tab "
+    f"(derived from **{_mtg_col_used}**)"
+    + (" ⚠️ First conv date column is missing from the sheet — using Latest conv date "
+       "as a fallback. Ask Dhanashree to add 'First conv date' back for accurate "
+       "first-meeting attribution." if _using_fallback else "")
+)
 
 if meetings_data:
     _MONTHS = _YTD_MONTHS
