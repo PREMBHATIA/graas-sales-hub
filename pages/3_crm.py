@@ -1,5 +1,6 @@
 """CRM & Email Outreach — Unified contacts from All-e Active & Dropped leads."""
 
+import os
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -250,6 +251,15 @@ contacts = load_crm_data()
 if contacts.empty:
     st.warning("No CRM data found. Check All-e sheet connection.")
     st.stop()
+
+# Schema sentry — runs on every render (not inside @st.cache_data) so missing-
+# column banners stay visible until the source sheet is fixed.
+from services.schema import validate_schema as _validate_schema
+from services.sheets_client import fetch_sheet_tab as _fetch_tab
+_alle_id = os.getenv("ALLE_SHEET_ID", "")
+if _alle_id:
+    _validate_schema(_fetch_tab(_alle_id, "Overall Pipeline for IN and SEA"),
+                     "Overall Pipeline for IN and SEA", context="CRM contacts")
 
 if st.button("🔄 Refresh CRM Data"):
     st.cache_data.clear()

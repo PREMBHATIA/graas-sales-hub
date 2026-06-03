@@ -175,6 +175,11 @@ raw_eval,       _err_eval       = load_evaluation_sheet()
 raw_user_state, _err_user_state = load_user_state()
 raw_funnel,     _err_funnel     = load_funnel()
 
+# Schema sentry — surface missing-column issues as visible banners. Runs on
+# every render (outside @st.cache_data) so warnings persist until fixed.
+from services.schema import validate_schema as _validate_schema
+_validate_schema(raw_daily, "Hoppr__Anaysis", context="Hoppr seller table + Account Detail")
+
 # ── Data status ───────────────────────────────────────────────────────────────
 with st.expander("🔍 Data Status (click to hide)", expanded=True):
     def _status(label, df, err, extra=""):

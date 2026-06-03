@@ -53,6 +53,11 @@ if raw.empty:
     st.warning("No All-e data found. Check the 'Overall Pipeline for IN and SEA' tab in the All-e Foundry Presales Tracker sheet.")
     st.stop()
 
+# Schema sentry — surface missing-column issues before the page renders metrics
+# derived from this tab.
+from services.schema import validate_schema as _validate_schema
+_validate_schema(raw, "Overall Pipeline for IN and SEA", context="All-e Presales page")
+
 if st.button("🔄 Refresh Data"):
     st.cache_data.clear()
     st.rerun()

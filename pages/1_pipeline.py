@@ -78,6 +78,9 @@ def load_meetings_summary():
                   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
     # ── Load: old tabs (for meetings) + unified tab (for pipeline progression) ──
+    # Schema sentry runs at the page level (outside this cache) because
+    # @st.cache_data only replays UI side-effects on cache miss — we want
+    # the missing-column banner to render on every page load until fixed.
     df_active = pd.DataFrame()
     df_dropped = pd.DataFrame()
     df_unified = pd.DataFrame()
@@ -241,6 +244,22 @@ if st.button("🔄 Refresh"):
 _ALL_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
                "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 _YTD_MONTHS = _ALL_MONTHS[:datetime.now().month]
+
+# ── Schema sentry — visible warnings if any tab we depend on is missing
+# expected columns. Runs on every render (NOT inside @st.cache_data) so the
+# banners stay visible until the underlying sheet is fixed.
+from services.schema import validate_schema as _validate_schema
+from services.sheets_client import fetch_sheet_tab as _fetch_tab
+_alle_id = os.getenv("ALLE_SHEET_ID", "")
+if _alle_id:
+    # These fetches are cache hits (the data was loaded above) — essentially free.
+    _validate_schema(_fetch_tab(_alle_id, "Active presales"),
+                     "Active presales", context="Pipeline Meetings YTD")
+    _validate_schema(_fetch_tab(_alle_id, "Dropped leads"),
+                     "Dropped leads", context="Pipeline Meetings YTD")
+    _validate_schema(_fetch_tab(_alle_id, "Overall Pipeline for IN and SEA"),
+                     "Overall Pipeline for IN and SEA",
+                     context="Pipeline progression (POC / Pilot / Production)")
 
 st.markdown(f"### 🤝 Meetings — YTD 2026 (through {_YTD_MONTHS[-1]})")
 _mtg_col_used = (meetings_data or {}).get("_mtg_col_used", "First conv date")
