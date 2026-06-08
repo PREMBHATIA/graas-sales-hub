@@ -475,7 +475,23 @@ with tab_gtm:
         "T_Pilots_Finished": "Pilots Done", "T_Live_Customers": "Live Cust",
     })
 
-    st.dataframe(roadmap_display, use_container_width=True, hide_index=True)
+    # Color-code Actuals (green tint) vs Targets (muted gray) so the eye
+    # can immediately tell "what we did" from "what we aimed at".
+    _actual_cols = ["Actual Mtgs", "Actual Cumul", "Proposals"]
+    _target_cols = ["Target Mtgs", "Target Cumul", "Target POCs",
+                    "Target Pilots", "Pilots Done", "Live Cust"]
+    _styled = (
+        roadmap_display.style
+            .set_properties(subset=_actual_cols, **{
+                "background-color": "rgba(16, 185, 129, 0.12)",  # emerald-500 @ 12%
+                "color": "#10B981",
+                "font-weight": "600",
+            })
+            .set_properties(subset=_target_cols, **{
+                "color": "#9CA3AF",  # gray-400 — visible but recessed
+            })
+    )
+    st.dataframe(_styled, use_container_width=True, hide_index=True)
 
     st.caption("Assumption: 13 Paid Pilots → 10 Customers in Production = $195K + $148K = **$343K invoiced revenue in 2026**")
 
