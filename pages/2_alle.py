@@ -457,22 +457,22 @@ with tab_gtm:
     # ── Full Roadmap Table ────────────────────────────────────────────────────
     st.markdown("### Full Roadmap — Targets")
 
-    # Show only up to current month + 1
-    roadmap_display = gtm_target.iloc[:current_month_idx + 2][["Month", "T_New_Mtgs", "T_Cumul_Mtgs", "T_Free_POCs",
-                                   "T_Pilots_Started", "T_Pilots_Finished", "T_Live_Customers",
-                                   "T_Pilot_Revenue", "T_Monthly_MRR",
-                                   "A_New_Mtgs", "A_Cumul_Mtgs", "A_Proposals"]].copy()
-
-    roadmap_display["T_Pilot_Revenue"] = roadmap_display["T_Pilot_Revenue"].apply(lambda x: f"${x:,}")
-    roadmap_display["T_Monthly_MRR"] = roadmap_display["T_Monthly_MRR"].apply(lambda x: f"${x:,}")
+    # Show only up to current month + 1.
+    # Order: Month → Actuals first (Mtgs / Cumul / Proposals) → Targets.
+    # Pilot Rev + MRR columns removed (low signal at this stage).
+    roadmap_display = gtm_target.iloc[:current_month_idx + 2][[
+        "Month",
+        "A_New_Mtgs", "A_Cumul_Mtgs", "A_Proposals",
+        "T_New_Mtgs", "T_Cumul_Mtgs", "T_Free_POCs",
+        "T_Pilots_Started", "T_Pilots_Finished", "T_Live_Customers",
+    ]].copy()
 
     roadmap_display = roadmap_display.rename(columns={
+        "A_New_Mtgs": "Actual Mtgs", "A_Cumul_Mtgs": "Actual Cumul",
+        "A_Proposals": "Proposals",
         "T_New_Mtgs": "Target Mtgs", "T_Cumul_Mtgs": "Target Cumul",
         "T_Free_POCs": "Target POCs", "T_Pilots_Started": "Target Pilots",
         "T_Pilots_Finished": "Pilots Done", "T_Live_Customers": "Live Cust",
-        "T_Pilot_Revenue": "Pilot Rev", "T_Monthly_MRR": "MRR",
-        "A_New_Mtgs": "Actual Mtgs", "A_Cumul_Mtgs": "Actual Cumul",
-        "A_Proposals": "Proposals",
     })
 
     st.dataframe(roadmap_display, use_container_width=True, hide_index=True)
