@@ -480,8 +480,24 @@ with tab_gtm:
     _actual_cols = ["Actual Mtgs", "Actual Cumul", "Proposals"]
     _target_cols = ["Target Mtgs", "Target Cumul", "Target POCs",
                     "Target Pilots", "Pilots Done", "Live Cust"]
+    _num_cols = _actual_cols + _target_cols
+
+    # Styler defaults to 6-decimal float for numeric columns once we apply
+    # .set_properties — explicit int formatter required to keep things clean.
+    def _int_fmt(v):
+        if v is None:
+            return "—"
+        try:
+            import math
+            if isinstance(v, float) and math.isnan(v):
+                return "—"
+            return f"{int(v)}"
+        except (TypeError, ValueError):
+            return "—"
+
     _styled = (
         roadmap_display.style
+            .format({c: _int_fmt for c in _num_cols})
             .set_properties(subset=_actual_cols, **{
                 "background-color": "rgba(16, 185, 129, 0.12)",  # emerald-500 @ 12%
                 "color": "#10B981",
