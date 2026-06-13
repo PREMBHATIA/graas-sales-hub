@@ -38,39 +38,66 @@ st.caption("Pre-call research → 2-3 page account brief, then a living doc upda
            "every call until it's ready for solutioning. Output is a native Google Doc.")
 
 with st.expander("ℹ️ How to use this — read once, then collapse", expanded=False):
-    st.markdown("""
-### What this does
+    st.markdown("#### What this does")
+    st.markdown(
+        "Turns raw research into a **2-3 page Prospect Brief Google Doc** "
+        "you can share with the team. The brief tells you:"
+    )
+    st.markdown(
+        "- **What they have** — business model, tech stack, channels, AI maturity (confidence tagged)\n"
+        "- **What they're missing** — gap analysis vs. what good looks like for their motion\n"
+        "- **Where to probe in discovery** — prioritized question list, not a generic checklist\n"
+        "- **Which product to pursue** — All-e, Knowledge Graph, or layered — tied to a CFO metric\n"
+        "- **People & path in** — who to engage, the champion, the budget owner"
+    )
 
-Turns raw research into a **2-3 page Prospect Brief Google Doc** you can share with the team. The brief tells you:
-- **What they have** — business model, tech stack, channels, AI maturity (with confidence tagged)
-- **What they're missing** — gap analysis vs. what good looks like for their motion
-- **Where to probe in discovery** — a prioritized question list, not a generic checklist
-- **Which product to pursue** — All-e, Knowledge Graph, or layered — tied to a CFO metric
-- **People & path in** — who to engage, who's the champion, who controls the budget
+    st.markdown("#### Two modes")
+    m1, m2 = st.columns(2)
+    with m1:
+        st.markdown("##### 🆕 New brief (pre-call)")
+        st.caption("Before the first conversation")
+        st.markdown(
+            "Paste research notes — website, LinkedIn, news, prior emails, "
+            "industry profile. If the company is in the CRM, pick it from "
+            "the dropdown and the form pre-fills with what we already know."
+        )
+    with m2:
+        st.markdown("##### 🔁 Update existing (post-call)")
+        st.caption("After every call")
+        st.markdown(
+            "Paste the existing brief's **Doc URL + your fresh call notes** "
+            "(Granola export, Zoom transcript, or hand-typed). The brief amends "
+            "in place — answers move into facts, confidence upgrades to "
+            "*Confirmed*, the route firms up."
+        )
 
-### Two modes
+    st.markdown("#### The living-document workflow")
+    st.info(
+        "**Pre-call draft → Post call-1 → Post call-2 → … → Ready for solutioning**\n\n"
+        "Don't treat this as one-shot. Build it before call 1, then re-open this page "
+        "after every call and run the update. The status line at the top of the brief "
+        "tracks the version. When the qualification gate is met (decision-maker known, "
+        "budget identified, data readiness understood, CFO metric confirmed by the customer), "
+        "hand it to the **Create Proposal** page."
+    )
 
-| Mode | When to use | What you paste |
-|---|---|---|
-| **🆕 New brief (pre-call)** | Before the first conversation | Research notes — website, LinkedIn, news, prior emails, industry profile. If the company is in the CRM, pick it and the form pre-fills with what we already know. |
-| **🔁 Update existing (post-call)** | After every call | The existing brief's Doc URL + your fresh call notes (Granola export, Zoom transcript, or hand-typed). The brief amends in place — answers move into facts, confidence upgrades to Confirmed, the route firms up. |
+    st.markdown("#### Tips that change output quality")
+    st.markdown(
+        "- **Quote your sources** in the research notes "
+        "(*\"$290M revenue per Euromonitor; $50-100M per LeadIQ — conflicting\"*). "
+        "The brief flags the conflict instead of silently picking one.\n"
+        "- **Note what you don't know** (*\"not yet clear if they have a DMS\"*). "
+        "The brief turns it into a discovery question.\n"
+        "- **Paste call notes verbatim**. Don't pre-summarize — the diff against the "
+        "discovery agenda works better with raw notes."
+    )
 
-### The living-document workflow
-
-> *Pre-call draft* → *Post call-1 → Post call-2 → … → Ready for solutioning*
-
-Don't treat this as one-shot. Build it before call 1, then re-open this page after every call and run the update. The status line at the top of the brief tracks the version. When the qualification gate is met (decision-maker known, budget identified, data readiness understood, CFO metric confirmed by the customer), the brief is ready to hand to the **Create Proposal** page.
-
-### Tips that change the output quality
-
-- **Quote your sources** in the research notes ("$290M revenue per Euromonitor; $50-100M per LeadIQ — conflicting"). The brief will flag the conflict instead of silently picking one.
-- **Note what you don't know** ("don't yet know if they have a DMS"). The brief turns it into a discovery question.
-- **Paste call notes verbatim**. Don't pre-summarize — the diff against the discovery agenda works better with raw notes.
-
-### Where the Doc lives
-
-Saved by default to the **"Prospect Brief (via SalesHub)"** Shared Drive. Override the folder ID in step 4 if you want a different destination. The Doc is auto-shared with `prem@graas.ai` so it appears in your "Shared with me."
-""")
+    st.markdown("#### Where the Doc lives")
+    st.markdown(
+        "Saved by default to the **\"Prospect Brief (via SalesHub)\"** Shared Drive. "
+        "Override the folder ID in step 4 for a different destination. The Doc is "
+        "auto-shared with the emails you list, so it shows up in their *Shared with me*."
+    )
     st.markdown("---")
 
 

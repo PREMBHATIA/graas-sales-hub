@@ -254,53 +254,93 @@ st.markdown("## 📝 All-e Proposal Builder")
 st.caption("From discovery inputs to a customer-ready commercial proposal — solution first, risk second")
 
 with st.expander("ℹ️ How to use this — read once, then collapse", expanded=False):
-    st.markdown("""
-### What this does
+    st.markdown("#### What this does")
+    st.markdown(
+        "Turns confirmed discovery findings into a **customer-ready commercial "
+        "proposal**. Different from the **Prospect Brief** (that's pre-call research) "
+        "and the **Architect** chat (that's brainstorming) — this builds the actual "
+        "document you'd send to the prospect's CIO/CFO after qualification is done."
+    )
 
-Turns confirmed discovery findings into a **customer-ready commercial proposal**. Different from the Prospect Brief (that's pre-call research) and the Architect chat (that's brainstorming) — this builds the actual document you'd send to the prospect's CIO/CFO after qualification is done.
+    st.markdown("#### When to use it (vs. the other All-e pages)")
+    s1, s2, s3, s4 = st.columns(4)
+    with s1:
+        st.markdown("##### Pre-call")
+        st.caption("Just research, no calls yet")
+        st.warning("Use **Create Prospect Brief** first.")
+    with s2:
+        st.markdown("##### Discovery in flight")
+        st.caption("Open questions, unconfirmed assumptions")
+        st.warning("Use **Architect a Soln** to think out loud.")
+    with s3:
+        st.markdown("##### Qualification met ✅")
+        st.caption(
+            "Decision-maker known · budget identified · data readiness "
+            "understood · CFO metric confirmed by the customer"
+        )
+        st.success("Use this page.")
+    with s4:
+        st.markdown("##### Re-proposal")
+        st.caption("Customer asked for revisions")
+        st.success("Use this page. Paste the prior proposal + the asks.")
 
-### When to use it
+    st.markdown("#### What to paste in Discovery Inputs")
+    st.markdown(
+        "Quality of output is bounded by quality of input. "
+        "The more concrete the inputs, the more commercial the proposal."
+    )
+    in1, in2 = st.columns(2)
+    with in1:
+        st.markdown("##### ✅ Strong inputs")
+        st.markdown(
+            "- **Confirmed numbers** from the customer (revenue, FSAs, retailers, "
+            "order volumes, current TAT)\n"
+            "- **Tech stack with vendor names** + who built what "
+            "(*\"DMS = SalesPoint, built by local vendor, API access available\"*)\n"
+            "- **Direct quotes on pain** in the customer's words "
+            "(*\"our reps spend half their day chasing collections\"*)\n"
+            "- **What's already committed** (pilot scope, geography, BU, "
+            "success metrics they defined)\n"
+            "- **Decision authority + budget cycle**"
+        )
+    with in2:
+        st.markdown("##### ❌ Weak inputs that produce vague proposals")
+        st.markdown(
+            "- *\"Generic FMCG company, wants AI to improve sales\"* "
+            "— no numbers, no scope, no metric\n"
+            "- Aggregator estimates without a confirmation pass "
+            "(*\"LeadIQ says $50M revenue\"*)\n"
+            "- Internal speculation about what they need "
+            "(*\"they probably want WhatsApp ordering\"*)"
+        )
 
-| Stage | What's expected | Use this page? |
-|---|---|---|
-| Pre-call | Just research, no calls yet | No — use **Create Prospect Brief** first |
-| During discovery | Open questions, unconfirmed assumptions | No — use **Architect a Soln** to think out loud |
-| **Qualification gate met** | Decision-maker known · budget identified · data readiness understood · CFO metric confirmed | **✅ Use this page** |
-| Re-proposal | Customer asked for revisions to a previous proposal | ✅ Paste the previous proposal + the asks |
+    st.markdown("#### The cardinal rule baked into this skill")
+    st.info(
+        "**Solution first, then ask about risk.** "
+        "The output gives you **2–3 distinct technical approaches** with trade-offs "
+        "(commercial impact vs. integration risk vs. timeline) — not a single cautious "
+        "option. Pick the one that matches the customer's risk appetite, then ask the "
+        "chat to build it out."
+    )
 
-### What to paste in Discovery Inputs
+    st.markdown("#### Iteration loop")
+    st.markdown(
+        "1. Fill in **Deal Context + Discovery Inputs** on the left\n"
+        "2. Click **Build proposal** — first cut renders on the right\n"
+        "3. **Push back in chat:** *\"Add a Phase 2 for retailer self-serve\"*, "
+        "*\"Reframe the commercial as a 60-day paid pilot\"*, *\"Too cautious — "
+        "give me the production-integration option\"*\n"
+        "4. **Quantify the CFO metric:** *\"What does 5–7 day order TAT cost them "
+        "in working capital? Show the math.\"*\n"
+        "5. When the proposal feels right, copy it out and send."
+    )
 
-Quality of output is bounded by quality of input. The more concrete the inputs, the more commercial the proposal.
-
-**Strong inputs**
-- Confirmed numbers from the customer (revenue, FSAs, retailers, order volumes, current TAT)
-- Tech stack with vendor names + who built what (e.g. "DMS = SalesPoint, built by local vendor, API access available")
-- Direct quotes on pain in the customer's words ("our reps spend half their day on the phone chasing collections")
-- What's already been committed (pilot scope, geography, BU, success metrics they defined)
-- Decision authority and budget owner (who signs off, when the budget cycle is)
-
-**Weak inputs that produce vague proposals**
-- "Generic FMCG company, wants AI to improve sales" — no numbers, no scope, no metric
-- Aggregator estimates without a confirmation pass ("LeadIQ says $50M revenue")
-- Internal speculation about what they need ("they probably want WhatsApp ordering")
-
-### The cardinal rule baked into this skill
-
-**Solution first, then ask about risk.** The output will give you **2-3 distinct technical approaches** with trade-offs (commercial impact vs. integration risk vs. timeline) — not a single cautious option. Pick the one that matches the customer's risk appetite, then ask the chat to build it out.
-
-### Iteration loop
-
-1. Fill in Deal Context + Discovery Inputs on the left
-2. Click **Build proposal** — gets the first cut on the right
-3. **Push back** in the chat: *"Add a Phase 2 for retailer self-serve"*, *"Reframe the commercial as a 60-day paid pilot"*, *"This is too cautious — give me the production-integration option"*
-4. **Quantify the CFO metric** — *"What does 5-7 day order TAT actually cost them in working capital? Show the math."*
-5. When the proposal feels right, copy it out and send.
-
-### What this won't do (yet)
-
-- It won't save to Drive — copy/paste into a Doc yourself, or use the **Download** action when you see one in the future.
-- It won't fetch the latest pricing — pricing logic is in the skill, but if commercial framing has shifted recently, double-check before sending.
-""")
+    st.markdown("#### Known limitations")
+    st.markdown(
+        "- **No Drive save yet** — copy/paste into a Doc yourself for now.\n"
+        "- **No live pricing fetch** — pricing logic is baked into the skill; "
+        "if commercial framing has shifted recently, double-check before sending."
+    )
     st.markdown("---")
 
 # Two-column layout: inputs on the left, chat on the right
