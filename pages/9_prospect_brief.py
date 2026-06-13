@@ -75,10 +75,13 @@ if not SKILL_TEXT or not TEMPLATE_HTML:
 
 
 # ── Drive folder config ───────────────────────────────────────────────────────
-# Default from SKILL.md (Graas Pre-Sales folder). Override per-session in the UI.
+# Default destination: the "Prospect Brief (via SalesHub)" Shared Drive.
+# Service accounts can't own files in personal My Drive (0 GB storage quota),
+# but they CAN write to Shared Drives where the SA is a Content Manager.
+# Override per-session in the UI, or set PROSPECT_BRIEF_DRIVE_FOLDER in env.
 DEFAULT_DRIVE_FOLDER = os.getenv(
     "PROSPECT_BRIEF_DRIVE_FOLDER",
-    "1tkuIUliuZClXP2biR_tSgUzIQejs-gHQ",
+    "0ABwowt8s9tmzUk9PVA",  # Shared Drive: Prospect Brief (via SalesHub)
 )
 
 
