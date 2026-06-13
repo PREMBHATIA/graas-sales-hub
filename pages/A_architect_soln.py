@@ -164,52 +164,66 @@ OUTPUT STYLE:
 """
 
 
-# ── Chat surface ──────────────────────────────────────────────────────────────
+# ── Load live context (used in system prompt) ────────────────────────────────
 live_ctx = load_live_context()
 
-# Status strip
-status_cols = st.columns([1, 1, 1, 1])
-with status_cols[0]:
-    if isinstance(live_ctx.get("active_pipeline"), dict):
-        st.metric("Active pipeline", live_ctx["active_pipeline"]["rows"])
-    else:
-        st.metric("Active pipeline", "—")
-with status_cols[1]:
-    notes = live_ctx.get("recent_meeting_notes", [])
-    st.metric("Meeting notes", len(notes) if isinstance(notes, list) else "—")
-with status_cols[2]:
-    st.metric("Skill version", "all-e SA v1")
-with status_cols[3]:
-    if st.button("🔄 Refresh data", use_container_width=True):
-        st.cache_data.clear()
-        st.rerun()
-
-st.markdown("---")
-
-# Example prompts
-st.markdown("**Try asking:**")
-examples = [
-    "Prep me for the next Nerolac discovery call — what should I probe on?",
-    "What use cases should I pitch to a multi-brand FMCG distributor?",
-    "How do I position All-e vs an in-house build for an OEM?",
-    "Draft the opening for a strategic note to a CIO at a paint major",
-]
-ex_cols = st.columns(len(examples))
-for i, prompt in enumerate(examples):
-    with ex_cols[i]:
-        if st.button(prompt, key=f"arch_ex_{i}", use_container_width=True):
-            st.session_state["arch_prefill"] = prompt
-
-# Render chat history
+# ── Session-state init ────────────────────────────────────────────────────────
 HIST = "arch_chat_history"
 if HIST not in st.session_state:
     st.session_state[HIST] = []
 
+PROSPECT = "arch_scoped_prospect"
+if PROSPECT not in st.session_state:
+    st.session_state[PROSPECT] = ""
+
+# ── Empty-state guidance (only when no chat yet) ─────────────────────────────
+if not st.session_state[HIST]:
+    st.markdown("""
+### How to use this
+
+This is your **All-e solutioning copilot**. Open it before any prospect meeting and ask it to prep you. It already knows the playbook (3 levers, System of Intelligence, journey × lever matrix, real customer references) and it can see the live Graas pipeline, so when you mention a company by name, it cross-references where they sit and what's been said.
+
+**What it's good at**
+
+| You need… | Ask it… |
+|---|---|
+| To prep for a discovery call | *"Prep me for the next Nerolac discovery call — what should I probe on?"* |
+| To pick the right use cases for a vertical | *"What use cases should I pitch to a multi-brand FMCG distributor?"* |
+| To position vs a competitor or in-house | *"How do I position All-e vs an in-house build for an OEM?"* |
+| To draft an opening line | *"Draft the opening for a strategic note to the CIO at a paint major"* |
+| To handle a specific objection | *"They said the chatbot they tried didn't work — how do I respond?"* |
+| To frame the commercial / ROI | *"Quantify the ROI for a distributor doing 1000 invoices/day"* |
+
+**Tips**
+
+- **Mention the company name** — it cross-references the live pipeline (vertical, region, stage, last conversation notes) automatically.
+- **Be specific about what you want** — "give me 5 discovery questions" beats "tell me about Nerolac."
+- **Iterate** — push back, ask follow-ups, request alternatives. Treat it like a senior SA you're brainstorming with.
+
+---
+""")
+
+    # Example prompt chips
+    st.markdown("**Quick start — click any:**")
+    examples = [
+        "Prep me for the next Nerolac discovery call — what should I probe on?",
+        "What use cases should I pitch to a multi-brand FMCG distributor?",
+        "How do I position All-e vs an in-house build for an OEM?",
+        "Draft the opening for a strategic note to a CIO at a paint major",
+    ]
+    ex_cols = st.columns(2)
+    for i, prompt in enumerate(examples):
+        with ex_cols[i % 2]:
+            if st.button(prompt, key=f"arch_ex_{i}", use_container_width=True):
+                st.session_state["arch_prefill"] = prompt
+                st.rerun()
+
+# ── Render chat history ──────────────────────────────────────────────────────
 for msg in st.session_state[HIST]:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"], unsafe_allow_html=True)
 
-# Input
+# ── Input ────────────────────────────────────────────────────────────────────
 user_input = st.chat_input(
     "Ask about discovery, use cases, positioning, pricing framing, objection handling…",
     key="arch_input",
@@ -247,6 +261,11 @@ if user_input:
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
-    if st.button("Clear Architect chat"):
-        st.session_state[HIST] = []
+    if st.session_state[HIST]:
+        st.markdown(f"**{len(st.session_state[HIST])} messages in this thread**")
+        if st.button("🆕 Start fresh", use_container_width=True):
+            st.session_state[HIST] = []
+            st.rerun()
+    if st.button("🔄 Refresh pipeline data", use_container_width=True):
+        st.cache_data.clear()
         st.rerun()
