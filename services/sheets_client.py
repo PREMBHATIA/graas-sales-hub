@@ -278,6 +278,66 @@ def create_google_doc_from_html(
                 "mime_type": None, "error": f"{type(e).__name__}: {e}"}
 
 
+def list_drive_folder_docs(folder_id: str) -> list:
+    """List Google Docs inside a Drive folder (Shared Drive supported).
+
+    Returns [{id, name, modified_time}] sorted newest-first. Filters out
+    non-Doc files (PDFs, slides etc.) so callers can assume export-as-text
+    will work on every returned id.
+    """
+    creds = _get_drive_credentials()
+    if creds is None:
+        return []
+    try:
+        import urllib.parse
+        session = greq.AuthorizedSession(creds)
+        q = urllib.parse.quote(
+            f"'{folder_id}' in parents "
+            f"and mimeType='application/vnd.google-apps.document' "
+            f"and trashed=false"
+        )
+        url = (
+            f"https://www.googleapis.com/drive/v3/files"
+            f"?q={q}&supportsAllDrives=true&includeItemsFromAllDrives=true"
+            f"&pageSize=100&orderBy=modifiedTime desc"
+            f"&fields=files(id,name,modifiedTime)"
+        )
+        r = session.get(url, timeout=15)
+        if r.status_code == 200:
+            files = r.json().get("files", [])
+            return [
+                {"id": f["id"], "name": f["name"], "modified_time": f.get("modifiedTime", "")}
+                for f in files
+            ]
+    except Exception:
+        pass
+    return []
+
+
+def fetch_drive_doc_text(doc_id: str) -> str:
+    """Export a Google Doc as plain text — for injecting into LLM prompts.
+
+    Plain text strips formatting (and the token noise that comes with it) so
+    reference proposals fit more cleanly into a system prompt. For round-trip
+    editing (post-call brief updates), use fetch_drive_doc_html instead.
+    """
+    creds = _get_drive_credentials()
+    if creds is None:
+        return ""
+    try:
+        session = greq.AuthorizedSession(creds)
+        url = (
+            f"https://www.googleapis.com/drive/v3/files/{doc_id}/export"
+            f"?mimeType=text/plain&supportsAllDrives=true"
+        )
+        r = session.get(url, timeout=30)
+        if r.status_code == 200:
+            return r.text
+    except Exception:
+        pass
+    return ""
+
+
 def fetch_drive_doc_html(doc_id: str) -> Optional[str]:
     """Export an existing Google Doc as HTML — used to load a brief for editing."""
     creds = _get_drive_credentials()

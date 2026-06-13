@@ -106,7 +106,7 @@ def load_live_context() -> dict:
 
 
 # ── Build system prompt ───────────────────────────────────────────────────────
-def build_system_prompt(live_ctx: dict) -> str:
+def build_system_prompt(live_ctx: dict, reference_docs: list = None) -> str:
     today = datetime.now().strftime("%B %d, %Y")
 
     # Format live context compactly
@@ -124,6 +124,21 @@ def build_system_prompt(live_ctx: dict) -> str:
                              f"{(n.get('summary') or '')[:300]}")
 
     live_block = "\n".join(ctx_lines) if ctx_lines else "(no live pipeline data loaded)"
+
+    # Reference proposals — actual Graas docs the team has shipped. Inject as
+    # patterns the architect should draw on (commercial framing, capability
+    # bundles, integration scope, voice positioning, etc).
+    ref_block = ""
+    if reference_docs:
+        chunks = ["\n\n============================================================",
+                  f"REFERENCE PROPOSALS ({len(reference_docs)} loaded)",
+                  "============================================================",
+                  "These are real Graas proposals you should draw patterns from when answering.",
+                  "Cite them by name when an approach in them maps to the question being asked.",
+                  ""]
+        for d in reference_docs:
+            chunks.append(f"\n--- BEGIN: {d['name']} ---\n{d['text']}\n--- END: {d['name']} ---\n")
+        ref_block = "\n".join(chunks)
 
     return f"""You are the Graas All-e Solutions Architect. Today is {today}.
 
@@ -147,6 +162,7 @@ END SKILL
 === LIVE GRAAS CONTEXT (active pipeline + recent meeting notes) ===
 {live_block}
 === END LIVE CONTEXT ===
+{ref_block}
 
 OUTPUT STYLE:
 - Specific, not generic. Quote numbers, name customer references, cite which
@@ -164,6 +180,38 @@ OUTPUT STYLE:
 """
 
 
+# ── Reference proposals — pulled from the SalesHub Shared Drive ──────────────
+# Folder ID set via env so it's overridable per environment. Default points to
+# the 'Reference Proposals / Knowledge Base' folder inside the SalesHub
+# Shared Drive that the service account already has access to.
+REFERENCE_PROPOSALS_FOLDER = os.getenv(
+    "REFERENCE_PROPOSALS_FOLDER",
+    "1tBMrcpiIDVhg5e0-N1ytjuzbDexQyheX",
+)
+
+
+@st.cache_data(ttl=3600)
+def list_reference_proposals() -> list:
+    from services.sheets_client import list_drive_folder_docs
+    return list_drive_folder_docs(REFERENCE_PROPOSALS_FOLDER)
+
+
+@st.cache_data(ttl=3600)
+def fetch_reference_text(doc_id: str) -> str:
+    from services.sheets_client import fetch_drive_doc_text
+    return fetch_drive_doc_text(doc_id)
+
+
+def _clean_proposal_name(raw: str) -> str:
+    """Strip the noise from filenames so the multiselect reads cleanly."""
+    s = raw
+    for prefix in ("Copy of ", "Copy of"):
+        if s.startswith(prefix):
+            s = s[len(prefix):].strip()
+            break
+    return s
+
+
 # ── Load live context (used in system prompt) ────────────────────────────────
 live_ctx = load_live_context()
 
@@ -175,6 +223,48 @@ if HIST not in st.session_state:
 PROSPECT = "arch_scoped_prospect"
 if PROSPECT not in st.session_state:
     st.session_state[PROSPECT] = ""
+
+# ── Reference proposal picker ────────────────────────────────────────────────
+# Sits at the top, persists across the whole chat. Picking a proposal injects
+# its full text into the system prompt so the architect can cite specific
+# patterns from real deals (Castrol's voice positioning, Nippon's dealer
+# automation phasing, 1mg's pricing structure, etc).
+ref_options = list_reference_proposals()
+with st.container(border=True):
+    rc1, rc2 = st.columns([5, 1])
+    with rc1:
+        if ref_options:
+            picked_ref_names = st.multiselect(
+                "📚 Reference proposals to draw from (pick 1–3 most relevant)",
+                options=[_clean_proposal_name(r["name"]) for r in ref_options],
+                key="arch_picked_refs",
+                help="Selected proposals get loaded into the system prompt so the architect "
+                     "can reference their actual commercial framing, capability bundles, and "
+                     "integration approach. Leave empty to rely on the playbook alone.",
+            )
+        else:
+            picked_ref_names = []
+            st.caption("⚠️ No reference proposals found in the Drive folder. "
+                       "Drop some in `Reference Proposals / Knowledge Base` to use them here.")
+    with rc2:
+        if st.button("🔄", help="Re-scan the proposals folder", use_container_width=True):
+            list_reference_proposals.clear()
+            st.rerun()
+
+# Resolve selected names → full texts (cached per doc id)
+reference_docs = []
+if picked_ref_names:
+    name_to_doc = {_clean_proposal_name(r["name"]): r for r in ref_options}
+    for name in picked_ref_names:
+        meta = name_to_doc.get(name)
+        if not meta:
+            continue
+        text = fetch_reference_text(meta["id"])
+        if text:
+            reference_docs.append({"name": name, "text": text})
+    if reference_docs:
+        st.caption(f"📚 Loaded **{len(reference_docs)}** proposal(s) — totalling "
+                   f"~{sum(len(d['text']) for d in reference_docs) // 1000}K characters.")
 
 # ── Empty-state guidance (only when no chat yet) ─────────────────────────────
 if not st.session_state[HIST]:
@@ -241,7 +331,7 @@ if user_input:
             try:
                 import anthropic
                 client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-                system_prompt = build_system_prompt(live_ctx)
+                system_prompt = build_system_prompt(live_ctx, reference_docs=reference_docs)
                 messages = [{"role": m["role"], "content": m["content"]}
                             for m in st.session_state[HIST][-20:]]
                 response = client.messages.create(

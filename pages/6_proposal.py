@@ -210,7 +210,7 @@ Scale adjustments:
 
 # ── System prompt builder ─────────────────────────────────────────────────────
 
-def build_proposal_system_prompt(context: dict) -> str:
+def build_proposal_system_prompt(context: dict, reference_docs: list = None) -> str:
     today = datetime.now().strftime("%B %d, %Y")
 
     context_section = ""
@@ -230,11 +230,37 @@ def build_proposal_system_prompt(context: dict) -> str:
             parts.append(f"\nDiscovery inputs:\n{context['notes']}")
         context_section = "\n=== DEAL CONTEXT ===\n" + "\n".join(parts)
 
+    # Reference proposals — actual Graas docs to draw patterns from.
+    # The proposal-writing skill teaches the *approach*; these show the
+    # *shape* (commercial framing, capability bundles, integration scope,
+    # voice positioning where applicable).
+    ref_section = ""
+    if reference_docs:
+        chunks = [
+            "\n\n============================================================",
+            f"REFERENCE PROPOSALS — {len(reference_docs)} loaded",
+            "============================================================",
+            "Below are real Graas proposals (full text). Use them as PATTERNS:",
+            "  - Commercial framing (pricing structure, phases, milestones)",
+            "  - Capability bundles (which agents/use cases go together)",
+            "  - Integration scope language",
+            "  - Voice / new-capability positioning when relevant",
+            "  - How risk gates are framed without losing commercial impact",
+            "Cite them by name when an approach maps to the deal at hand.",
+            "Do NOT copy text verbatim — adapt to this deal's specifics.",
+            "",
+        ]
+        for d in reference_docs:
+            chunks.append(f"\n--- BEGIN: {d['name']} ---\n{d['text']}\n--- END: {d['name']} ---\n")
+        ref_section = "\n".join(chunks)
+
     return f"""You are a Graas pre-sales engineer building a commercial proposal for All-e (Graas's agentic retail platform). Today is {today}.
 
 {PRE_SALES_PROPOSAL_SKILL}
 
 {context_section}
+
+{ref_section}
 
 YOUR BEHAVIOUR:
 - When given discovery inputs: FIRST produce a clean data extraction (business facts, tech stack, pain points, metrics, people), then flag any data quality issues or gaps.
@@ -389,6 +415,65 @@ with left:
         "notes": notes,
     }
 
+    # ── Reference proposals ──────────────────────────────────────────────────
+    # Real Graas proposals injected into the system prompt as patterns to
+    # draw from. Folder ID configurable via REFERENCE_PROPOSALS_FOLDER env
+    # var; defaults to the SalesHub Shared Drive's 'Reference Proposals /
+    # Knowledge Base' folder.
+    st.markdown("### Reference Proposals")
+    st.caption("Pick 1–3 real Graas proposals for this deal's pattern (commercial framing, "
+               "capability bundles, integration scope). Leave empty to rely on the playbook alone.")
+
+    REFERENCE_PROPOSALS_FOLDER = os.getenv(
+        "REFERENCE_PROPOSALS_FOLDER",
+        "1tBMrcpiIDVhg5e0-N1ytjuzbDexQyheX",
+    )
+
+    @st.cache_data(ttl=3600)
+    def _list_refs():
+        from services.sheets_client import list_drive_folder_docs
+        return list_drive_folder_docs(REFERENCE_PROPOSALS_FOLDER)
+
+    @st.cache_data(ttl=3600)
+    def _fetch_ref_text(doc_id: str) -> str:
+        from services.sheets_client import fetch_drive_doc_text
+        return fetch_drive_doc_text(doc_id)
+
+    def _clean_ref_name(raw: str) -> str:
+        s = raw
+        for prefix in ("Copy of ", "Copy of"):
+            if s.startswith(prefix):
+                s = s[len(prefix):].strip()
+                break
+        return s
+
+    ref_options = _list_refs()
+    if ref_options:
+        picked_ref_names = st.multiselect(
+            "📚 Reference proposals",
+            options=[_clean_ref_name(r["name"]) for r in ref_options],
+            key="proposal_picked_refs",
+            label_visibility="collapsed",
+        )
+    else:
+        picked_ref_names = []
+        st.caption("⚠️ No proposals found in the reference folder. Drop some Google Docs in "
+                   "the `Reference Proposals / Knowledge Base` folder to use them here.")
+
+    reference_docs = []
+    if picked_ref_names:
+        name_to_doc = {_clean_ref_name(r["name"]): r for r in ref_options}
+        for name in picked_ref_names:
+            meta = name_to_doc.get(name)
+            if not meta:
+                continue
+            text = _fetch_ref_text(meta["id"])
+            if text:
+                reference_docs.append({"name": name, "text": text})
+        if reference_docs:
+            st.caption(f"📚 Loaded **{len(reference_docs)}** proposal(s) "
+                       f"(~{sum(len(d['text']) for d in reference_docs) // 1000}K chars).")
+
     btn_col1, btn_col2 = st.columns(2)
     with btn_col1:
         start_btn = st.button("🚀 Start Proposal", use_container_width=True, type="primary")
@@ -462,7 +547,7 @@ with right:
             try:
                 import anthropic
                 client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-                system = build_proposal_system_prompt(deal_context)
+                system = build_proposal_system_prompt(deal_context, reference_docs=reference_docs)
 
                 messages = [
                     {"role": m["role"], "content": m["content"]}
