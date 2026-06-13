@@ -633,9 +633,15 @@ def _build_data_context(data: dict) -> str:
 
     if "current_pipeline" in data and isinstance(data["current_pipeline"], dict):
         cp = data["current_pipeline"]
-        context_parts.append(f"\n=== {cp['month'].upper()} PIPELINE (KANBAN) === [Source: All-e Sheet — {cp['month']} Pipeline tab]")
-        context_parts.append(cp["note"])
-        context_parts.append(f"Data: {json.dumps(cp['raw_data'][:25], default=str)}")
+        # Migration to the unified tab dropped the per-month label; build the
+        # header against what's actually present so the chat doesn't KeyError.
+        _label = cp.get("month", "CURRENT (IN + SEA)")
+        _src = cp.get("month", "Overall Pipeline for IN and SEA")
+        context_parts.append(f"\n=== {str(_label).upper()} PIPELINE (KANBAN) === [Source: All-e Sheet — {_src} tab]")
+        if cp.get("note"):
+            context_parts.append(cp["note"])
+        if cp.get("raw_data"):
+            context_parts.append(f"Data: {json.dumps(cp['raw_data'][:25], default=str)}")
 
     if "crm_overlay" in data and isinstance(data["crm_overlay"], dict):
         co = data["crm_overlay"]
