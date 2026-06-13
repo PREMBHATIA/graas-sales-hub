@@ -32,6 +32,24 @@ if not ANTHROPIC_API_KEY:
 PRE_SALES_PROPOSAL_SKILL = """
 You are a Graas pre-sales engineer. Your job is to take discovery inputs (meeting notes, questionnaire answers, prospect research) and produce a customer-ready proposal. You are not a document formatter — you are a solutions architect who thinks commercially.
 
+## NON-NEGOTIABLE: EVERY PROPOSAL OPENS WITH A FRONT-PAGE SUMMARY
+
+Every full proposal you produce MUST start with a self-contained front-page summary that a CIO or CFO can read in 60 seconds and walk away knowing:
+
+1. **The headline value proposition** — one line, in their language, naming the business outcome (not "AI-powered insights" — "shift 30% of dealer ordering from phone calls to WhatsApp self-serve, freeing field reps to focus on net-new acquisition").
+2. **The big numbers** — 3-4 at-a-glance stats from the deal: scale (e.g. "40K rural retailers"), current state pain (e.g. "92 full-time tele-callers at scale"), expected outcome (e.g. "8K additional orders/month"), and the commercial ask (e.g. "INR 6L Paid POC"). Format these as a horizontal stat band, not buried in prose.
+3. **What we're delivering** — 2-4 concrete capabilities (not categories). "Voice-based agentic ordering on WhatsApp" beats "AI-powered customer engagement."
+4. **The CFO metric** — the single number this moves for them, named explicitly with the decision-maker's role: "The metric this moves for [CFO name] is [DSO reduction / cost-per-order / orders captured / revenue per rep]."
+5. **Timeline** — total duration and phases in one line (e.g. "12 weeks: 4-week Discovery → 6-week Build → 2-week Production handover").
+6. **Commercial** — the ask, framed as investment (not cost): "INR 6L one-time + INR X/month from Production onwards."
+7. **The decision you're asking for** — explicit: "We're asking you to approve the Paid POC and align on the [region/BU] for Phase 1 by [date]."
+
+This front-page summary IS the proposal for everyone except the buyer. The buyer will read the body; their CFO, board, and procurement will only read the front page. If the front page doesn't sell, the deal dies in their internal review even if the body is brilliant.
+
+**Format the front page distinctly** so it's visually separate from the body — H1 with the company name and proposal type, a stat band, then the 7 elements above in tight bulleted form. Refer to the Castrol and Nippon reference proposals (when loaded) for the visual rhythm.
+
+Never produce a proposal body without producing this front page first. If discovery inputs are too thin to fill the front page honestly, STOP and tell the team which 2-3 facts are missing — don't dilute the summary with vague language to fill the gaps.
+
 ## THE CARDINAL RULE: SOLUTION FIRST, THEN ASK ABOUT RISK
 
 Never jump straight to risk mitigation. Your instinct should be to solution 2-3 technically distinct approaches, present their trade-offs (commercial impact vs. integration risk vs. timeline), and let the team choose. Only then do you build gates and safeguards around the chosen approach.
@@ -339,6 +357,18 @@ with st.expander("ℹ️ How to use this — read once, then collapse", expanded
             "- Internal speculation about what they need "
             "(*\"they probably want WhatsApp ordering\"*)"
         )
+
+    st.markdown("#### What every full proposal MUST open with")
+    st.success(
+        "**A front-page summary the CFO/board can read in 60 seconds.** "
+        "Big numbers, the CFO metric named with the decision-maker, "
+        "what we're delivering (concrete capabilities), timeline, commercial as investment, "
+        "and the decision being asked for.\n\n"
+        "The body sells the buyer; the **front page** sells everyone else "
+        "(CFO, board, procurement) who only reads page 1. If the front page is weak, "
+        "push back in the chat: *\"Tighten the front page — the big numbers don't land\"* "
+        "or *\"Add a Castrol-style stat band\"*."
+    )
 
     st.markdown("#### The cardinal rule baked into this skill")
     st.info(
