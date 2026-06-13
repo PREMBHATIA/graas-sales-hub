@@ -750,9 +750,10 @@ with st.expander("📂 Data Sources", expanded=False):
 st.markdown("---")
 
 
-# ── Tabs ─────────────────────────────────────────────────────────────────────
-
-tab_pipeline, tab_architect = st.tabs(["📊 Pipeline Analytics", "🏗️ Solutions Architect"])
+# ── Single surface (Pipeline Analytics) ──────────────────────────────────────
+# The 'Solutions Architect' tab was moved out to its own page under All-e
+# ('🏗️ Architect a Soln') — see app.py nav. Ask Graas now focuses on
+# cross-product pipeline + data Q&A.
 
 
 def _render_chat(
@@ -826,43 +827,25 @@ def _render_chat(
                     st.error(f"Error: {e}")
 
 
-with tab_pipeline:
-    st.caption("Track meetings vs target, deal stages, proposals won/lost, and follow-up priorities.")
-    _render_chat(
-        tab_key="pipeline",
-        system_prompt_fn=build_pipeline_prompt,
-        example_prompts=[
-            "Give me a pipeline summary for Q1",
-            "Which All-e deals are closest to closing?",
-            "How are meetings tracking vs target?",
-            "Who should we follow up with this week?",
-        ],
-        placeholder="Ask about pipeline, meetings, proposals, deal stages...",
-    )
-
-with tab_architect:
-    st.caption("Discovery frameworks, use case scoping, industry guidance, objection handling, pitch prep.")
-    _render_chat(
-        tab_key="architect",
-        system_prompt_fn=build_solutions_architect_prompt,
-        example_prompts=[
-            "Prep me for a pharma distributor discovery call in Malaysia",
-            "What use cases should I pitch to an FMCG brand with field agents?",
-            "Draft a value prop for a B2B consumer electronics company",
-            "What's our engagement model and how do I frame the pilot?",
-        ],
-        placeholder="Ask about discovery, use cases, pitch framing, objection handling...",
-    )
+st.caption("Track meetings vs target, deal stages, proposals won/lost, and follow-up priorities.")
+_render_chat(
+    tab_key="pipeline",
+    system_prompt_fn=build_pipeline_prompt,
+    example_prompts=[
+        "Give me a pipeline summary for Q1",
+        "Which All-e deals are closest to closing?",
+        "How are meetings tracking vs target?",
+        "Who should we follow up with this week?",
+    ],
+    placeholder="Ask about pipeline, meetings, proposals, deal stages...",
+)
 
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 
 with st.sidebar:
-    if st.button("Clear Pipeline Chat"):
+    if st.button("Clear Chat"):
         st.session_state["chat_pipeline"] = []
-        st.rerun()
-    if st.button("Clear Architect Chat"):
-        st.session_state["chat_architect"] = []
         st.rerun()
     if st.button("Refresh Data"):
         st.cache_data.clear()

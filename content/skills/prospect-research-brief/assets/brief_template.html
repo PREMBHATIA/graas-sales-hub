@@ -1,0 +1,208 @@
+<!--
+  PROSPECT RESEARCH BRIEF — HTML SCAFFOLD
+  Living doc: fill PRE-CALL (status = Pre-call draft), then amend after EACH call
+  (status = Post call-1 — [date], Post call-2 — [date] …) before it goes to solutioning.
+  This is a SCAFFOLD Claude fills — not a form a human completes by hand.
+  When filling: replace every [PLACEHOLDER] with real content; delete these comments,
+  the grey filler captions, all bracketed hints, and any option/row/line that doesn't
+  apply (keep only the matching Type, Motion, and B2B-or-B2C order-flow line; drop empty
+  sections). The delivered Doc shows real content only — no brackets, no instructions.
+  Confidence: explicit Confidence column lives only in the "What they have" ledger.
+  Stat band: prefix estimates with ~ (no per-cell tag). Elsewhere: flag inline only
+  load-bearing, unverified figures. Levels: Confirmed | Public estimate | Inferred | Unknown.
+  Keep it to 2-3 pages. Comments (like this) are stripped on Doc conversion.
+  Upload via Google Drive:create_file with contentMimeType "text/html" (conversion ON),
+  then verify the resulting mimeType is application/vnd.google-apps.document.
+  Brand styling below is best-effort — Google's importer strips most CSS.
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { font-family: 'Outfit', Arial, sans-serif; font-size: 11pt; color: #1a1a1a; line-height: 1.45; }
+  h1 { font-size: 20pt; color: #2742FF; margin-bottom: 2pt; }
+  h2 { font-size: 14pt; color: #2742FF; border-bottom: 1px solid #d6d9ee; padding-bottom: 3pt; margin-top: 20pt; }
+  h3 { font-size: 12pt; margin-top: 14pt; }
+  h4 { font-size: 11pt; margin-bottom: 2pt; }
+  .sub { color: #666666; font-size: 9pt; margin-top: 0; }
+  .status { font-size: 10pt; color: #2742FF; font-weight: bold; margin: 4pt 0 0; }
+  table { border-collapse: collapse; width: 100%; margin: 8pt 0; }
+  th, td { border: 1px solid #bbbbbb; padding: 5pt 7pt; text-align: left; vertical-align: top; font-size: 10pt; }
+  th { background-color: #eef1ff; font-weight: bold; }
+  .callout td { background-color: #fff4e5; }
+</style>
+</head>
+<body>
+
+<h1>Prospect Brief — [Company]</h1>
+<p class="sub">Graas Pre-Sales &nbsp;|&nbsp; Confidential — Internal Use Only &nbsp;|&nbsp; Prepared by [Name]</p>
+<p class="status">Status: [Pre-call draft → Post call-1 — YYYY-MM-DD → Post call-2 — YYYY-MM-DD …]</p>
+
+<!-- ===================== PAGE 1 — SNAPSHOT ===================== -->
+<!-- B2C prospect? Swap "Channel touchpoints" and "Field force" below for "Monthly traffic" and "Conversion %"; capture ad spend / ROAS in the ledger and the B2C discovery block. -->
+
+<table>
+  <tr>
+    <th>Revenue</th>
+    <th>SKUs</th>
+    <th>Channel touchpoints</th>
+    <th>Field force</th>
+    <th>Geography</th>
+  </tr>
+  <tr>
+    <td>[value]</td>
+    <td>[value]</td>
+    <td>[value]</td>
+    <td>[value]</td>
+    <td>[value]</td>
+  </tr>
+</table>
+
+<p><strong>Type:</strong> [OEM / Principal / Brand] &nbsp;|&nbsp; [Multi-brand distributor] &nbsp;|&nbsp; [Multi-brand retailer]</p>
+<p><strong>Motion:</strong> [B2B / General Trade — distributors, retailers, sales force] &nbsp;|&nbsp; [B2C / eCommerce] &nbsp;|&nbsp; [Both — wedge is ___]</p>
+
+<h2>What they have</h2>
+<table>
+  <tr>
+    <th>Dimension</th>
+    <th>What we know</th>
+    <th>Confidence</th>
+    <th>Source</th>
+  </tr>
+  <tr><td>Business model</td><td>[B2B / B2C / both; how they sell and to whom]</td><td>[confidence]</td><td>[source]</td></tr>
+  <tr><td>Scale</td><td>[revenue / volume / growth]</td><td>[confidence]</td><td>[source]</td></tr>
+  <tr><td>Channel structure</td><td>[HQ → distributors → retailers → influencers; counts]</td><td>[confidence]</td><td>[source]</td></tr>
+  <tr><td>Catalogue size / SKU count</td><td>[# categories, # active SKUs, variant depth — drives KG complexity, ordering difficulty, and pricing]</td><td>[confidence]</td><td>[source]</td></tr>
+  <tr><td>Tech stack</td><td>[ERP / CRM / DMS / SFA / support-ticketing (Zendesk/Freshdesk) / engagement channels — name vendors]</td><td>[confidence]</td><td>[source]</td></tr>
+  <tr><td>External-facing agents</td><td>[Any customer/retailer-facing agent, chatbot, or search deployed? On what surface? — the All-e (greenfield) vs KG (improve existing) signal]</td><td>[confidence]</td><td>[source]</td></tr>
+  <tr><td>AI maturity</td><td>[internal AI/ML use; who leads tech; build-vs-buy appetite]</td><td>[confidence]</td><td>[source]</td></tr>
+</table>
+
+<h2>Order flow today</h2>
+<p class="sub">Trace the path end-to-end; mark manual handoffs and where TAT / cost / orders leak. Keep the line that matches the motion. This is where All-e (B2B) or the retrieval layer (B2C) inserts.</p>
+<p><strong>B2B:</strong> Origination [OEM app / call center / salesperson via SFA] &rarr; Processing [HQ / admin: credit check, approval] &rarr; Order in ERP &rarr; Invoice &rarr; Transport &nbsp;—&nbsp; <em>manual / slow steps:</em> [flag them].</p>
+<p><strong>B2C:</strong> Origination [web / mobile app / WhatsApp] &rarr; Cart / checkout &rarr; Fulfilment &nbsp;—&nbsp; <em>where it leaks:</em> [abandonment / conversion drop-off].</p>
+
+<h2>What they're likely missing</h2>
+<ul>
+  <li>[Gap vs. what good looks like for their motion. Phrase soft/unverified gaps as questions.]</li>
+  <li>[e.g. No connection between systems of record and systems of engagement?]</li>
+  <li>[e.g. No structured loyalty/enrolment program for their influencer layer?]</li>
+</ul>
+
+<h2>Other signals</h2>
+<p class="sub">Catch-all for material that doesn't fit a field but matters. Delete if empty.</p>
+<ul>
+  <li>[M&amp;A, funding, leadership change, regulatory shift, competitor displacement, earnings remark, a warm connection, unusual org structure…]</li>
+</ul>
+
+<!-- ===================== PAGE 2 — PRODUCT FIT & CFO LENS ===================== -->
+
+<h2>Product fit &amp; CFO lens</h2>
+
+<h3>Product route</h3>
+<p><strong>[All-e (GT application) / Knowledge Graph (infra-retrieval) / Layered].</strong> [Two or three lines on why this shape follows from the motion above, not the other. State the wedge (Phase 1) vs. the expansion. If routing is ambiguous, name the signals each way and the deciding discovery question. If they own a rich data asset, flag the layered / Dunnhumby data-product angle. If it's a B2C application opportunity, note it's hoppr territory — out of scope here — and flag for the right owner.]</p>
+
+<h3>Persona map</h3>
+<p class="sub">Personas follow the type — OEM: distributors + field force + retailers below; distributor: field force + retailers; retailer: store staff + consumers. Keep the rows that apply.</p>
+<table>
+  <tr>
+    <th>Persona</th>
+    <th>Est. count</th>
+    <th>Primary surface</th>
+  </tr>
+  <tr><td>[Distributors]</td><td>[count — mark (Confirmed) if firm, else leave as estimate]</td><td>[WhatsApp / SFA / portal]</td></tr>
+  <tr><td>[Field reps]</td><td>[count]</td><td>[SFA / WhatsApp]</td></tr>
+  <tr><td>[Retailers]</td><td>[count]</td><td>[WhatsApp]</td></tr>
+  <tr><td>[Influencers / applicators / consumers]</td><td>[count]</td><td>[WhatsApp / web]</td></tr>
+</table>
+
+<h3>Pain &rarr; Capability &rarr; CFO metric</h3>
+<table>
+  <tr>
+    <th>Pain (their language)</th>
+    <th>Product capability</th>
+    <th>CFO metric it moves</th>
+  </tr>
+  <tr><td>[pain 1]</td><td>[All-e / KG capability]</td><td>[DSO / revenue per rep / cost per order / conversion / infra cost per query ...]</td></tr>
+  <tr><td>[pain 2]</td><td>[capability]</td><td>[metric]</td></tr>
+  <tr><td>[pain 3]</td><td>[capability]</td><td>[metric]</td></tr>
+</table>
+
+<h3>The metric that matters</h3>
+<p>The metric this moves for [CEO/CFO name, title] is <strong>[the single literal metric — e.g. days sales outstanding, working capital tied up in receivables, revenue per field rep]</strong>.</p>
+
+<!-- ===================== PAGE 3 — DISCOVERY & NEXT MOVE ===================== -->
+
+<h2>Discovery &amp; next move</h2>
+
+<h3>Double-click in discovery</h3>
+<p class="sub">The agenda the team works through on the call — not the full questionnaire. Every unverified load-bearing fact below is a question, not a statement. Post-call, move the answers into the tables above and upgrade the confidence tags.</p>
+
+<h4>Business model</h4>
+<ul>
+  <li>[Walk me through one order end-to-end — from the moment a dealer/customer decides to reorder to goods shipped: which surface, what processing/credit steps, where it lands in the ERP, who touches it.]</li>
+  <li>[question]</li>
+</ul>
+
+<h4>Data readiness</h4>
+<ul>
+  <li>[How many active SKUs, and how clean/enriched is the catalogue — entity resolution, attributes, images?]</li>
+  <li>[Does the data exist AND is it agent-ready? Dealer-level sell-out, order history?]</li>
+</ul>
+
+<h4>Tech stack &amp; integration</h4>
+<ul>
+  <li>[Have you deployed any customer/retailer-facing agent, chatbot, or search today? On what surface, and what's working / not working?]</li>
+  <li>[What's the system of record, is there an API, who can co-build it, is there an existing WABA?]</li>
+</ul>
+
+<h4>Commercial authority</h4>
+<ul><li>[Who owns the budget and the metric? Who signs?]</li></ul>
+
+<h4>If B2B / General Trade</h4>
+<ul>
+  <li>[Support / ticketing system — Zendesk, Freshdesk, in-house? Monthly ticket volume, average handling time, anything automated today?]</li>
+  <li>[How do retailers/distributors raise orders and claims today, and where do they land?]</li>
+</ul>
+
+<h4>If B2C / eCommerce</h4>
+<ul>
+  <li>[Storefront URL and platform — Shopify / Magento / custom?]</li>
+  <li>[Monthly traffic / sessions?]</li>
+  <li>[On-site conversion rate and AOV?]</li>
+  <li>[Monthly ad spend and blended ROAS — how much paid traffic lands on the site?]</li>
+</ul>
+
+<h3>Conflicts &amp; unknowns</h3>
+<table class="callout">
+  <tr><td>
+    <strong>Conflicting figures:</strong> [e.g. branch count cited as X and Y; revenue cited as A and B — both unverified.]<br>
+    <strong>Unverified, load-bearing:</strong> [the facts the recommendation rests on that we have not confirmed.]<br>
+    <strong>The one fact that would most change the recommendation:</strong> [name it.]
+  </td></tr>
+</table>
+
+<h3>People &amp; path in</h3>
+<table>
+  <tr>
+    <th>Name</th>
+    <th>Role</th>
+    <th>Why they matter</th>
+    <th>Type</th>
+  </tr>
+  <tr><td>[name]</td><td>[title]</td><td>[relevance]</td><td>[Decision-maker]</td></tr>
+  <tr><td>[name]</td><td>[title]</td><td>[relevance]</td><td>[Champion]</td></tr>
+  <tr><td>[name]</td><td>[title]</td><td>[relevance]</td><td>[Finance buyer]</td></tr>
+</table>
+<p><strong>Entry wedge:</strong> [the lowest-friction way in — top-down to the CEO, or a single-branch/single-BU pilot.]</p>
+
+<h3>Next step</h3>
+<p><strong>Recommended next move:</strong> [another discovery call / demo / POC scoping / solutioning / park — with one line on why.]<br>
+<strong>Ready to solution?</strong> [Yes — qualification gate met / No — still open: list what's missing (motion, route, customer-confirmed CFO metric, data readiness, DM + budget).]</p>
+
+<h3>Opening hook</h3>
+<p>[One or two lines, grounded in their actual numbers — the question that makes them lean in. Most relevant before the first call.]</p>
+
+</body>
+</html>

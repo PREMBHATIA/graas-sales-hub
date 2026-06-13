@@ -19,10 +19,12 @@ pg = st.navigation(
             st.Page("pages/4_ask_graas.py", title="💬 Ask Graas",  url_path="ask-graas"),
         ],
         "All-e": [
-            st.Page("pages/2_alle.py",      title="🤖 All-e Presales", url_path="alle"),
-            st.Page("pages/3_crm.py",       title="📧 CRM",            url_path="crm"),
-            st.Page("pages/5_resources.py", title="📚 Resources",       url_path="resources"),
-            st.Page("pages/6_proposal.py",  title="📝 All-e Proposal",  url_path="proposal"),
+            st.Page("pages/2_alle.py",            title="📊 Pipeline",                url_path="alle"),
+            st.Page("pages/3_crm.py",             title="📧 Emails & Segments",        url_path="crm"),
+            st.Page("pages/9_prospect_brief.py",  title="📋 Create Prospect Brief",   url_path="prospect-brief"),
+            st.Page("pages/A_architect_soln.py",  title="🏗️ Architect a Soln",         url_path="architect"),
+            st.Page("pages/6_proposal.py",        title="📝 Create Proposal",         url_path="proposal"),
+            st.Page("pages/5_resources.py",       title="📚 Resources",                url_path="resources"),
         ],
         "Hoppr": [
             st.Page("pages/7_hoppr.py",      title="📊 Hoppr",      url_path="hoppr"),

@@ -40,6 +40,13 @@ WRITER_SCOPES = [
     "https://www.googleapis.com/auth/drive",
 ]
 
+# Drive-only scope for creating Google Docs (Prospect Brief). Kept separate from
+# the spreadsheet writer so the create-file capability is opt-in and obvious.
+DRIVE_FILE_SCOPES = [
+    "https://www.googleapis.com/auth/drive.file",     # create/manage files this app creates
+    "https://www.googleapis.com/auth/drive",          # for moving into parent folders the SA already accesses
+]
+
 
 def _get_client() -> Optional[gspread.Client]:
     """Get authenticated gspread client. Returns None if no credentials."""
@@ -149,6 +156,170 @@ def fetch_log_rows(sheet_id: str, tab_name: str) -> pd.DataFrame:
         return pd.DataFrame(data[1:], columns=headers)
     except Exception:
         return pd.DataFrame()
+
+
+def _get_drive_credentials() -> Optional[Credentials]:
+    """Get service account credentials with Drive-file scope for creating Docs."""
+    try:
+        import streamlit as st
+        if hasattr(st, 'secrets') and 'gcp_service_account' in st.secrets:
+            return Credentials.from_service_account_info(
+                dict(st.secrets["gcp_service_account"]), scopes=DRIVE_FILE_SCOPES
+            )
+    except Exception:
+        pass
+    creds_path = os.getenv("GOOGLE_CREDENTIALS_PATH", "credentials/service_account.json")
+    full_path = Path(__file__).parent.parent / creds_path
+    if not full_path.exists():
+        return None
+    return Credentials.from_service_account_file(str(full_path), scopes=DRIVE_FILE_SCOPES)
+
+
+def create_google_doc_from_html(
+    html_body: str,
+    title: str,
+    parent_folder_id: Optional[str] = None,
+    share_with: Optional[list] = None,
+) -> dict:
+    """Create a native Google Doc from HTML content.
+
+    Posts the HTML to Drive with conversion=True so it imports as a Google Doc
+    (real tables preserved). Verifies the resulting mimeType.
+
+    Args:
+        html_body: the HTML content (self-contained, with tables).
+        title: file title — e.g. "Prospect Brief — Nerolac — 2026-05-29".
+        parent_folder_id: Drive folder ID to place the file in. None = SA's root.
+        share_with: list of email addresses to grant editor access (so humans
+                    can open it without needing folder access).
+
+    Returns:
+        {
+            "ok": bool,
+            "doc_id": str | None,
+            "doc_url": str | None,
+            "mime_type": str | None,
+            "error": str | None,
+        }
+    """
+    creds = _get_drive_credentials()
+    if creds is None:
+        return {"ok": False, "doc_id": None, "doc_url": None,
+                "mime_type": None, "error": "Drive credentials unavailable"}
+
+    try:
+        session = greq.AuthorizedSession(creds)
+
+        # Build metadata
+        metadata = {
+            "name": title,
+            "mimeType": "application/vnd.google-apps.document",  # target type after conversion
+        }
+        if parent_folder_id:
+            metadata["parents"] = [parent_folder_id]
+
+        # Multipart upload — Drive's REST API expects boundary-delimited body.
+        # Using the v3 uploads endpoint with uploadType=multipart.
+        import json as _json
+        import io
+        boundary = "graas-prospect-brief-boundary"
+        body = io.BytesIO()
+        body.write(f"--{boundary}\r\n".encode())
+        body.write(b"Content-Type: application/json; charset=UTF-8\r\n\r\n")
+        body.write(_json.dumps(metadata).encode("utf-8"))
+        body.write(b"\r\n")
+        body.write(f"--{boundary}\r\n".encode())
+        body.write(b"Content-Type: text/html; charset=UTF-8\r\n\r\n")
+        body.write(html_body.encode("utf-8"))
+        body.write(f"\r\n--{boundary}--\r\n".encode())
+
+        upload_url = ("https://www.googleapis.com/upload/drive/v3/files"
+                      "?uploadType=multipart&supportsAllDrives=true&fields=id,mimeType,webViewLink")
+        resp = session.post(
+            upload_url,
+            headers={"Content-Type": f"multipart/related; boundary={boundary}"},
+            data=body.getvalue(),
+            timeout=30,
+        )
+        if resp.status_code not in (200, 201):
+            return {"ok": False, "doc_id": None, "doc_url": None,
+                    "mime_type": None,
+                    "error": f"Drive create failed: HTTP {resp.status_code} — {resp.text[:300]}"}
+
+        data = resp.json()
+        doc_id = data.get("id")
+        mime_type = data.get("mimeType", "")
+        doc_url = data.get("webViewLink") or (f"https://docs.google.com/document/d/{doc_id}/edit" if doc_id else None)
+
+        # Share with humans if requested (so they don't need folder access)
+        if share_with:
+            for email in share_with:
+                try:
+                    session.post(
+                        f"https://www.googleapis.com/drive/v3/files/{doc_id}/permissions"
+                        f"?sendNotificationEmail=false&supportsAllDrives=true",
+                        json={"type": "user", "role": "writer", "emailAddress": email},
+                        timeout=15,
+                    )
+                except Exception:
+                    pass  # don't fail the whole operation if one share fails
+
+        # Verify conversion happened (mimeType should be application/vnd.google-apps.document)
+        if mime_type != "application/vnd.google-apps.document":
+            return {"ok": False, "doc_id": doc_id, "doc_url": doc_url,
+                    "mime_type": mime_type,
+                    "error": f"Conversion didn't take — mimeType is '{mime_type}'. Tables likely won't render."}
+
+        return {"ok": True, "doc_id": doc_id, "doc_url": doc_url,
+                "mime_type": mime_type, "error": None}
+
+    except Exception as e:
+        return {"ok": False, "doc_id": None, "doc_url": None,
+                "mime_type": None, "error": f"{type(e).__name__}: {e}"}
+
+
+def fetch_drive_doc_html(doc_id: str) -> Optional[str]:
+    """Export an existing Google Doc as HTML — used to load a brief for editing."""
+    creds = _get_drive_credentials()
+    if creds is None:
+        return None
+    try:
+        session = greq.AuthorizedSession(creds)
+        url = f"https://www.googleapis.com/drive/v3/files/{doc_id}/export?mimeType=text/html"
+        resp = session.get(url, timeout=20)
+        if resp.status_code == 200:
+            return resp.text
+    except Exception:
+        pass
+    return None
+
+
+def update_google_doc_html(doc_id: str, new_html: str) -> dict:
+    """Replace the contents of an existing Google Doc with new HTML (re-uploads + converts).
+
+    Drive's v3 update endpoint supports media uploads; combined with mimeType target
+    of vnd.google-apps.document it re-converts the content. Preserves the file ID
+    and URL — keeps the team's edit history.
+    """
+    creds = _get_drive_credentials()
+    if creds is None:
+        return {"ok": False, "error": "Drive credentials unavailable"}
+    try:
+        session = greq.AuthorizedSession(creds)
+        # PATCH endpoint with media upload + conversion
+        update_url = (f"https://www.googleapis.com/upload/drive/v3/files/{doc_id}"
+                      f"?uploadType=media&supportsAllDrives=true")
+        resp = session.patch(
+            update_url,
+            headers={"Content-Type": "text/html; charset=UTF-8"},
+            data=new_html.encode("utf-8"),
+            timeout=30,
+        )
+        if resp.status_code not in (200, 201):
+            return {"ok": False, "error": f"Drive update failed: HTTP {resp.status_code} — {resp.text[:300]}"}
+        return {"ok": True, "error": None}
+    except Exception as e:
+        return {"ok": False, "error": f"{type(e).__name__}: {e}"}
 
 
 def fetch_google_doc_text(doc_id: str, force_refresh: bool = False) -> str:
