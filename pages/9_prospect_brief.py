@@ -344,7 +344,9 @@ BRIEF_JSON_SCHEMA = """{
     "status": "Pre-call draft  (post-call: 'Pre-call draft → Post call-1 — YYYY-MM-DD …')"
   },
   "executive_summary": {
-    "category": "vertical + business model in one line — e.g. 'Industrial gases distributor; B2B/GT'",
+    "category": "vertical + business model in one line — e.g. 'Industrial gases distributor'",
+    "type": "ONE of: 'OEM / Principal / Brand' | 'Multi-brand distributor' | 'Multi-brand retailer'",
+    "motion": "ONE of: 'B2B / General Trade' | 'B2C / eCommerce' | 'Both — wedge is ___'",
     "comps": "2-3 named competitors with one-clause positioning — e.g. 'Linde (premium), Aboitiz Power (regional scale), Bharat Petroleum (state-owned challenger)'",
     "history": "founding / trajectory / recent inflection in one line — e.g. 'Founded 1972; family-owned; expanded into specialty gases 2019; now 3rd-largest by volume'",
     "maturity": "AI & systems maturity assessment in one line — e.g. 'Mid: SAP-ERP since 2018, Salesforce CRM, no agents deployed; piloting GenAI for support tickets (2025)'"
@@ -356,8 +358,7 @@ BRIEF_JSON_SCHEMA = """{
     {"label": "Field force", "value": "..."},
     {"label": "Geography", "value": "..."}
   ],
-  "type": "ONE of: 'OEM / Principal / Brand' | 'Multi-brand distributor' | 'Multi-brand retailer'",
-  "motion": "ONE of: 'B2B / General Trade — distributors, retailers, sales force' | 'B2C / eCommerce' | 'Both — wedge is ___'",
+  "_type_motion_note": "type and motion now live INSIDE executive_summary (above) — they render as boxes in the Exec Summary section. Top-level keys are kept here only for back-compat with existing briefs in session state; do not populate them in new output.",
   "what_they_have": [
     {"dimension": "Business model", "what_we_know": "PHRASE 5-15 words", "confidence": "Confirmed|Public estimate|Inferred|Unknown", "source": "short source"},
     {"dimension": "Scale", "what_we_know": "...", "confidence": "...", "source": "..."},
@@ -441,8 +442,9 @@ def _build_new_brief_prompt(
         f"Compress lists with commas and semicolons. Strip filler ('the company', 'they "
         f"also have', 'is a leading').\n\n"
         f"**DO NOT DROP MANDATORY FIELDS.** Every brief must include: "
-        f"executive_summary (4 labelled lines: category/comps/history/maturity — NOT a "
-        f"paragraph), stat_band (all 5), type, motion, what_they_have (all 10 dimensions: "
+        f"executive_summary (6 fields rendered as two stacked box rows: "
+        f"category/type/motion on row 1, comps/history/maturity on row 2 — NOT a "
+        f"paragraph, NOT labelled lines), stat_band (all 5), what_they_have (all 10 dimensions: "
         f"Business model · Scale · Funding status · Top brands · Top competitors · "
         f"Channel structure · Catalogue size / SKU count · Tech stack · External-facing "
         f"agents · AI maturity), recent_news (**MAX 2 bullets**, the most material; or "

@@ -215,15 +215,13 @@ Fill `assets/brief_template.html`. The template carries placeholder text and fil
 **Page 1 — Snapshot**
 - **Header** — Company name; *Date prepared* (today); *Meeting date* (the upcoming meeting, if known); *Prepared by: Graas Enterprise Team*. One line each.
 - **Status line** — *Pre-call draft* / *Post call-1 — [date]* / *Post call-2 — [date]* …
-- **Executive Summary** — **four labelled lines**, NOT a paragraph. Each line is one phrase, no filler:
-  - *Category:* vertical + business model (e.g. "Industrial gases distributor; B2B/GT").
-  - *Comps:* 2-3 named competitors with one-clause positioning (e.g. "Linde (premium), Aboitiz Power (regional scale), Bharat Petroleum (state-owned)").
-  - *History:* founding / trajectory / recent inflection in one line (e.g. "Founded 1972; family-owned; expanded into specialty gases 2019; now 3rd by volume").
-  - *Maturity:* AI & systems maturity assessment in one line (e.g. "Mid: SAP-ERP since 2018, Salesforce CRM, no agents deployed; piloting GenAI for support 2025").
+- **Executive Summary** — **two stacked 3-cell box rows**, NOT a paragraph, NOT labelled lines. Each cell is one phrase, no filler:
+  - Row 1 (boxes): **Category** (vertical + business model) | **Type** (OEM / Principal / Brand · Multi-brand distributor · Multi-brand retailer) | **Motion** (B2B / GT · B2C / eCommerce · Both)
+  - Row 2 (boxes): **Comps** (2-3 named competitors with one-clause positioning) | **History** (founding / trajectory / recent inflection) | **Maturity** (AI & systems maturity assessment)
+  - Type and Motion *replace* the standalone Type:/Motion: lines that used to live below the stat band — they're now boxes inside Exec Summary.
   - Do **not** repeat what's in the ledger or the stat band — this is the analytical frame, not a re-statement of facts.
 - **Stat band** (one row): Revenue | SKUs | Channel touchpoints | Field force | Geography — prefix estimates with `~`, no per-cell tag. *(B2C: swap Channel touchpoints and Field force for Monthly traffic and Conversion %.)*
-- **Type** — OEM/Principal/Brand · Multi-brand distributor · Multi-brand retailer. One line.
-- **Motion** — B2B/GT or B2C (or both, wedge named). One line.
+- *Type and Motion live INSIDE the Executive Summary boxes above — no standalone lines here.*
 - **What they have** (table): Dimension | What we know | Confidence | Source. Required rows: **business model**, **scale**, **funding status** (listed/PE-backed/VC-funded/bootstrapped + profitable/loss-making — name the round, year, lead if applicable), **top brands** (the brands they own or carry — the ones the customer's market would recognise), **top 2-3 competitors** (the names that come up in their category — useful for positioning), **channel structure**, **catalogue size / SKU count**, **tech stack**, **external-facing agents** (the All-e-vs-KG signal), **AI maturity**.
 - **Recent news** — **MAX 2 bullets** covering the most material event(s) in the last 12 months: expansion, acquisition, leadership change, new product line, regulatory action, major funding. Cite source inline. Use this to find the *why now*. Pick the two highest-signal items — don't list five.
 - **What they're likely missing** — short bullets; soft/unverified gaps phrased as questions.

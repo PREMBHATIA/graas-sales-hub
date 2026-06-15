@@ -158,12 +158,16 @@ def _add_table(
     col_widths_cm: list,
     header_size: float = 9.5,
     cell_size: float = 9.5,
+    col_styles: dict = None,
 ) -> None:
     """Build a table with explicit column widths and tighter cell padding.
 
     rows: list[list[str]] — must match len(headers).
     col_widths_cm: list[float] — column widths in cm, must match len(headers).
+    col_styles: optional dict of {col_index: {"size": float, "italic": bool, "color": RGBColor}}
+                to override per-column font size / italic / color in DATA cells only.
     """
+    col_styles = col_styles or {}
     table = doc.add_table(rows=1 + len(rows), cols=len(headers))
     table.autofit = False
     table.style = "Table Grid"
@@ -197,7 +201,12 @@ def _add_table(
             p.paragraph_format.space_after = Pt(0)
             p.paragraph_format.line_spacing = 1.15
             run = p.add_run(str(val) if val is not None else "")
-            run.font.size = Pt(cell_size)
+            style = col_styles.get(c_idx, {})
+            run.font.size = Pt(style.get("size", cell_size))
+            if style.get("italic"):
+                run.font.italic = True
+            if style.get("color"):
+                run.font.color.rgb = style["color"]
 
 
 def _add_callout_box(doc: Document, lines: list) -> None:
@@ -262,15 +271,34 @@ def render_brief_docx(data: dict) -> bytes:
         _add_status(doc, f"Status: {header['status']}")
 
     # ── Executive Summary ────────────────────────────────────────────────────
-    # Accept either the new structured shape (dict with category/comps/history/maturity)
-    # or the legacy string (rendered as a single paragraph) so older briefs still work.
+    # Two stacked 3-col tables that look like the stat band — Category/Type/Motion
+    # on row 1, Comps/History/Maturity on row 2. Type and Motion live INSIDE the
+    # exec summary now (used to be standalone lines below the stat band).
+    # Back-compat:
+    #   - exec_summary as dict → new boxed layout
+    #   - exec_summary as string → old paragraph rendering
+    #   - type/motion may live at top level (legacy) or inside exec_summary
     es = data.get("executive_summary")
+    top_type = data.get("type") or ""
+    top_motion = data.get("motion") or ""
     if isinstance(es, dict) and any(es.values()):
         _add_h2(doc, "Executive Summary")
-        for label, key in [("Category", "category"), ("Comps", "comps"),
-                           ("History", "history"), ("Maturity", "maturity")]:
-            if es.get(key):
-                _add_kv_para(doc, label, es[key], size=10)
+        # Row 1 — Category | Type | Motion
+        es_type = es.get("type") or top_type
+        es_motion = es.get("motion") or top_motion
+        _add_table(
+            doc,
+            headers=["Category", "Type", "Motion"],
+            rows=[[es.get("category", ""), es_type, es_motion]],
+            col_widths_cm=[6.5, 6.5, 6.5],
+        )
+        # Row 2 — Comps | History | Maturity
+        _add_table(
+            doc,
+            headers=["Comps", "History", "Maturity"],
+            rows=[[es.get("comps", ""), es.get("history", ""), es.get("maturity", "")]],
+            col_widths_cm=[6.5, 6.5, 6.5],
+        )
     elif isinstance(es, str) and es.strip():
         _add_h2(doc, "Executive Summary")
         _add_para(doc, es, size=10)
@@ -285,11 +313,10 @@ def render_brief_docx(data: dict) -> bytes:
         col_w = round(19.5 / n, 2)
         _add_table(doc, headers, [values], [col_w] * n, header_size=9.5, cell_size=9.5)
 
-    # ── Type / Motion ────────────────────────────────────────────────────────
-    if data.get("type"):
-        _add_kv_para(doc, "Type", data["type"])
-    if data.get("motion"):
-        _add_kv_para(doc, "Motion", data["motion"])
+    # Type / Motion now live INSIDE Executive Summary as boxes — no standalone
+    # paragraphs here. Legacy briefs without a structured Exec Summary still get
+    # the back-compat string paragraph above, so type/motion are surfaced there
+    # via the schema's top-level keys when needed.
 
     # ── What they have ───────────────────────────────────────────────────────
     what = data.get("what_they_have") or []
@@ -309,6 +336,8 @@ def render_brief_docx(data: dict) -> bytes:
             headers=["Dimension", "What we know", "Confidence", "Source"],
             rows=rows,
             col_widths_cm=[3.2, 10.8, 2.5, 3.0],
+            # Source column = small, italic, grey — reads as a footnote
+            col_styles={3: {"size": 6.5, "italic": True, "color": GREY}},
         )
 
     # ── Recent news ──────────────────────────────────────────────────────────
@@ -490,6 +519,7 @@ th, td { border: 1px solid #bbb; padding: 2pt 6pt; text-align: left; vertical-al
 th { background: #eef1ff; font-weight: bold; }
 .callout td { background: #fff4e5; }
 .hook { font-style: italic; }
+td.src { font-size: 7pt; font-style: italic; color: #777; }
 </style></head><body>""")
 
     parts.append(f"<h1>Prospect Brief — {company}</h1>")
@@ -505,12 +535,28 @@ th { background: #eef1ff; font-weight: bold; }
         parts.append(f"<p class='status'>Status: {_esc(header['status'])}</p>")
 
     _es = data.get("executive_summary")
+    _top_type = _esc(data.get("type") or "")
+    _top_motion = _esc(data.get("motion") or "")
     if isinstance(_es, dict) and any(_es.values()):
         parts.append("<h2>Executive Summary</h2>")
-        for label, key in [("Category", "category"), ("Comps", "comps"),
-                           ("History", "history"), ("Maturity", "maturity")]:
-            if _es.get(key):
-                parts.append(f"<p><strong>{label}:</strong> {_esc(_es[key])}</p>")
+        _es_type = _esc(_es.get("type") or "") or _top_type
+        _es_motion = _esc(_es.get("motion") or "") or _top_motion
+        # Row 1 — Category | Type | Motion (stat-band style)
+        parts.append("<table><tr>")
+        parts.append("<th>Category</th><th>Type</th><th>Motion</th>")
+        parts.append("</tr><tr>")
+        parts.append(f"<td>{_esc(_es.get('category', ''))}</td>"
+                     f"<td>{_es_type}</td>"
+                     f"<td>{_es_motion}</td>")
+        parts.append("</tr></table>")
+        # Row 2 — Comps | History | Maturity
+        parts.append("<table><tr>")
+        parts.append("<th>Comps</th><th>History</th><th>Maturity</th>")
+        parts.append("</tr><tr>")
+        parts.append(f"<td>{_esc(_es.get('comps', ''))}</td>"
+                     f"<td>{_esc(_es.get('history', ''))}</td>"
+                     f"<td>{_esc(_es.get('maturity', ''))}</td>")
+        parts.append("</tr></table>")
     elif isinstance(_es, str) and _es.strip():
         parts.append("<h2>Executive Summary</h2>")
         parts.append(f"<p>{_esc(_es)}</p>")
@@ -525,10 +571,7 @@ th { background: #eef1ff; font-weight: bold; }
             parts.append(f"<td>{_esc(s.get('value'))}</td>")
         parts.append("</tr></table>")
 
-    if data.get("type"):
-        parts.append(f"<p><strong>Type:</strong> {_esc(data['type'])}</p>")
-    if data.get("motion"):
-        parts.append(f"<p><strong>Motion:</strong> {_esc(data['motion'])}</p>")
+    # Type / Motion now live inside Executive Summary boxes — no standalone lines.
 
     what = data.get("what_they_have") or []
     if what:
@@ -539,7 +582,7 @@ th { background: #eef1ff; font-weight: bold; }
                 f"<tr><td>{_esc(r.get('dimension'))}</td>"
                 f"<td>{_esc(r.get('what_we_know'))}</td>"
                 f"<td>{_esc(r.get('confidence'))}</td>"
-                f"<td>{_esc(r.get('source'))}</td></tr>"
+                f"<td class='src'>{_esc(r.get('source'))}</td></tr>"
             )
         parts.append("</table>")
 
