@@ -460,8 +460,24 @@ def fmt(v):
     if abs(v) >= 1_000: return f"${v/1_000:.0f}K"
     return f"${v:,.0f}"
 
-st.markdown("### 📋 Proposals")
+st.markdown("### 📋 Proposal Tracker")
 st.caption("By product | Source: Weekly Revenue Call Sheet — Proposals tab")
+
+# ── Product grouping (used by KPI rows, By-Product table, Kanban, bar chart) ─
+PRODUCT_GROUPS = {
+    "All-e B2B": "All-e",
+    "All-e B2C": "All-e",
+    "All-e": "All-e",
+    "Replenishment Intelligence": "All-e",  # pharmacy/retail All-e play (e.g. Sunway MY)
+    "Execute": "Execute",
+    "Integration": "Execute",
+    "Hoppr": "Hoppr",
+    "Extract": "Extract",
+    "Extract ": "Extract",
+    "Analysis/Extract": "Extract",
+    "MP Enablement": "MP Enablement",
+}
+df["Product Group"] = df["Product"].map(PRODUCT_GROUPS).fillna("Other")
 
 # ── Total / New / Existing KPI rows ─────────────────────────────────────────
 
@@ -522,24 +538,56 @@ with e4:
 with e5:
     st.metric("Win Rate", f"{ewr:.0f}%")
 
+st.markdown("#### By Product")
+
+prod_group = df.groupby("Product Group").agg(
+    Sent=("Client", "count"),
+    Won=("Status", lambda x: (x == "Won").sum()),
+    Lost=("Status", lambda x: (x == "Lost").sum()),
+    Open=("Status", lambda x: (x == "Open").sum()),
+    # Open_GP is what "Pipeline GP" should mean — future revenue from deals
+    # still in play. Summing all rows would conflate it with Won + Lost value.
+    Open_GP=("GP", lambda x: x[df.loc[x.index, "Status"] == "Open"].sum()),
+    Won_GP=("GP", lambda x: x[df.loc[x.index, "Status"] == "Won"].sum()),
+).reset_index().sort_values("Open_GP", ascending=False)
+
+prod_table = []
+for _, r in prod_group.iterrows():
+    wr_p = r["Won"] / (r["Won"] + r["Lost"]) * 100 if (r["Won"] + r["Lost"]) > 0 else 0
+    prod_table.append({
+        "Product": r["Product Group"],
+        "Sent": int(r["Sent"]),
+        "Won": int(r["Won"]),
+        "Won GP": fmt(r["Won_GP"]),
+        "Lost": int(r["Lost"]),
+        "Open": int(r["Open"]),
+        "Pipeline GP": fmt(r["Open_GP"]),
+        "Win Rate": f"{wr_p:.0f}%",
+    })
+
+prod_df = pd.DataFrame(prod_table)
+
+def green_cell(val):
+    try:
+        if int(val) > 0: return "color: #10B981; font-weight: bold"
+    except: pass
+    if isinstance(val, str) and val.startswith("$") and val != "$0":
+        return "color: #10B981; font-weight: bold"
+    return ""
+
+def red_cell(val):
+    try:
+        if int(val) > 0: return "color: #EF4444"
+    except: pass
+    return ""
+
+styled_prod = (prod_df.style
+    .map(green_cell, subset=["Won", "Won GP"])
+    .map(red_cell, subset=["Lost"])
+)
+st.dataframe(styled_prod, use_container_width=True, hide_index=True, height=240)
+
 st.markdown("---")
-
-# ── Product grouping (used by Kanban + Product table) ─────────────────────────
-PRODUCT_GROUPS = {
-    "All-e B2B": "All-e",
-    "All-e B2C": "All-e",
-    "All-e": "All-e",
-    "Replenishment Intelligence": "All-e",  # pharmacy/retail All-e play (e.g. Sunway MY)
-    "Execute": "Execute",
-    "Integration": "Execute",
-    "Hoppr": "Hoppr",
-    "Extract": "Extract",
-    "Extract ": "Extract",
-    "Analysis/Extract": "Extract",
-    "MP Enablement": "MP Enablement",
-}
-
-df["Product Group"] = df["Product"].map(PRODUCT_GROUPS).fillna("Other")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 2. KANBAN VIEW
@@ -670,57 +718,10 @@ for col, (stage, color, icon) in zip(cols, STAGES):
 st.markdown("---")
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 3. BY PRODUCT GROUP
+# 3. PIPELINE VALUE BY PRODUCT (chart — the per-product table is up under the Tracker)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-st.markdown("### Pipeline by Product")
-
-prod_group = df.groupby("Product Group").agg(
-    Sent=("Client", "count"),
-    Won=("Status", lambda x: (x == "Won").sum()),
-    Lost=("Status", lambda x: (x == "Lost").sum()),
-    Open=("Status", lambda x: (x == "Open").sum()),
-    # Open_GP is what "Pipeline GP" should mean — future revenue from deals
-    # still in play. Summing all rows would conflate it with Won + Lost value.
-    Open_GP=("GP", lambda x: x[df.loc[x.index, "Status"] == "Open"].sum()),
-    Won_GP=("GP", lambda x: x[df.loc[x.index, "Status"] == "Won"].sum()),
-).reset_index().sort_values("Open_GP", ascending=False)
-
-prod_table = []
-for _, r in prod_group.iterrows():
-    wr_p = r["Won"] / (r["Won"] + r["Lost"]) * 100 if (r["Won"] + r["Lost"]) > 0 else 0
-    prod_table.append({
-        "Product": r["Product Group"],
-        "Sent": int(r["Sent"]),
-        "Won": int(r["Won"]),
-        "Won GP": fmt(r["Won_GP"]),
-        "Lost": int(r["Lost"]),
-        "Open": int(r["Open"]),
-        "Pipeline GP": fmt(r["Open_GP"]),
-        "Win Rate": f"{wr_p:.0f}%",
-    })
-
-prod_df = pd.DataFrame(prod_table)
-
-def green_cell(val):
-    try:
-        if int(val) > 0: return "color: #10B981; font-weight: bold"
-    except: pass
-    if isinstance(val, str) and val.startswith("$") and val != "$0":
-        return "color: #10B981; font-weight: bold"
-    return ""
-
-def red_cell(val):
-    try:
-        if int(val) > 0: return "color: #EF4444"
-    except: pass
-    return ""
-
-styled_prod = (prod_df.style
-    .map(green_cell, subset=["Won", "Won GP"])
-    .map(red_cell, subset=["Lost"])
-)
-st.dataframe(styled_prod, use_container_width=True, hide_index=True, height=220)
+st.markdown("### Pipeline Value by Product")
 
 fig_pg = go.Figure()
 fig_pg.add_trace(go.Bar(
