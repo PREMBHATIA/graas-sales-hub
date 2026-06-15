@@ -495,78 +495,191 @@ with right:
                 st.stop()
             user_prompt = _build_update_prompt(existing_html, call_notes, company_name or "<this prospect>")
 
-        # Call Claude. For "new brief" we hand Claude the web_search tool so it can
-        # actually research the company. For "update from notes" we don't — the existing
-        # brief + new notes are the source of truth, no fresh research needed.
-        spinner_msg = (
-            f"Researching {company_name} on the web — reading filings, news, LinkedIn, then drafting…"
+        # Call Claude with streaming so we can surface every web search + draft step
+        # live. For "new brief" we hand Claude the web_search tool; for "update from
+        # notes" we don't (existing brief + new notes are the source of truth).
+        status_label = (
+            f"Researching **{company_name}** on the web…"
             if mode.startswith("🆕")
-            else "Diffing call notes against the discovery agenda, updating the brief…"
+            else "Diffing call notes against the discovery agenda…"
         )
-        with st.spinner(spinner_msg):
-            try:
-                import anthropic
-                client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-                system_prompt = SKILL_TEXT
-                kwargs = dict(
-                    model="claude-sonnet-4-20250514",
-                    max_tokens=8000,
-                    system=system_prompt,
-                    messages=[{"role": "user", "content": user_prompt}],
+        status_box = st.status(status_label, expanded=True)
+        try:
+            import anthropic
+            import json as _json
+            client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+            system_prompt = SKILL_TEXT
+            kwargs = dict(
+                model="claude-sonnet-4-20250514",
+                max_tokens=8000,
+                system=system_prompt,
+                messages=[{"role": "user", "content": user_prompt}],
+            )
+            if mode.startswith("🆕"):
+                kwargs["tools"] = [{
+                    "type": "web_search_20250305",
+                    "name": "web_search",
+                    "max_uses": 10,
+                }]
+
+            # Activity log inside the status box. Each line is a markdown row.
+            activity_lines: list = []
+            search_count = 0
+            source_count = 0
+            text_chars = 0
+            with status_box:
+                activity_box = st.empty()
+
+                def _render_activity():
+                    activity_box.markdown(
+                        "\n\n".join(activity_lines) if activity_lines else "_Connecting to Claude…_"
+                    )
+
+                def _push(line: str):
+                    activity_lines.append(line)
+                    _render_activity()
+
+                def _replace_last(line: str):
+                    if activity_lines:
+                        activity_lines[-1] = line
+                    else:
+                        activity_lines.append(line)
+                    _render_activity()
+
+                _render_activity()
+                with client.messages.stream(**kwargs) as stream:
+                    pending_input_json = ""
+                    for event in stream:
+                        etype = getattr(event, "type", None)
+                        if etype == "content_block_start":
+                            block = getattr(event, "content_block", None)
+                            btype = getattr(block, "type", "")
+                            if btype == "server_tool_use" and getattr(block, "name", "") == "web_search":
+                                pending_input_json = ""
+                                search_count += 1
+                                _push(f"🔍 **Search #{search_count}** — preparing query…")
+                            elif btype == "web_search_tool_result":
+                                # block.content is the list of results
+                                results = getattr(block, "content", None) or []
+                                if not isinstance(results, list):
+                                    results = []
+                                source_count += len(results)
+                                if results:
+                                    _replace_last(
+                                        activity_lines[-1].replace("preparing query…", "")
+                                        + f" → **{len(results)}** result(s)"
+                                        if activity_lines else
+                                        f"📄 {len(results)} result(s)"
+                                    )
+                                    for r in results[:4]:
+                                        title = (getattr(r, "title", None) or "")[:90]
+                                        url = getattr(r, "url", None) or ""
+                                        if title or url:
+                                            disp = title or url
+                                            if url:
+                                                activity_lines.append(f"   · [{disp}]({url})")
+                                            else:
+                                                activity_lines.append(f"   · {disp}")
+                                    if len(results) > 4:
+                                        activity_lines.append(f"   · +{len(results) - 4} more")
+                                    _render_activity()
+                                else:
+                                    _replace_last(activity_lines[-1] + " → no results")
+                            elif btype == "text":
+                                _push("✏️ **Drafting the brief…**")
+                        elif etype == "content_block_delta":
+                            delta = getattr(event, "delta", None)
+                            dtype = getattr(delta, "type", None)
+                            if dtype == "input_json_delta":
+                                # Accumulate partial JSON until it parses, then show the query
+                                pending_input_json += getattr(delta, "partial_json", "") or ""
+                                try:
+                                    parsed = _json.loads(pending_input_json)
+                                    q = parsed.get("query", "")
+                                    if q and activity_lines and activity_lines[-1].startswith(f"🔍 **Search #{search_count}**"):
+                                        _replace_last(f"🔍 **Search #{search_count}** — \"{q}\"")
+                                except Exception:
+                                    pass
+                            elif dtype == "text_delta":
+                                text_chars += len(getattr(delta, "text", "") or "")
+                                # Lightly tick the drafting line every ~500 chars
+                                if text_chars and text_chars % 500 < 20 and activity_lines:
+                                    if activity_lines[-1].startswith("✏️"):
+                                        _replace_last(f"✏️ **Drafting the brief…** ({text_chars:,} chars)")
+
+                    final_message = stream.get_final_message()
+
+            # Multi-block final: extract text blocks only
+            text_parts = []
+            for block in final_message.content:
+                if getattr(block, "type", None) == "text":
+                    text_parts.append(block.text)
+            raw_text = "\n".join(p for p in text_parts if p).strip()
+
+            if not raw_text:
+                status_box.update(label="❌ No brief returned", state="error", expanded=True)
+                st.error(
+                    "Claude returned no text — only tool calls. This usually means the "
+                    "model burned all its budget on web search and ran out of tokens. "
+                    "Try again, or paste some research notes to reduce the search scope."
                 )
-                if mode.startswith("🆕"):
-                    kwargs["tools"] = [{
-                        "type": "web_search_20250305",
-                        "name": "web_search",
-                        "max_uses": 10,
-                    }]
-                response = client.messages.create(**kwargs)
-                # Multi-block response: skip web_search_tool_use / _tool_result blocks,
-                # concatenate text blocks (usually just one final text block).
-                text_parts = []
-                for block in response.content:
-                    if getattr(block, "type", None) == "text":
-                        text_parts.append(block.text)
-                    elif hasattr(block, "text"):  # fallback for SDK shape variations
-                        text_parts.append(block.text)
-                raw_text = "\n".join(p for p in text_parts if p).strip()
-                if not raw_text:
-                    st.error(
-                        "Claude returned no text — only tool calls. This usually means the "
-                        "model burned all its budget on web search and ran out of tokens. "
-                        "Try again, or paste some research notes to reduce the search scope."
-                    )
-                    st.stop()
-                brief_html = _clean_brief_html(raw_text)
-                # Guard: if Claude refused or returned prose instead of HTML, surface it
-                # honestly instead of silently rendering a malformed brief.
-                lower_html = brief_html.lower()
-                if "<html" not in lower_html and "<!doctype" not in lower_html:
-                    st.error(
-                        "Claude didn't return a brief — it returned prose instead. "
-                        "This usually means the inputs were too thin to ground the brief. "
-                        "Paste more research notes and try again.\n\n"
-                        f"**What Claude said:**\n\n{raw_text[:1500]}"
-                    )
-                    st.stop()
-                if "<table" not in lower_html:
-                    st.warning(
-                        "Brief generated, but it's missing the expected fact tables — the "
-                        "Doc may not render properly in Google Docs. Consider regenerating "
-                        "with more research notes."
-                    )
-                st.session_state["last_brief_html"] = brief_html
-                st.session_state["last_brief_company"] = company_name
-                st.session_state["last_brief_mode"] = ("Pre-call draft" if mode.startswith("🆕") else f"Post-call update — {datetime.now():%Y-%m-%d}")
-                # When updating, remember the existing doc id so "Save back" can patch it
-                if mode.startswith("🔁"):
-                    st.session_state["last_brief_doc_id"] = _extract_doc_id(existing_brief_id)
-                else:
-                    st.session_state["last_brief_doc_id"] = ""
-                st.session_state["last_brief_doc_url"] = ""
-                st.rerun()
-            except Exception as e:
-                st.error(f"Brief generation failed: {e}")
+                st.stop()
+
+            summary = []
+            if search_count:
+                summary.append(f"{search_count} search(es)")
+            if source_count:
+                summary.append(f"{source_count} source(s)")
+            if text_chars:
+                summary.append(f"{text_chars:,} chars drafted")
+            status_box.update(
+                label="✅ Brief ready" + (f" — {' · '.join(summary)}" if summary else ""),
+                state="complete",
+                expanded=False,
+            )
+
+            brief_html = _clean_brief_html(raw_text)
+            # Guard: if Claude refused or returned prose instead of HTML, surface it
+            # honestly instead of silently rendering a malformed brief.
+            lower_html = brief_html.lower()
+            if "<html" not in lower_html and "<!doctype" not in lower_html:
+                status_box.update(label="❌ Wrong shape returned", state="error", expanded=True)
+                st.error(
+                    "Claude didn't return a brief — it returned prose instead. "
+                    "This usually means the inputs were too thin to ground the brief. "
+                    "Paste more research notes and try again.\n\n"
+                    f"**What Claude said:**\n\n{raw_text[:1500]}"
+                )
+                st.stop()
+            if "<table" not in lower_html:
+                st.warning(
+                    "Brief generated, but it's missing the expected fact tables — the "
+                    "Doc may not render properly in Google Docs. Consider regenerating "
+                    "with more research notes."
+                )
+            st.session_state["last_brief_html"] = brief_html
+            st.session_state["last_brief_company"] = company_name
+            st.session_state["last_brief_mode"] = ("Pre-call draft" if mode.startswith("🆕") else f"Post-call update — {datetime.now():%Y-%m-%d}")
+            if mode.startswith("🔁"):
+                st.session_state["last_brief_doc_id"] = _extract_doc_id(existing_brief_id)
+            else:
+                st.session_state["last_brief_doc_id"] = ""
+            st.session_state["last_brief_doc_url"] = ""
+            _should_rerun = True
+        except Exception as e:
+            # Streamlit's flow-control exceptions (RerunException, StopException) must
+            # propagate, not get masked as a "generation failed" error.
+            if type(e).__name__ in ("RerunException", "StopException"):
+                raise
+            try:
+                status_box.update(label="❌ Generation failed", state="error", expanded=True)
+            except Exception:
+                pass
+            st.error(f"Brief generation failed: {e}")
+            _should_rerun = False
+
+        if locals().get("_should_rerun"):
+            st.rerun()
 
     # Render whatever's in session state
     _render_brief(
