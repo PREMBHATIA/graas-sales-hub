@@ -377,6 +377,8 @@ def render_brief_docx(data: dict) -> bytes:
             rows=rows,
             col_widths_cm=[3.5, 2.0, 4.0, 10.0],
         )
+        # Caption: flag flow & leaks as critical and pending verification.
+        _add_sub(doc, "(critical — to be further verified)")
 
     pain_map = data.get("pain_capability_cfo") or []
     if pain_map:
@@ -615,6 +617,7 @@ td.src { font-size: 7pt; font-style: italic; color: #777; }
                 f"<td>{_esc(flow)}</td></tr>"
             )
         parts.append("</table>")
+        parts.append("<p class='sub'>(critical — to be further verified)</p>")
 
     if data.get("pain_capability_cfo"):
         parts.append("<h3>Pain → Capability → CFO metric</h3><table>")
