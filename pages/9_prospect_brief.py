@@ -202,23 +202,33 @@ with left:
     )
 
     st.markdown("### 2. Company")
-    # Picker from CRM + free-text fallback
+    # Two paths: pick from CRM, OR type any name (overrides the picker).
+    # The text_input is always visible — typing into the selectbox just
+    # filters its options, so users who want a non-CRM company have to
+    # type it explicitly here.
     crm_names = [name for name, _ in CRM]
     selected_company = st.selectbox(
-        "Pick a company (or type to add one not in CRM)",
-        ["— pick or type —"] + crm_names + ["+ Other (type below)"],
+        "Pick a company in the CRM",
+        ["— pick from CRM —"] + crm_names,
         key="brief_company_picker",
+        help="Picks a known prospect from the All-e pipeline. To use a company not in CRM, leave this on '— pick from CRM —' and type the name in the field below.",
     )
-    custom_company = ""
-    crm_data = {}
-    if selected_company == "+ Other (type below)":
-        custom_company = st.text_input("Company name *", key="brief_custom_company")
-    elif selected_company != "— pick or type —":
-        crm_data = next((d for n, d in CRM if n == selected_company), {})
+    custom_company = st.text_input(
+        "…or type a company not in the CRM",
+        key="brief_custom_company",
+        placeholder="e.g. Godrej Indonesia",
+        help="Overrides the picker above. Use this for any company outside our pipeline.",
+    ).strip()
 
-    company_name = custom_company if custom_company else (
-        selected_company if selected_company not in ("— pick or type —", "+ Other (type below)") else ""
-    )
+    crm_data = {}
+    if custom_company:
+        # Custom name wins — no CRM context to fall back on.
+        company_name = custom_company
+    elif selected_company != "— pick from CRM —":
+        crm_data = next((d for n, d in CRM if n == selected_company), {})
+        company_name = selected_company
+    else:
+        company_name = ""
 
     if crm_data:
         with st.expander(f"📋 CRM context for {selected_company}", expanded=False):
@@ -416,6 +426,14 @@ with right:
             if not company_name:
                 st.error("Pick or type a company name first.")
                 st.stop()
+            # When the company isn't in CRM, we have no fallback context — require research.
+            if not crm_data and not research_text.strip():
+                st.error(
+                    f"**{company_name}** isn't in the CRM, so I have no prior context to fall back on. "
+                    "Paste at least a few lines of research (website blurb, LinkedIn, news, prior emails) "
+                    "into the **Research notes** box and try again."
+                )
+                st.stop()
             user_prompt = _build_new_brief_prompt(crm_data, research_text, company_name)
         else:
             doc_id = _extract_doc_id(existing_brief_id)
@@ -447,6 +465,23 @@ with right:
                 )
                 raw_text = response.content[0].text
                 brief_html = _clean_brief_html(raw_text)
+                # Guard: if Claude refused or returned prose instead of HTML, surface it
+                # honestly instead of silently rendering a malformed brief.
+                lower_html = brief_html.lower()
+                if "<html" not in lower_html and "<!doctype" not in lower_html:
+                    st.error(
+                        "Claude didn't return a brief — it returned prose instead. "
+                        "This usually means the inputs were too thin to ground the brief. "
+                        "Paste more research notes and try again.\n\n"
+                        f"**What Claude said:**\n\n{raw_text[:1500]}"
+                    )
+                    st.stop()
+                if "<table" not in lower_html:
+                    st.warning(
+                        "Brief generated, but it's missing the expected fact tables — the "
+                        "Doc may not render properly in Google Docs. Consider regenerating "
+                        "with more research notes."
+                    )
                 st.session_state["last_brief_html"] = brief_html
                 st.session_state["last_brief_company"] = company_name
                 st.session_state["last_brief_mode"] = ("Pre-call draft" if mode.startswith("🆕") else f"Post-call update — {datetime.now():%Y-%m-%d}")
