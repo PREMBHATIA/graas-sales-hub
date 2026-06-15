@@ -188,6 +188,7 @@ Fill `assets/brief_template.html`. The template carries placeholder text and fil
 **Page 1 — Snapshot**
 - **Header** — Company name; *Date prepared* (today); *Meeting date* (the upcoming meeting, if known); *Prepared by: Graas Enterprise Team*. One line each.
 - **Status line** — *Pre-call draft* / *Post call-1 — [date]* / *Post call-2 — [date]* …
+- **Executive Summary** — one paragraph, 3-4 sentences, ~4-6 lines. Names *(a)* who they are (parent group if relevant, what they do), *(b)* scale in their own numbers (revenue + the scale figure that matters for this play — dealers / outlets / FSAs / traffic), *(c)* channel/motion shape in one clause, *(d)* the meeting hypothesis — why this conversation matters for Graas in one specific line, not boilerplate. This is what anyone opening the Doc reads first; it must stand on its own. Cite inline. Skip filler ("the company", "is a leading", "well-positioned").
 - **Stat band** (one row): Revenue | SKUs | Channel touchpoints | Field force | Geography — prefix estimates with `~`, no per-cell tag. *(B2C: swap Channel touchpoints and Field force for Monthly traffic and Conversion %.)*
 - **Type** — OEM/Principal/Brand · Multi-brand distributor · Multi-brand retailer. One line.
 - **Motion** — B2B/GT or B2C (or both, wedge named). One line.
@@ -243,6 +244,7 @@ On the post-call pass, edit the same Doc — don't spin up a new file — so ver
 
 - Are **type and motion** classified (value-chain position + B2B/GT vs B2C), and does the route follow from them?
 - Is the **status line** set correctly? Is the **header** filled (date prepared, meeting date if known, prepared by)?
+- Is there a **one-paragraph Executive Summary** at the top — 3-4 sentences naming who they are, the scale numbers that matter, the channel shape, and the meeting hypothesis (no boilerplate)?
 - Does the **ledger** cover the required rows — including funding status, top brands, top competitors, plus the standard business/scale/channel/SKU/tech-stack/agents/AI-maturity rows?
 - Is there a **Recent news** block with at least 2-4 events from the last 12 months (or an honest *"nothing material in the last 12 months"*)?
 - For an upcoming meeting with known external attendees: is the **Meeting attendees** table populated with LinkedIn summaries (or *"LinkedIn profile not publicly available"* per row)?
