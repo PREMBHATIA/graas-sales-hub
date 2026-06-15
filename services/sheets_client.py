@@ -382,6 +382,115 @@ def update_google_doc_html(doc_id: str, new_html: str) -> dict:
         return {"ok": False, "error": f"{type(e).__name__}: {e}"}
 
 
+_DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+
+def create_google_doc_from_docx(
+    docx_bytes: bytes,
+    title: str,
+    parent_folder_id: Optional[str] = None,
+    share_with: Optional[list] = None,
+) -> dict:
+    """Create a native Google Doc from a DOCX byte stream.
+
+    DOCX → Google Doc conversion preserves font sizes, table column widths, cell
+    padding, and margins far better than HTML → Doc. Same multipart-upload pattern
+    as create_google_doc_from_html, just a different inner Content-Type.
+    """
+    creds = _get_drive_credentials()
+    if creds is None:
+        return {"ok": False, "doc_id": None, "doc_url": None,
+                "mime_type": None, "error": "Drive credentials unavailable"}
+    try:
+        session = greq.AuthorizedSession(creds)
+        metadata = {
+            "name": title,
+            "mimeType": "application/vnd.google-apps.document",  # target type after conversion
+        }
+        if parent_folder_id:
+            metadata["parents"] = [parent_folder_id]
+
+        import json as _json
+        import io
+        boundary = "graas-prospect-brief-docx-boundary"
+        body = io.BytesIO()
+        body.write(f"--{boundary}\r\n".encode())
+        body.write(b"Content-Type: application/json; charset=UTF-8\r\n\r\n")
+        body.write(_json.dumps(metadata).encode("utf-8"))
+        body.write(b"\r\n")
+        body.write(f"--{boundary}\r\n".encode())
+        body.write(f"Content-Type: {_DOCX_MIME}\r\n\r\n".encode())
+        body.write(docx_bytes)
+        body.write(f"\r\n--{boundary}--\r\n".encode())
+
+        upload_url = ("https://www.googleapis.com/upload/drive/v3/files"
+                      "?uploadType=multipart&supportsAllDrives=true&fields=id,mimeType,webViewLink")
+        resp = session.post(
+            upload_url,
+            headers={"Content-Type": f"multipart/related; boundary={boundary}"},
+            data=body.getvalue(),
+            timeout=60,
+        )
+        if resp.status_code not in (200, 201):
+            return {"ok": False, "doc_id": None, "doc_url": None,
+                    "mime_type": None,
+                    "error": f"Drive create failed: HTTP {resp.status_code} — {resp.text[:300]}"}
+
+        data = resp.json()
+        doc_id = data.get("id")
+        mime_type = data.get("mimeType", "")
+        doc_url = data.get("webViewLink") or (f"https://docs.google.com/document/d/{doc_id}/edit" if doc_id else None)
+
+        if share_with:
+            for email in share_with:
+                try:
+                    session.post(
+                        f"https://www.googleapis.com/drive/v3/files/{doc_id}/permissions"
+                        f"?sendNotificationEmail=false&supportsAllDrives=true",
+                        json={"type": "user", "role": "writer", "emailAddress": email},
+                        timeout=15,
+                    )
+                except Exception:
+                    pass
+
+        if mime_type != "application/vnd.google-apps.document":
+            return {"ok": False, "doc_id": doc_id, "doc_url": doc_url,
+                    "mime_type": mime_type,
+                    "error": f"Conversion didn't take — mimeType is '{mime_type}'."}
+
+        return {"ok": True, "doc_id": doc_id, "doc_url": doc_url,
+                "mime_type": mime_type, "error": None}
+
+    except Exception as e:
+        return {"ok": False, "doc_id": None, "doc_url": None,
+                "mime_type": None, "error": f"{type(e).__name__}: {e}"}
+
+
+def update_google_doc_docx(doc_id: str, docx_bytes: bytes) -> dict:
+    """Replace the contents of an existing Google Doc by uploading new DOCX.
+
+    Keeps the file ID + URL + sharing intact; only the content is replaced.
+    """
+    creds = _get_drive_credentials()
+    if creds is None:
+        return {"ok": False, "error": "Drive credentials unavailable"}
+    try:
+        session = greq.AuthorizedSession(creds)
+        update_url = (f"https://www.googleapis.com/upload/drive/v3/files/{doc_id}"
+                      f"?uploadType=media&supportsAllDrives=true")
+        resp = session.patch(
+            update_url,
+            headers={"Content-Type": _DOCX_MIME},
+            data=docx_bytes,
+            timeout=60,
+        )
+        if resp.status_code not in (200, 201):
+            return {"ok": False, "error": f"Drive update failed: HTTP {resp.status_code} — {resp.text[:300]}"}
+        return {"ok": True, "error": None}
+    except Exception as e:
+        return {"ok": False, "error": f"{type(e).__name__}: {e}"}
+
+
 def fetch_google_doc_text(doc_id: str, force_refresh: bool = False) -> str:
     """Fetch a Google Doc as plain text via the Drive export API, with caching."""
     cache_key = f"gdoc_{doc_id}"

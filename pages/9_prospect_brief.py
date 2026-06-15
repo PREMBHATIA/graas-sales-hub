@@ -333,6 +333,66 @@ def _extract_doc_id(input_str: str) -> str:
     return ""
 
 
+# JSON schema we ask Claude to fill — keep this string version in sync with
+# services/brief_renderer.py (both render_brief_docx and render_brief_html).
+BRIEF_JSON_SCHEMA = """{
+  "company": "string — display name",
+  "header": {
+    "date_prepared": "YYYY-MM-DD",
+    "meeting_date": "YYYY-MM-DD or 'TBC'",
+    "market": "India / Indonesia / Vietnam / Thailand / Philippines / Malaysia / Singapore — primary",
+    "status": "Pre-call draft  (post-call: 'Pre-call draft → Post call-1 — YYYY-MM-DD …')"
+  },
+  "executive_summary": "ONE paragraph, 3-4 sentences: (1) who they are + parent group, (2) scale in their numbers with inline citation, (3) channel/motion shape, (4) the meeting hypothesis specific to this customer.",
+  "stat_band": [
+    {"label": "Revenue", "value": "value, prefix estimates with ~"},
+    {"label": "SKUs", "value": "..."},
+    {"label": "Channel touchpoints", "value": "..."},
+    {"label": "Field force", "value": "..."},
+    {"label": "Geography", "value": "..."}
+  ],
+  "type": "ONE of: 'OEM / Principal / Brand' | 'Multi-brand distributor' | 'Multi-brand retailer'",
+  "motion": "ONE of: 'B2B / General Trade — distributors, retailers, sales force' | 'B2C / eCommerce' | 'Both — wedge is ___'",
+  "what_they_have": [
+    {"dimension": "Business model", "what_we_know": "PHRASE 5-15 words", "confidence": "Confirmed|Public estimate|Inferred|Unknown", "source": "short source"},
+    {"dimension": "Scale", "what_we_know": "...", "confidence": "...", "source": "..."},
+    {"dimension": "Funding status", "what_we_know": "Listed / PE-backed / VC-funded (round, year, lead) / bootstrapped; profitable or loss-making", "confidence": "...", "source": "..."},
+    {"dimension": "Top brands", "what_we_know": "3-5 recognisable brands", "confidence": "...", "source": "..."},
+    {"dimension": "Top competitors", "what_we_know": "2-3 competitors", "confidence": "...", "source": "..."},
+    {"dimension": "Channel structure", "what_we_know": "HQ → distributors → retailers; counts", "confidence": "...", "source": "..."},
+    {"dimension": "Catalogue size / SKU count", "what_we_know": "...", "confidence": "...", "source": "..."},
+    {"dimension": "Tech stack", "what_we_know": "ERP / CRM / DMS / SFA / channels — name vendors", "confidence": "...", "source": "..."},
+    {"dimension": "External-facing agents", "what_we_know": "agents/chatbots deployed? — the All-e vs KG signal", "confidence": "...", "source": "..."},
+    {"dimension": "AI maturity", "what_we_know": "...", "confidence": "...", "source": "..."}
+  ],
+  "recent_news": ["Event with inline citation. e.g. 'Raised Series D at $1.2B (Economic Times, Mar 2024).'", "..."],
+  "order_flow": "ONE line tracing the order end-to-end for the matching motion (B2B or B2C), flagging manual/leak points.",
+  "what_missing": ["Gap phrased as a question or honest gap statement.", "..."],
+  "other_signals": ["M&A / leadership / regulatory / competitor-displacement signals.  Omit array if empty."],
+  "product_route": "All-e / Knowledge Graph / Layered — 2-3 lines on why this follows from motion + signals; name wedge vs expansion.",
+  "persona_map": [{"persona": "Distributors", "count": "~50-100", "surface": "WhatsApp / SFA"}],
+  "pain_capability_cfo": [{"pain": "pain in their language", "capability": "All-e/KG capability", "metric": "DSO / revenue per rep / cost per order / ..."}],
+  "metric_that_matters": "The metric this moves for [CFO or decision-maker name, role] is [single literal metric].",
+  "discovery": {
+    "business_model": ["Walk-me-through-one-order question, plus 1-2 motion questions."],
+    "data_readiness": ["SKU count + catalogue cleanliness questions; sell-out data agent-readiness."],
+    "tech_integration": ["Existing agents? Channels live? System of record + API? WABA?"],
+    "commercial_authority": ["Who owns the budget and the metric? Who signs?"],
+    "motion_specific": {"label": "If B2B / General Trade  OR  If B2C / eCommerce", "questions": ["..."]}
+  },
+  "conflicts_unknowns": {
+    "conflicting": "conflicting figures, both numbers shown",
+    "unverified": "load-bearing unverified facts",
+    "key_fact": "the one fact that would most change the recommendation"
+  },
+  "meeting_attendees": [{"name": "...", "title": "...", "linkedin_summary": "2-3 lines: background, prior companies, current focus. 'LinkedIn profile not publicly available' if not found.", "angle": "why this conversation matters to them"}],
+  "people_path_in": [{"name": "...", "role": "...", "why_matter": "...", "type": "Decision-maker | Champion | Finance buyer"}],
+  "entry_wedge": "lowest-friction way in",
+  "next_step": {"action": "another discovery call | demo | POC scoping | solutioning | park", "why": "one-line rationale", "gate_met": false, "still_open": "what's missing (motion / route / customer-confirmed CFO metric / data / DM)"},
+  "opening_hook": "one or two lines grounded in their actual numbers — phrase as a question, no quote marks (we add them)."
+}"""
+
+
 def _build_new_brief_prompt(
     crm_data: dict,
     research: str,
@@ -359,91 +419,113 @@ def _build_new_brief_prompt(
 
     return (
         f"Build a pre-call Prospect Research Brief for **{company or '<NAME>'}**.\n"
-        f"Today is {today}. Set the status line to *Pre-call draft*. "
-        f"In the header, set Date prepared = {today}"
-        f"{f', Meeting date = {meeting_date}' if meeting_date else ''}.\n\n"
+        f"Today is {today}. Set status = *Pre-call draft*. Header.date_prepared = {today}"
+        f"{f'. Header.meeting_date = {meeting_date}' if meeting_date else ''}.\n\n"
         f"**You have the `web_search` tool. Use it.** Before filling the brief, run the "
-        f"searches you'd need a junior analyst to run: company website + investor pages, "
-        f"recent news (last 12 months), LinkedIn for the attendees (when provided), funding "
+        f"searches a junior analyst would run: company website + investor pages, recent "
+        f"news (last 12 months), LinkedIn for the attendees (when provided), funding "
         f"history (Crunchbase / Tracxn / DealStreetAsia), industry coverage (Economic "
         f"Times, Mint, Reuters, Tech in Asia). Apply the source hierarchy from the skill: "
         f"company filings/website = Confirmed; news = Confirmed for the event reported; "
         f"aggregators (LeadIQ/Lusha/Euromonitor) = Public estimate. Cite sources inline.\n"
         f"Geography: start with India; if the company isn't there, check South East Asia "
-        f"(Indonesia, Vietnam, Thailand, Philippines, Malaysia, Singapore) and state the "
-        f"market in the header.\n\n"
-        f"Use the HTML scaffold below — replace EVERY [placeholder] with real content "
-        f"derived from your research and the inputs. Delete bracketed hints, filler "
-        f"captions, and `<!-- comments -->`. Keep only the matching Type, Motion, and "
-        f"the matching B2B-or-B2C order-flow line. Output a clean, finished HTML brief "
-        f"— no brackets, no instructions, no scaffold markers.\n\n"
-        f"**DO NOT DELETE MANDATORY SECTIONS.** Every brief must include: Executive "
-        f"Summary, the full *What they have* ledger (all 10 rows: Business model, Scale, "
-        f"**Funding status, Top brands, Top competitors**, Channel structure, Catalogue "
-        f"size, Tech stack, External-facing agents, AI maturity), Recent news, Order flow, "
-        f"Product route, Persona map, Pain → Capability → CFO, The metric that matters, "
-        f"Discovery agenda, Conflicts & unknowns, People & path in, Next step, Opening "
-        f"hook. If you can't find a fact for a mandatory cell, write *\"Info not publicly "
-        f"available\"* with Confidence = Unknown — **NEVER drop the row**. Meeting attendees "
-        f"section: keep only if attendees were provided in inputs.\n\n"
-        f"**HARD LIMIT: 2 PAGES** (3 absolute max when printed). Apply the density rule "
-        f"from the skill: every cell is a **phrase, 5-15 words, not a sentence**. "
-        f"Compress lists with commas and semicolons — never one bullet per item where a "
-        f"comma-list works. Strip filler ('the company', 'they also have', 'it is worth "
-        f"noting'). One idea per cell. If a cell needs more, move the second idea to a "
-        f"different row or to *Other signals*. The brief is a working tool, not a "
-        f"dossier — a tight 2-pager is the point.\n\n"
+        f"and state the actual market in header.market.\n\n"
+        f"**Return a single JSON object** matching the schema below. Every cell must be a "
+        f"PHRASE, 5-15 words, not a sentence — the rendered brief is a tight 2-pager. "
+        f"Compress lists with commas and semicolons. Strip filler ('the company', 'they "
+        f"also have', 'is a leading').\n\n"
+        f"**DO NOT DROP MANDATORY FIELDS.** Every brief must include: executive_summary, "
+        f"stat_band (all 5), type, motion, what_they_have (all 10 dimensions: "
+        f"Business model · Scale · **Funding status** · **Top brands** · **Top competitors** · "
+        f"Channel structure · Catalogue size / SKU count · Tech stack · External-facing "
+        f"agents · AI maturity), recent_news (2-4 items or one honest 'Nothing material in "
+        f"the last 12 months from public sources'), order_flow, what_missing, "
+        f"product_route, persona_map, pain_capability_cfo, metric_that_matters, "
+        f"discovery (all 4 buckets + motion_specific), conflicts_unknowns, people_path_in, "
+        f"entry_wedge, next_step, opening_hook. If a fact is genuinely not findable, set "
+        f"the value to *\"Info not publicly available\"* and confidence to *\"Unknown\"* "
+        f"— **never drop the row**.\n\n"
+        f"**Conditional fields:** include meeting_attendees only if attendees were "
+        f"provided in inputs; include other_signals only if there's genuine material.\n\n"
         f"=== INPUTS — INTERNAL RESEARCH / CONTEXT ===\n{research or '(no internal notes pasted — research the company from public sources using web_search)'}\n"
         f"{crm_block}{meeting_block}\n\n"
-        f"=== HTML SCAFFOLD ===\n{TEMPLATE_HTML}\n\n"
-        f"Return ONLY the filled HTML brief as your final message. No prose before or "
-        f"after, no markdown code fences. The output must start with `<html>` (or "
-        f"`<!DOCTYPE html>`) and be a single self-contained HTML document."
+        f"=== JSON SCHEMA (fill exactly this shape) ===\n{BRIEF_JSON_SCHEMA}\n\n"
+        f"Return ONLY the JSON object as your final message. No prose before or after, "
+        f"no markdown code fences. Must parse with json.loads()."
     )
 
 
-def _build_update_prompt(existing_html: str, call_notes: str, company: str) -> str:
-    """Compose the user-turn prompt for a post-call update."""
+def _build_update_prompt(existing_brief_text: str, call_notes: str, company: str) -> str:
+    """Compose the user-turn prompt for a post-call update — returns updated JSON."""
     today = datetime.now().strftime("%Y-%m-%d")
     return (
         f"Update the existing Prospect Brief for **{company or '<NAME>'}** with new "
         f"call notes from today ({today}).\n\n"
         f"Diff the notes against the discovery agenda. For each open question:\n"
-        f"- Answered → move it into the fact tables, upgrade its Confidence to "
-        f"Confirmed, strike it from the agenda.\n"
+        f"- Answered → move it into the fact tables, upgrade Confidence to Confirmed, "
+        f"strike from the agenda.\n"
         f"- Contradicted → update the fact and flag in Conflicts & Unknowns.\n"
-        f"- Unanswered → leave it in the agenda for the next call.\n"
-        f"Capture anything new the call surfaced (pains, people, systems, an existing "
-        f"agent, a competitor, budget/timeline).\n\n"
+        f"- Unanswered → leave in the agenda for the next call.\n"
+        f"Capture anything new the call surfaced (pains, people, systems, agents, "
+        f"competitors, budget/timeline).\n\n"
         f"Re-check the product route — new info may shift All-e ↔ KG or open the "
-        f"layered angle. Update the CFO metric line if needed.\n\n"
-        f"Decide and record the **Next step** explicitly (another discovery call / "
-        f"demo / POC scoping / solutioning / park-or-disqualify) with one line on why.\n\n"
-        f"Update the status line: append `→ Post call-N — {today}` where N is the "
-        f"next number after the latest in the existing status. Keep all prior status "
-        f"entries intact.\n\n"
-        f"Keep the brief 2-3 pages.\n\n"
+        f"layered angle. Update the CFO metric if needed.\n\n"
+        f"Decide and record the **next_step** explicitly with one line on why.\n\n"
+        f"Update header.status: append `→ Post call-N — {today}` where N is the next "
+        f"number after the latest. Keep prior status entries intact in the string.\n\n"
+        f"Output rules: same 2-pager density (phrases not sentences); keep all mandatory "
+        f"fields populated; if a fact stays unverified use *Info not publicly available* "
+        f"+ Unknown.\n\n"
         f"=== NEW CALL NOTES ===\n{call_notes}\n\n"
-        f"=== EXISTING BRIEF (HTML) ===\n{existing_html}\n\n"
-        f"Return ONLY the updated HTML brief. No prose before or after, no markdown "
-        f"code fences. Single self-contained HTML document."
+        f"=== EXISTING BRIEF (plain text export of the Doc) ===\n{existing_brief_text}\n\n"
+        f"=== JSON SCHEMA (return exactly this shape) ===\n{BRIEF_JSON_SCHEMA}\n\n"
+        f"Return ONLY the updated JSON object. No prose, no code fences. Must parse "
+        f"with json.loads()."
     )
 
 
-def _clean_brief_html(text: str) -> str:
-    """Strip code fences and any pre/post commentary so we get clean HTML."""
-    s = text.strip()
-    # Remove ```html ... ``` or ``` ... ``` wrappers
-    s = re.sub(r"^```(?:html|HTML)?\s*\n", "", s)
+def _extract_json_object(text: str) -> dict:
+    """Extract the first JSON object from a model response.
+
+    Strips ```json fences, then finds the first `{` and parses from there. Raises
+    ValueError with a useful message if no JSON object is found.
+    """
+    s = (text or "").strip()
+    # Strip ```json ... ``` fences if present
+    s = re.sub(r"^```(?:json|JSON)?\s*\n", "", s)
     s = re.sub(r"\n```\s*$", "", s)
-    # If response includes prose then HTML, snip from the first <html or <!DOCTYPE
-    lower = s.lower()
-    for marker in ("<!doctype html", "<html"):
-        idx = lower.find(marker)
-        if idx > 0:
-            s = s[idx:]
-            break
-    return s.strip()
+    s = s.strip()
+    start = s.find("{")
+    if start < 0:
+        raise ValueError("No JSON object found in response")
+    # Try to parse from the first `{`; json.loads is strict about trailing content
+    try:
+        return json.loads(s[start:])
+    except json.JSONDecodeError:
+        # Fall back to a balanced-brace scan from start
+        depth = 0
+        in_str = False
+        esc = False
+        for i in range(start, len(s)):
+            c = s[i]
+            if in_str:
+                if esc:
+                    esc = False
+                elif c == "\\":
+                    esc = True
+                elif c == '"':
+                    in_str = False
+                continue
+            if c == '"':
+                in_str = True
+                continue
+            if c == "{":
+                depth += 1
+            elif c == "}":
+                depth -= 1
+                if depth == 0:
+                    return json.loads(s[start:i + 1])
+        raise ValueError("Couldn't find a balanced JSON object in response")
 
 
 # ── Output side ───────────────────────────────────────────────────────────────
@@ -503,13 +585,13 @@ with right:
             if not call_notes.strip():
                 st.error("Paste the new call notes.")
                 st.stop()
-            from services.sheets_client import fetch_drive_doc_html
-            existing_html = fetch_drive_doc_html(doc_id)
-            if not existing_html:
+            from services.sheets_client import fetch_drive_doc_text
+            existing_text = fetch_drive_doc_text(doc_id)
+            if not existing_text:
                 st.error(f"Could not fetch the existing brief at `{doc_id}`. "
                          f"Check the URL/ID and that the service account has access.")
                 st.stop()
-            user_prompt = _build_update_prompt(existing_html, call_notes, company_name or "<this prospect>")
+            user_prompt = _build_update_prompt(existing_text, call_notes, company_name or "<this prospect>")
 
         # Call Claude with streaming so we can surface every web search + draft step
         # live. For "new brief" we hand Claude the web_search tool; for "update from
@@ -660,26 +742,46 @@ with right:
                 expanded=False,
             )
 
-            brief_html = _clean_brief_html(raw_text)
-            # Guard: if Claude refused or returned prose instead of HTML, surface it
-            # honestly instead of silently rendering a malformed brief.
-            lower_html = brief_html.lower()
-            if "<html" not in lower_html and "<!doctype" not in lower_html:
-                status_box.update(label="❌ Wrong shape returned", state="error", expanded=True)
+            # Parse JSON, render HTML for preview + DOCX for save
+            try:
+                brief_data = _extract_json_object(raw_text)
+            except Exception as parse_err:
+                status_box.update(label="❌ Couldn't parse JSON", state="error", expanded=True)
                 st.error(
-                    "Claude didn't return a brief — it returned prose instead. "
-                    "This usually means the inputs were too thin to ground the brief. "
-                    "Paste more research notes and try again.\n\n"
-                    f"**What Claude said:**\n\n{raw_text[:1500]}"
+                    "Claude didn't return valid JSON. This usually means the model "
+                    "wrapped the response in commentary or got cut off mid-output.\n\n"
+                    f"**Parse error:** {parse_err}\n\n"
+                    f"**First 1500 chars of response:**\n\n{raw_text[:1500]}"
                 )
                 st.stop()
-            if "<table" not in lower_html:
+
+            # Sanity-check mandatory fields are populated
+            required_keys = ("executive_summary", "stat_band", "what_they_have",
+                             "product_route", "pain_capability_cfo", "opening_hook")
+            missing_required = [k for k in required_keys if not brief_data.get(k)]
+            if missing_required:
                 st.warning(
-                    "Brief generated, but it's missing the expected fact tables — the "
-                    "Doc may not render properly in Google Docs. Consider regenerating "
-                    "with more research notes."
+                    "Brief generated but missing required fields: "
+                    f"`{', '.join(missing_required)}`. The Doc will still render — "
+                    "consider regenerating with more research notes."
                 )
+
+            from services.brief_renderer import render_brief_html, render_brief_docx
+            try:
+                brief_html = render_brief_html(brief_data)
+                brief_docx = render_brief_docx(brief_data)
+            except Exception as render_err:
+                status_box.update(label="❌ Render failed", state="error", expanded=True)
+                st.error(
+                    "Got valid JSON but the renderer choked on it. This is usually a "
+                    "schema mismatch (a field shape Claude returned isn't what we "
+                    f"expect).\n\n**Error:** {render_err}"
+                )
+                st.stop()
+
+            st.session_state["last_brief_data"] = brief_data
             st.session_state["last_brief_html"] = brief_html
+            st.session_state["last_brief_docx"] = brief_docx
             st.session_state["last_brief_company"] = company_name
             st.session_state["last_brief_mode"] = ("Pre-call draft" if mode.startswith("🆕") else f"Post-call update — {datetime.now():%Y-%m-%d}")
             if mode.startswith("🔁"):
@@ -726,7 +828,7 @@ with right:
             )
             if st.button(save_label, type="primary", use_container_width=True, key="brief_save_btn"):
                 with st.spinner("Talking to Drive…"):
-                    from services.sheets_client import create_google_doc_from_html, update_google_doc_html
+                    from services.sheets_client import create_google_doc_from_docx, update_google_doc_docx
                     title = (
                         f"Prospect Brief — {st.session_state['last_brief_company']} — "
                         f"{datetime.now():%Y-%m-%d}"
@@ -735,10 +837,14 @@ with right:
                         e.strip() for e in (share_with_raw or "").split(",")
                         if e.strip() and "@" in e
                     ]
+                    docx_bytes = st.session_state.get("last_brief_docx", b"")
+                    if not docx_bytes:
+                        st.error("No DOCX bytes in session — regenerate the brief.")
+                        st.stop()
                     if st.session_state.get("last_brief_doc_id"):
-                        res = update_google_doc_html(
+                        res = update_google_doc_docx(
                             st.session_state["last_brief_doc_id"],
-                            st.session_state["last_brief_html"],
+                            docx_bytes,
                         )
                         if res["ok"]:
                             url = f"https://docs.google.com/document/d/{st.session_state['last_brief_doc_id']}/edit"
@@ -747,8 +853,8 @@ with right:
                         else:
                             st.error(f"Update failed: {res['error']}")
                     else:
-                        res = create_google_doc_from_html(
-                            html_body=st.session_state["last_brief_html"],
+                        res = create_google_doc_from_docx(
+                            docx_bytes=docx_bytes,
                             title=title,
                             parent_folder_id=(drive_folder or None),
                             share_with=share_with or None,
@@ -766,21 +872,22 @@ with right:
                                 f"as **Editor**, then try again."
                             )
 
-        # Download as HTML
+        # Download as DOCX (opens cleanly in Word + Google Docs)
         with save_cols[1]:
-            fname = f"prospect-brief-{(st.session_state['last_brief_company'] or 'untitled').lower().replace(' ', '-')}-{datetime.now():%Y-%m-%d}.html"
+            fname = f"prospect-brief-{(st.session_state['last_brief_company'] or 'untitled').lower().replace(' ', '-')}-{datetime.now():%Y-%m-%d}.docx"
             st.download_button(
-                "⬇️ Download HTML",
-                data=st.session_state["last_brief_html"],
+                "⬇️ Download DOCX",
+                data=st.session_state.get("last_brief_docx", b""),
                 file_name=fname,
-                mime="text/html",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                 use_container_width=True,
             )
 
         # Clear
         with save_cols[2]:
             if st.button("🗑 Clear", use_container_width=True, key="brief_clear_btn"):
-                for k in ("last_brief_html", "last_brief_company", "last_brief_mode",
+                for k in ("last_brief_data", "last_brief_html", "last_brief_docx",
+                          "last_brief_company", "last_brief_mode",
                           "last_brief_doc_url", "last_brief_doc_id"):
                     st.session_state.pop(k, None)
                 st.rerun()
