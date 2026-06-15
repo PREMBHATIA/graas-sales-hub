@@ -68,6 +68,27 @@ Invoke **research-integrity** throughout — it's the verification/confidence di
 
 ---
 
+## Density rule — every cell is a phrase, not a sentence
+
+The brief is a **tight 2-pager** (3 absolute max). The number-one failure mode is sprawling cells full of full sentences, which then wrap across multiple lines in Google Docs and double the page count. Apply these rules in every table cell and every bullet:
+
+- **Phrases, not sentences.** Target 5-15 words per cell. No "the company …", "they also have …", "it is worth noting that …". Strip filler.
+- **Compress lists.** Use commas and semicolons — never one bullet per item when a comma-list works.
+- **Cite inline, briefly.** *"Per FY24 AR"* not *"According to their Fiscal Year 2024 Annual Report"*.
+- **One idea per cell.** If a cell needs two ideas, split into two rows or move the second to *Other signals*.
+
+Examples — same fact, two densities:
+
+| Bad (sprawling) | Good (tight) |
+|---|---|
+| "Multi-brand FMCG manufacturer and distributor; sells to traditional kirana stores and modern retail through field force and distributor network" | "Multi-brand FMCG; field force → distributors → 4.5M kiranas + 38K modern stores" |
+| "HIT, Stella, Mitu as flagship brands plus Proclin, Biosol, Klinpak, Polytex, Carrera, Cap Gajah, Shock, Nyu, Saniter — estimate ~200-400 SKUs across categories" | "HIT, Stella, Mitu (flagships); ~12 brands; ~200-400 SKUs (est.)" |
+| "~$300M revenue (Rp 3 trillion fiscal 2014-15); 21% annual sales growth over 5 years" | "~$300M FY15 (Public est., Euromonitor); 21% CAGR" |
+
+A working brief beats a dossier every time. If a cell is over two lines in the rendered Doc, rewrite it.
+
+---
+
 ## The hard rule: never assert a guess
 
 Prospect research is full of public estimates that look like facts. The failure this prevents: two people brief the same company, one writes "41 branches, ~$50-100M", the other "47 branches, ~$290M", and nobody notices the brief is built on sand.
@@ -230,7 +251,8 @@ On the post-call pass, edit the same Doc — don't spin up a new file — so ver
 - Did any load-bearing Inferred/Unknown fact slip in as a statement instead of a discovery question?
 - Are conflicting figures shown in the Conflicts box, not silently reconciled?
 - Does the route have a **CFO metric**, and is "the metric that matters" literal and named?
-- Is it 2-3 pages, bullet-led, free of marketing language?
+- Is it a tight **2 pages** (3 max), bullet-led, free of marketing language?
+- **Density check:** is every cell a phrase (5-15 words) and not a sentence? Are list rows compressed with commas/semicolons rather than expanded into multiple lines?
 - Casing: **All-e** (never "Agent X"), **hoppr**, **Turbo**, **Extract**, **Graas**; Pilot vs POC used precisely?
 - Was the Doc created AND the conversion verified (tables render)?
 - Post-call: were the notes diffed against the agenda (answers moved up, confidence upgraded), and is the **Next step** recorded?
