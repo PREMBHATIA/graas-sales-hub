@@ -532,6 +532,24 @@ def _cache_key(sheet_id: str, tab_name: str) -> str:
     return hashlib.md5(f"{sheet_id}:{tab_name}".encode()).hexdigest()
 
 
+def clear_disk_cache() -> int:
+    """Delete every parquet/meta file under data/cache/ so the next sheet read
+    goes back to Google. Returns the number of files removed. Safe to call when
+    the cache directory is empty.
+    """
+    removed = 0
+    if not CACHE_DIR.exists():
+        return 0
+    for p in CACHE_DIR.iterdir():
+        if p.is_file() and p.suffix in (".parquet", ".json"):
+            try:
+                p.unlink()
+                removed += 1
+            except Exception:
+                pass
+    return removed
+
+
 def _read_cache(sheet_id: str, tab_name: str, max_age_hours: int = 4) -> Optional[pd.DataFrame]:
     """Read cached data if fresh enough."""
     key = _cache_key(sheet_id, tab_name)

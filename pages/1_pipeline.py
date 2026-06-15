@@ -234,8 +234,11 @@ raw = load_proposals()
 pipeline_raw = load_current_pipeline()
 meetings_data = load_meetings_summary()
 
-if st.button("🔄 Refresh"):
+if st.button("🔄 Refresh", help="Clears both Streamlit's in-memory cache AND the parquet disk cache so the next read goes back to Google."):
+    from services.sheets_client import clear_disk_cache
+    removed = clear_disk_cache()
     st.cache_data.clear()
+    st.toast(f"Cleared {removed} cached file(s). Reloading from sheet…")
     st.rerun()
 
 # ══════════════════════════════════════════════════════════════════════════════
