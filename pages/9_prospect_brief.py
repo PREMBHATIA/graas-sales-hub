@@ -528,17 +528,24 @@ with right:
                     "max_uses": 10,
                 }]
 
-            # Activity log inside the status box. Each line is a markdown row.
+            # Activity log inside the status box. Lines are stored as HTML so we can
+            # wrap them in a small-font div for a tighter visual footprint.
             activity_lines: list = []
             search_count = 0
             source_count = 0
             text_chars = 0
+            import html as _html
+
             with status_box:
                 activity_box = st.empty()
 
                 def _render_activity():
+                    body = "<br>".join(activity_lines) if activity_lines else "<i>Connecting to Claude…</i>"
                     activity_box.markdown(
-                        "\n\n".join(activity_lines) if activity_lines else "_Connecting to Claude…_"
+                        f"<div style='font-size: 0.78em; line-height: 1.4; color: #444; "
+                        f"font-family: ui-monospace, SFMono-Regular, Menlo, monospace;'>"
+                        f"{body}</div>",
+                        unsafe_allow_html=True,
                     )
 
                 def _push(line: str):
@@ -563,7 +570,7 @@ with right:
                             if btype == "server_tool_use" and getattr(block, "name", "") == "web_search":
                                 pending_input_json = ""
                                 search_count += 1
-                                _push(f"🔍 **Search #{search_count}** — preparing query…")
+                                _push(f"🔍 <b>Search #{search_count}</b> — preparing query…")
                             elif btype == "web_search_tool_result":
                                 # block.content is the list of results
                                 results = getattr(block, "content", None) or []
@@ -571,28 +578,26 @@ with right:
                                     results = []
                                 source_count += len(results)
                                 if results:
-                                    _replace_last(
-                                        activity_lines[-1].replace("preparing query…", "")
-                                        + f" → **{len(results)}** result(s)"
-                                        if activity_lines else
-                                        f"📄 {len(results)} result(s)"
-                                    )
+                                    last = activity_lines[-1] if activity_lines else f"🔍 <b>Search #{search_count}</b>"
+                                    last = last.replace(" — preparing query…", "")
+                                    _replace_last(f"{last} → <b>{len(results)}</b> result(s)")
                                     for r in results[:4]:
                                         title = (getattr(r, "title", None) or "")[:90]
                                         url = getattr(r, "url", None) or ""
                                         if title or url:
-                                            disp = title or url
+                                            disp = _html.escape(title or url)
+                                            safe_url = _html.escape(url, quote=True)
                                             if url:
-                                                activity_lines.append(f"   · [{disp}]({url})")
+                                                activity_lines.append(f"&nbsp;&nbsp;&nbsp;· <a href='{safe_url}' target='_blank' style='color:#666; text-decoration:none;'>{disp}</a>")
                                             else:
-                                                activity_lines.append(f"   · {disp}")
+                                                activity_lines.append(f"&nbsp;&nbsp;&nbsp;· {disp}")
                                     if len(results) > 4:
-                                        activity_lines.append(f"   · +{len(results) - 4} more")
+                                        activity_lines.append(f"&nbsp;&nbsp;&nbsp;· +{len(results) - 4} more")
                                     _render_activity()
                                 else:
                                     _replace_last(activity_lines[-1] + " → no results")
                             elif btype == "text":
-                                _push("✏️ **Drafting the brief…**")
+                                _push("✏️ <b>Drafting the brief…</b>")
                         elif etype == "content_block_delta":
                             delta = getattr(event, "delta", None)
                             dtype = getattr(delta, "type", None)
@@ -602,8 +607,9 @@ with right:
                                 try:
                                     parsed = _json.loads(pending_input_json)
                                     q = parsed.get("query", "")
-                                    if q and activity_lines and activity_lines[-1].startswith(f"🔍 **Search #{search_count}**"):
-                                        _replace_last(f"🔍 **Search #{search_count}** — \"{q}\"")
+                                    if q and activity_lines and activity_lines[-1].startswith(f"🔍 <b>Search #{search_count}</b>"):
+                                        safe_q = _html.escape(q)
+                                        _replace_last(f"🔍 <b>Search #{search_count}</b> — \"{safe_q}\"")
                                 except Exception:
                                     pass
                             elif dtype == "text_delta":
@@ -611,7 +617,7 @@ with right:
                                 # Lightly tick the drafting line every ~500 chars
                                 if text_chars and text_chars % 500 < 20 and activity_lines:
                                     if activity_lines[-1].startswith("✏️"):
-                                        _replace_last(f"✏️ **Drafting the brief…** ({text_chars:,} chars)")
+                                        _replace_last(f"✏️ <b>Drafting the brief…</b> ({text_chars:,} chars)")
 
                     final_message = stream.get_final_message()
 
