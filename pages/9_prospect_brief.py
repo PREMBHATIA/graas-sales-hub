@@ -119,9 +119,10 @@ if not ANTHROPIC_API_KEY:
 SKILL_DIR = Path(__file__).parent.parent / "content" / "skills" / "prospect-research-brief"
 
 
-@st.cache_data(ttl=86400)
+@st.cache_data(ttl=60)
 def load_skill() -> tuple[str, str]:
-    """Return (SKILL.md text, brief_template.html text). Cached for the day."""
+    """Return (SKILL.md text, brief_template.html text). Cached for 60s so
+    template edits surface quickly after a deploy without a manual restart."""
     skill_md = SKILL_DIR / "SKILL.md"
     tmpl = SKILL_DIR / "assets" / "brief_template.html"
     if not skill_md.exists() or not tmpl.exists():
@@ -373,9 +374,18 @@ def _build_new_brief_prompt(
         f"market in the header.\n\n"
         f"Use the HTML scaffold below — replace EVERY [placeholder] with real content "
         f"derived from your research and the inputs. Delete bracketed hints, filler "
-        f"captions, and any section/option/row that doesn't apply. Keep only the matching "
-        f"Type, Motion, and the matching B2B-or-B2C order-flow line. Output a clean, "
-        f"finished HTML brief — no brackets, no instructions, no scaffold markers.\n\n"
+        f"captions, and `<!-- comments -->`. Keep only the matching Type, Motion, and "
+        f"the matching B2B-or-B2C order-flow line. Output a clean, finished HTML brief "
+        f"— no brackets, no instructions, no scaffold markers.\n\n"
+        f"**DO NOT DELETE MANDATORY SECTIONS.** Every brief must include: Executive "
+        f"Summary, the full *What they have* ledger (all 10 rows: Business model, Scale, "
+        f"**Funding status, Top brands, Top competitors**, Channel structure, Catalogue "
+        f"size, Tech stack, External-facing agents, AI maturity), Recent news, Order flow, "
+        f"Product route, Persona map, Pain → Capability → CFO, The metric that matters, "
+        f"Discovery agenda, Conflicts & unknowns, People & path in, Next step, Opening "
+        f"hook. If you can't find a fact for a mandatory cell, write *\"Info not publicly "
+        f"available\"* with Confidence = Unknown — **NEVER drop the row**. Meeting attendees "
+        f"section: keep only if attendees were provided in inputs.\n\n"
         f"**HARD LIMIT: 2 PAGES** (3 absolute max when printed). Apply the density rule "
         f"from the skill: every cell is a **phrase, 5-15 words, not a sentence**. "
         f"Compress lists with commas and semicolons — never one bullet per item where a "

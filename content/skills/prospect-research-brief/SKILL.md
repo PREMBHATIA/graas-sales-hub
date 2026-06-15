@@ -68,6 +68,31 @@ Invoke **research-integrity** throughout — it's the verification/confidence di
 
 ---
 
+## Mandatory sections — never delete
+
+The salesperson opens the same brief every time, and a missing section reads as "we couldn't be bothered." Some sections and rows are **mandatory** and must appear in every brief, even when public data is thin. For a missing fact in a mandatory cell, write *"Info not publicly available"* verbatim — never delete the row.
+
+**Mandatory (always present, never delete the row/section header):**
+- Header line + Status line + **Executive Summary** (one paragraph)
+- Stat band, Type line, Motion line
+- The **What they have** ledger — every required row: Business model · Scale · **Funding status** · **Top brands** · **Top competitors** · Channel structure · Catalogue size/SKU count · Tech stack · External-facing agents · AI maturity. If you can't find a fact, put *"Info not publicly available"* in the *What we know* column with Confidence = Unknown.
+- **Recent news (last 12 months)** — at least 2-4 bullets, or one honest bullet *"Nothing material in the last 12 months from public sources"* if genuinely empty
+- Order flow today (one line that matches the motion)
+- **Product fit & CFO lens** (Product route, Persona map, Pain → Capability → CFO metric, "The metric that matters")
+- **Discovery & next move** (Double-click in discovery — all four sub-groups + the motion-specific block, Conflicts & unknowns, People & path in, Next step, Opening hook)
+
+**Conditional (delete only if not applicable):**
+- *Type* options — keep only the matching one, delete the other two
+- *Motion* options — same
+- *Order flow* line — keep only the matching B2B-or-B2C line
+- *Meeting attendees* — keep only if attendee names were provided as input
+- *Other signals* — keep only if there's genuine material to add (M&A, leadership change, etc.)
+- *B2B-specific vs B2C-specific discovery block* — keep only the matching one
+
+If you're tempted to skip a mandatory row because "there's no data" — that's exactly the signal to write *"Info not publicly available"* and turn the gap into a discovery question. A complete brief with honest gaps is far more useful than a tidy brief that quietly skipped half the fields.
+
+---
+
 ## Density rule — every cell is a phrase, not a sentence
 
 The brief is a **tight 2-pager** (3 absolute max). The number-one failure mode is sprawling cells full of full sentences, which then wrap across multiple lines in Google Docs and double the page count. Apply these rules in every table cell and every bullet:
