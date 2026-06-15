@@ -675,9 +675,11 @@ prod_group = df.groupby("Product Group").agg(
     Won=("Status", lambda x: (x == "Won").sum()),
     Lost=("Status", lambda x: (x == "Lost").sum()),
     Open=("Status", lambda x: (x == "Open").sum()),
-    GP=("GP", "sum"),
+    # Open_GP is what "Pipeline GP" should mean — future revenue from deals
+    # still in play. Summing all rows would conflate it with Won + Lost value.
+    Open_GP=("GP", lambda x: x[df.loc[x.index, "Status"] == "Open"].sum()),
     Won_GP=("GP", lambda x: x[df.loc[x.index, "Status"] == "Won"].sum()),
-).reset_index().sort_values("GP", ascending=False)
+).reset_index().sort_values("Open_GP", ascending=False)
 
 prod_table = []
 for _, r in prod_group.iterrows():
@@ -689,7 +691,7 @@ for _, r in prod_group.iterrows():
         "Won GP": fmt(r["Won_GP"]),
         "Lost": int(r["Lost"]),
         "Open": int(r["Open"]),
-        "Pipeline GP": fmt(r["GP"]),
+        "Pipeline GP": fmt(r["Open_GP"]),
         "Win Rate": f"{wr_p:.0f}%",
     })
 
@@ -717,9 +719,9 @@ st.dataframe(styled_prod, use_container_width=True, hide_index=True, height=220)
 
 fig_pg = go.Figure()
 fig_pg.add_trace(go.Bar(
-    y=prod_group["Product Group"], x=prod_group["GP"], orientation="h",
+    y=prod_group["Product Group"], x=prod_group["Open_GP"], orientation="h",
     name="Pipeline GP",
-    text=[fmt(v) for v in prod_group["GP"]], textposition="outside",
+    text=[fmt(v) for v in prod_group["Open_GP"]], textposition="outside",
     marker_color="#7C3AED",
 ))
 fig_pg.add_trace(go.Bar(
