@@ -526,11 +526,13 @@ PRODUCT_GROUPS = {
     "All-e B2B": "All-e",
     "All-e B2C": "All-e",
     "All-e": "All-e",
+    "Replenishment Intelligence": "All-e",  # pharmacy/retail All-e play (e.g. Sunway MY)
     "Execute": "Execute",
     "Integration": "Execute",
     "Hoppr": "Hoppr",
     "Extract": "Extract",
     "Extract ": "Extract",
+    "Analysis/Extract": "Extract",
     "MP Enablement": "MP Enablement",
 }
 
