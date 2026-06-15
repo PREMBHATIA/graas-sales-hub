@@ -56,6 +56,18 @@ Invoke **research-integrity** throughout — it's the verification/confidence di
 
 ---
 
+## Where to research, and how to cite
+
+**Source hierarchy.** Tier-1 (annual reports, investor decks, company filings, the company website's investor pages) → *Confirmed* for figures they themselves publish. Press/news (Economic Times, Mint, Reuters, Tech in Asia, DealStreetAsia, Crunchbase News) → *Confirmed* for the event reported (funding round, acquisition, leadership change), *Public estimate* for derived figures (revenue inferred from "Series C at $X valuation"). Aggregators (LeadIQ, Lusha, Tracxn, Euromonitor) → always *Public estimate*. LinkedIn → *Confirmed* for stated role/headcount of the profile owner, *Inferred* when you're counting employees by filter to size a team.
+
+**Geography order.** India is the primary market — start there. If you can't find the company in India, check **South East Asia** (Indonesia, Vietnam, Thailand, Philippines, Malaysia, Singapore) and state the actual country of operation up front. If the company operates in both (e.g. an Indian brand expanding into SEA), name the home market and call out the SEA presence as expansion.
+
+**Cite inline, briefly.** When a fact is load-bearing, add a one-clause source at the end: *"₹2,400 Cr FY24 revenue (per FY24 Annual Report)"*, *"Series D in March 2024 at $1.2B valuation (per Economic Times, March 2024)"*. The ledger's Source column is the formal record; inline citations are for the prose bullets and the stat-band footnotes. Aggregator citations are fine but tag them: *"~$290M (Euromonitor — public estimate)"*.
+
+**When a fact is genuinely not findable** — not "I didn't look hard enough", but actually not in any public source — write *"Info not publicly available"* verbatim. Don't fudge it with a vague phrase like "around mid-sized" or "regional player". Honest gaps are useful; vague language isn't.
+
+---
+
 ## The hard rule: never assert a guess
 
 Prospect research is full of public estimates that look like facts. The failure this prevents: two people brief the same company, one writes "41 branches, ~$50-100M", the other "47 branches, ~$290M", and nobody notices the brief is built on sand.
@@ -105,7 +117,7 @@ Then route to a product shape:
 **Before the first call:**
 1. **Ingest everything.** Research, notes, prior correspondence. Read referenced Drive files via `read_file_content`. Search the web only to fill gaps or check a load-bearing figure — and apply the research-integrity source hierarchy (aggregators are *Public estimate*, never *Confirmed*).
 2. **Classify position + motion** — value-chain position (OEM/Principal/Brand · multi-brand distributor · multi-brand retailer) and B2B/GT vs B2C. Together they set the personas and the route.
-3. **Build the "What they have" facts.** Cover business model, scale, channel structure, catalogue size / SKU count, tech stack (ERP/CRM/DMS/SFA/support-ticketing/channels), external-facing agents deployed, AI maturity, people — each with its confidence.
+3. **Build the "What they have" facts.** Cover business model, scale, **funding status** (round/year/lead + profitable or loss-making), **top brands they own or carry**, **top 2-3 competitors in their category**, channel structure, catalogue size / SKU count, tech stack (ERP/CRM/DMS/SFA/support-ticketing/channels), external-facing agents deployed, AI maturity, people — each with its confidence. Separately, build a short **Recent news** list covering significant events in the last 12 months (expansion, acquisition, leadership change, new product line, regulatory action, major funding) — this is where the *why now* usually lives.
    - **Trace the order flow to populate this fast** — following one order end-to-end maps the systems *and* finds the seams. *B2B/GT:* origination (OEM app / call center / salesperson via SFA) → processing (HQ/admin: credit check, approval) → order in ERP → invoice → transport — note every manual handoff and where TAT/cost/orders leak. *B2C:* web / mobile app / WhatsApp → checkout → fulfilment — note where conversion leaks. The current flow is what solutioning later turns into the agentic flow; the leak points become the Pain → Capability → CFO rows.
    - **Sanity-check the quantifiables.** Cross-check the SKU estimate against the brand/category portfolio — a long brand list with only "hundreds of SKUs" is usually an undercount; widen the range or flag the tension. And for a public company, bound the findable counts (distributors, field force from LinkedIn headcount splits, outlet reach) from desk sources before marking *Unknown* — reserve *Unknown* for genuinely non-public facts, not for research you haven't done yet.
 4. **Gap analysis.** Against what good looks like for their motion, what's missing? Write soft/unverified gaps as questions.
@@ -153,11 +165,13 @@ Research turns up material that maps to no field — an acquisition, fresh fundi
 Fill `assets/brief_template.html`. The template carries placeholder text and filler captions to guide you — strip all of it when you fill it. The delivered Doc shows real content only: no brackets, no instructions, no unused options.
 
 **Page 1 — Snapshot**
+- **Header** — Company name; *Date prepared* (today); *Meeting date* (the upcoming meeting, if known); *Prepared by: Graas Enterprise Team*. One line each.
 - **Status line** — *Pre-call draft* / *Post call-1 — [date]* / *Post call-2 — [date]* …
 - **Stat band** (one row): Revenue | SKUs | Channel touchpoints | Field force | Geography — prefix estimates with `~`, no per-cell tag. *(B2C: swap Channel touchpoints and Field force for Monthly traffic and Conversion %.)*
 - **Type** — OEM/Principal/Brand · Multi-brand distributor · Multi-brand retailer. One line.
 - **Motion** — B2B/GT or B2C (or both, wedge named). One line.
-- **What they have** (table): Dimension | What we know | Confidence | Source. Rows: business model, scale, channel structure, catalogue size / SKU count, tech stack, external-facing agents (the All-e-vs-KG signal), AI maturity.
+- **What they have** (table): Dimension | What we know | Confidence | Source. Required rows: **business model**, **scale**, **funding status** (listed/PE-backed/VC-funded/bootstrapped + profitable/loss-making — name the round, year, lead if applicable), **top brands** (the brands they own or carry — the ones the customer's market would recognise), **top 2-3 competitors** (the names that come up in their category — useful for positioning), **channel structure**, **catalogue size / SKU count**, **tech stack**, **external-facing agents** (the All-e-vs-KG signal), **AI maturity**.
+- **Recent news** — 2-4 bullets covering significant events in the last 12 months: expansion, acquisition, leadership change, new product line, regulatory action, major funding. Cite source inline. Use this to find the *why now*. Omit only if genuinely nothing material has happened.
 - **Order flow today** — a one-line end-to-end trace with manual steps and leak points flagged. The clearest single picture of where the product inserts; sets up the Pain → Capability → CFO rows.
 - **What they're likely missing** — short bullets; soft/unverified gaps phrased as questions.
 - **Other signals** — catch-all for material that matters but fits no field. Omit if empty.
@@ -171,7 +185,8 @@ Fill `assets/brief_template.html`. The template carries placeholder text and fil
 **Page 3 — Discovery & next move**
 - **Double-click in discovery** — grouped questions (Business model / Data readiness / Tech & integration / Commercial authority) plus a motion-specific block: *B2C* → storefront URL, traffic, conversion %, AOV, ad spend/ROAS; *B2B/GT* → support-ticket system + volume/AHT, order/claim flow. This is the agenda, not a full questionnaire. Post-call, answered questions move up into the tables; the rest carry forward.
 - **Conflicts & unknowns** (callout) — conflicting figures, what's unverified, and the one fact that would most change the recommendation.
-- **People & path in** (table): Name | Role | Why they matter | DM / Champion / Finance buyer; plus the entry wedge.
+- **Meeting attendees** (table, when the calendar invite is known): Name | Title | LinkedIn summary (2-3 lines: background, prior companies, current focus) | Likely angle on Graas. One row per *external* attendee (skip the Graas team). If LinkedIn isn't findable, write *"LinkedIn profile not publicly available"* — don't guess. This table is what gets read in the 5 minutes before the call.
+- **People & path in** (table — the strategic map across the account, broader than just this meeting): Name | Role | Why they matter | DM / Champion / Finance buyer; plus the entry wedge. Overlaps with attendees are fine — this table captures who matters across the deal, not just who's in the room.
 - **Next step** — the decided next action + one line on why, and whether the qualification gate is met. Pre-first-call this is the opening hook below.
 - **Opening hook** — one or two lines grounded in their actual numbers (most relevant before the first call).
 
@@ -206,8 +221,12 @@ On the post-call pass, edit the same Doc — don't spin up a new file — so ver
 ## Before you share (self-audit)
 
 - Are **type and motion** classified (value-chain position + B2B/GT vs B2C), and does the route follow from them?
-- Is the **status line** set correctly?
+- Is the **status line** set correctly? Is the **header** filled (date prepared, meeting date if known, prepared by)?
+- Does the **ledger** cover the required rows — including funding status, top brands, top competitors, plus the standard business/scale/channel/SKU/tech-stack/agents/AI-maturity rows?
+- Is there a **Recent news** block with at least 2-4 events from the last 12 months (or an honest *"nothing material in the last 12 months"*)?
+- For an upcoming meeting with known external attendees: is the **Meeting attendees** table populated with LinkedIn summaries (or *"LinkedIn profile not publicly available"* per row)?
 - Do the **load-bearing** figures carry a confidence read (ledger column; `~` in the stat band; inline flags elsewhere) — without tagging the obvious?
+- Are sources **cited inline** for load-bearing facts (annual report / Economic Times / aggregator-with-tag)?
 - Did any load-bearing Inferred/Unknown fact slip in as a statement instead of a discovery question?
 - Are conflicting figures shown in the Conflicts box, not silently reconciled?
 - Does the route have a **CFO metric**, and is "the metric that matters" literal and named?

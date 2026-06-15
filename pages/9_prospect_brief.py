@@ -245,6 +245,17 @@ with left:
     st.markdown("### 3. Inputs")
 
     if mode.startswith("🆕"):
+        meeting_date = st.text_input(
+            "Meeting date (optional — paste from the calendar invite)",
+            key="brief_meeting_date",
+            placeholder="e.g. 2026-06-20, or leave blank",
+        ).strip()
+        attendees_raw = st.text_area(
+            "External attendees (optional — names + titles from the invite, one per line)",
+            key="brief_attendees",
+            height=80,
+            placeholder="e.g.\nRavi Kumar — CTO\nPriya Sharma — VP Sales\nAnil Mehta — CFO",
+        )
         research_text = st.text_area(
             "Research notes (paste anything: website blurb, LinkedIn, prior emails, "
             "industry profile, news clippings, screenshots-of-PDFs as text)",
@@ -320,7 +331,13 @@ def _extract_doc_id(input_str: str) -> str:
     return ""
 
 
-def _build_new_brief_prompt(crm_data: dict, research: str, company: str) -> str:
+def _build_new_brief_prompt(
+    crm_data: dict,
+    research: str,
+    company: str,
+    meeting_date: str = "",
+    attendees: str = "",
+) -> str:
     """Compose the user-turn prompt for a fresh pre-call brief."""
     today = datetime.now().strftime("%Y-%m-%d")
     crm_block = ""
@@ -330,16 +347,26 @@ def _build_new_brief_prompt(crm_data: dict, research: str, company: str) -> str:
             + json.dumps({k: v for k, v in crm_data.items() if v}, indent=2)
         )
 
+    meeting_block = ""
+    if meeting_date or attendees.strip():
+        meeting_block = "\n=== MEETING CONTEXT ===\n"
+        if meeting_date:
+            meeting_block += f"Meeting date: {meeting_date}\n"
+        if attendees.strip():
+            meeting_block += f"External attendees from the invite (research LinkedIn for each):\n{attendees.strip()}\n"
+
     return (
         f"Build a pre-call Prospect Research Brief for **{company or '<NAME>'}**.\n"
-        f"Today is {today}. Set the status line to *Pre-call draft*.\n\n"
+        f"Today is {today}. Set the status line to *Pre-call draft*. "
+        f"In the header, set Date prepared = {today}"
+        f"{f', Meeting date = {meeting_date}' if meeting_date else ''}.\n\n"
         f"Use the HTML scaffold below — replace EVERY [placeholder] with real content "
         f"derived from the inputs. Delete bracketed hints, filler captions, and any "
         f"section/option/row that doesn't apply. Keep only the matching Type, Motion, "
         f"and the matching B2B-or-B2C order-flow line. Output a clean, finished HTML "
         f"brief — no brackets, no instructions, no scaffold markers. 2-3 pages.\n\n"
         f"=== INPUTS — RESEARCH ===\n{research or '(no extra research pasted — use the CRM context + your general knowledge of this company)'}\n"
-        f"{crm_block}\n\n"
+        f"{crm_block}{meeting_block}\n\n"
         f"=== HTML SCAFFOLD ===\n{TEMPLATE_HTML}\n\n"
         f"Return ONLY the filled HTML brief. No prose before or after, no markdown code "
         f"fences. The output must start with `<html>` (or `<!DOCTYPE html>`) and be a "
@@ -434,7 +461,11 @@ with right:
                     "into the **Research notes** box and try again."
                 )
                 st.stop()
-            user_prompt = _build_new_brief_prompt(crm_data, research_text, company_name)
+            user_prompt = _build_new_brief_prompt(
+                crm_data, research_text, company_name,
+                meeting_date=meeting_date,
+                attendees=attendees_raw,
+            )
         else:
             doc_id = _extract_doc_id(existing_brief_id)
             if not doc_id:

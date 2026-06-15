@@ -135,57 +135,85 @@ Do not build the full proposal until the team has chosen an approach.
 
 ### Step 5: Build the Proposal Document
 
-Once the approach is chosen, produce the full proposal in structured markdown. Structure:
+Once the approach is chosen, produce the full proposal in structured markdown. **Every full proposal must contain every section below, in this order. Do not omit a section — if a section truly doesn't apply, write one line saying so and why.**
 
-1. Executive Summary (half a page max)
+**HEADER** (top of doc, before the front-page summary)
+   - Company name + parent/group (e.g. "Prepared for Nippon Paints India (Wuthelam Group)")
+   - Use case title + subtitle (one line that names the play, e.g. "All-e for Dealer Ordering & Collections — Paid POC scope")
+   - Date prepared · **Valid Until** (default: 14 days from today)
+   - Prepared by GraasAI · Prepared for [Company]
+
+1. **Front-page Summary** (the CFO-readable opener — see the NON-NEGOTIABLE section above; mandatory)
+
+2. **Executive Summary** (half a page max — expands the front page into prose)
+   - Who the client is, what is being proposed, why it matters
    - Size of the problem (revenue leakage numbers)
-   - What we're proposing (product, channel, use cases)
    - Phasing and timeline
    - Commercial shape in one sentence
 
-2. Context & Confirmed Understanding
-   - Customer background
-   - Confirmed facts table — "SDN should confirm that the facts below are correctly stated before proceeding"
+3. **What Sets GraasAI Apart** (3-4 differentiation pillars, *tailored to this client* — don't copy boilerplate)
+   - Pick from: **Voice-Native Intelligence** (agents that work over voice + WhatsApp, not just text bots), **Distribution-Grade Execution** (built for GT/distribution-network scale, not white-collar pilots), **App-Agnostic / Channel-Agnostic** (works on the customer's existing WABA, SFA, or web — no rip-and-replace), **Enterprise-Ready Architecture with Governance** (audit trails, role-based access, data residency), **Shared Knowledge Graph / Model Tuning** (the KG that powers the agent is itself an asset the customer owns or co-owns)
+   - Each pillar = one bolded label + 2-3 lines explaining what it means *for this customer's situation*
+   - If the customer is evaluating multiple vendors, lean harder on the pillar that breaks the tie
 
-3. Revenue Leakage Analysis
-   - Quantified problem by lever
+4. **Context & Confirmed Understanding**
+   - Customer background (one paragraph)
+   - Confirmed facts table — "Please confirm the facts below before we proceed"
+
+5. **Current State → Future State** [MANDATORY — one before/after row per use case]
+   - For each use case, a structured before/after that quantifies the baseline:
+   - Table columns: Use case | Current flow (with TAT, headcount, or volume baseline) | Future flow with All-e | Target metric (TAT reduction / cost saving / orders captured / DSO)
+   - If a baseline is genuinely unknown, write "baseline TBD — to be established in Phase 1" — never invent one
+   - This is the single picture of why this proposal exists; do not skip it even for a single-use-case POC
+
+6. **Revenue Leakage Analysis**
+   - Quantified problem by lever (revenue / cost / experience)
    - Summary table: Leakage Category | Estimated Impact | Addressed By | Phase
    - Honest about what's calculated vs. what's TBD
 
-4. Solution (Current vs. Agentic)
-   - For each phase/use case: side-by-side table showing current workflow, agentic workflow, expected impact
-   - Explain the consumption surface (WhatsApp, SFA, portal) and why
-   - If intelligence is embedded inline, explain this clearly
+7. **Scope of Work**
+   - 7.1 **Use Case(s) and Parameters** — use case name, pilot size (retailers/distributors/FSAs in scope), geography, language(s), modality (voice/text/both)
+   - 7.2 **Integration Scope** — systems to integrate (name them), depth (read/write, real-time/batch, API or file drop), what's explicitly out of scope
+   - 7.3 **What Graas Delivers** — concrete bullet list (the agent, the KG build, the integration, the dashboards, the tuning)
+   - 7.4 **What Client Provides** — data, API access, named contacts, approvals needed, WABA/telephony setup, sandbox environment — be specific, no ambiguity
+   - 7.5 **Pre-conditions** — what must be true before the phase clock starts (data delivered, API stubs available, decision-maker aligned)
 
-5. Scope of Work (by phase)
-   - Objective, channel, persona, categories, languages, core capabilities, integrations, out of scope
-   - Pre-conditions: what the customer must provide before each phase starts
-   - Timeline: realistic, with the clock starting on data/access receipt, not contract signature
+8. **Success Metrics / KPIs**
+   - **Minimum two KPIs**, each with **a target AND a baseline** (baseline TBD is allowed if it's calibrated in Phase 1)
+   - Must include the **primary CFO-lens metric** (cost efficiency / revenue uplift / TAT reduction)
+   - Mark each KPI as **directional** (an indicator we track) or a **hard gating condition** (failing it kills the next phase)
+   - Who evaluates, on what timeline, what happens on pass/fail
 
-6. Success Metrics / KPIs
-   - Concrete, measurable, with targets
-   - Gating conditions vs. outcome indicators (match to customer's risk appetite)
-   - Who evaluates, what timeline for sign-off, what happens on pass/fail
+9. **Technical & Commercial**
+   - 9.1 **Architecture Overview** — deployment model (cloud / customer cloud / on-prem), integration path, governance/audit, monitoring
+   - 9.2 **Commercials — three tiers, clearly separated**: **POC/Demo** | **Pilot** | **Production**. For each: one-time fee, monthly retainer, conversation volume included, overage rate. Plus Meta/telephony charge model (customer pays direct, or passthrough with admin surcharge). Anchor to comparable deals.
+   - 9.3 **Timelines** — phase-wise with key milestones (kickoff, integration cut, UAT, go-live, end-of-POC review). The clock starts on data/access receipt, not contract signature.
+   - 9.4 **Payment Schedule** — standard: 50% advance + 50% on delivery for one-time fees; monthly retainer billed by the 7th of each month
 
-7. Commercials
-   - One-time fees by phase (what's included)
-   - Monthly retainer (conversations included, overage rate)
-   - Meta/WhatsApp charges (actuals or passthrough with surcharge)
-   - Payment schedule: 50% advance, 50% on agent delivery for UAT
-   - Always anchor to comparable deals, adjust for customer scale
+10. **Post-POC — Path to Production** [MANDATORY for any POC or Pilot proposal]
+    - What carries forward from the POC (the agent, the KG, the integration, the tuned models) — and what doesn't
+    - What the production proposal will cover (full scale, additional use cases, ongoing monthly)
+    - Expected timeline from POC sign-off to production go-live
 
-8. Next Steps
-   - Action table: #, Action, Owner, Dependency
-   - Make dependencies explicit
+11. **Next Steps**
+    - Numbered, action-owner tagged: # | Action | Owner | Dependency | Target date
+    - Dependencies must be explicit (e.g. "Owner: Customer IT. Dependency: SAP sandbox credentials.")
 
-9. Proposal Acceptance
-   - Signature block for both parties
+12. **Contracting Note** [include ONLY if there's a known constraint]
+    - Vendor onboarding freeze, parent-company procurement process, NDA prerequisite, SPV / special-entity structure, regulatory pre-approval — name the constraint and the path through it
+    - Omit the section entirely if none of these apply
+
+13. **Proposal Acceptance**
+    - Acceptance method (countersigned PDF, PO reference, signed email)
+    - Validity reminder ("This proposal is valid until [Valid Until date]")
+    - Confidentiality note (one line)
+    - Signature block for both parties
 
 What NOT to include:
 - Elaborate multi-gate frameworks with 9-metric tables when the customer is ready for production
-- "What Sets Graas Apart" competitive sections (unless customer is evaluating multiple vendors — ask the team)
 - Technical architecture diagrams (save for the joint technical workshop)
 - References to "Agent X" — the product is called All-e
+- Boilerplate differentiation pillars — every *What Sets Apart* pillar must connect to a fact from this customer's discovery
 
 ## COMMERCIAL BENCHMARKS
 
@@ -223,6 +251,26 @@ Scale adjustments:
 - "Knowledge Graph" is fine — it's the right technical term for the intelligence layer
 - "Field agents" / "FSAs" (field sales agents) — clarify which term the customer uses
 - Don't use "GAF" (Graas Agent Foundry) with customers
+- Frame commercials as **investment**, not cost
+
+## PRE-SEND QUALITY CHECKLIST — RUN BEFORE EVERY PROPOSAL GOES OUT
+
+Before finalising any proposal, confirm every line below. If any item fails, fix it or surface the gap to the team — do not send a proposal with red flags.
+
+- [ ] **Front-page summary** present, with all 7 elements (headline value prop, big numbers stat band, what we deliver, CFO metric named, timeline, commercial-as-investment, decision asked for)
+- [ ] **What Sets GraasAI Apart** has 3-4 pillars, each tailored to a specific fact from this customer's discovery — no boilerplate
+- [ ] **Current → Future** table present for every use case, with quantified baselines (or honest "baseline TBD")
+- [ ] **KPIs** have both **target AND baseline** (or "baseline TBD" calibrated in Phase 1); the primary CFO-lens metric is one of them
+- [ ] **Commercials cover all three tiers**: POC/Demo · Pilot · Production — each with one-time + monthly + conversation volume + overage
+- [ ] **Timelines** included for each phase (kickoff → integration → UAT → go-live → review), with the clock starting on data/access receipt
+- [ ] **What Client Provides** is unambiguous — every data feed, API, contact, approval, and dependency is named
+- [ ] **Post-POC — Path to Production** section is present (mandatory for any POC/Pilot)
+- [ ] **Valid Until** date set (default: 14 days from send date)
+- [ ] **Payment Schedule** stated (50% advance + 50% on delivery for one-time; by 7th of month for monthly)
+- [ ] **Contracting Note** included only if there's a real constraint (omit otherwise)
+- [ ] **Tone check** — factual, outcome-led, customer-language, no AI buzzwords ("seamless", "enterprise-grade", "AI-powered", "moment of intent")
+- [ ] **Numbers check** — every revenue / volume / percentage figure traces back to discovery or is marked TBD; no invented baselines
+- [ ] **Casing** — All-e (not Agent X), hoppr, Turbo, Extract, Graas
 """
 
 
