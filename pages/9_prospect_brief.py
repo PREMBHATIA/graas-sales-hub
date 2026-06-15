@@ -40,8 +40,9 @@ st.caption("Pre-call research → 2-3 page account brief, then a living doc upda
 with st.expander("ℹ️ How to use this — read once, then collapse", expanded=False):
     st.markdown("#### What this does")
     st.markdown(
-        "Turns raw research into a **2-3 page Prospect Brief Google Doc** "
-        "you can share with the team. The brief tells you:"
+        "Type a company name → Claude **web-researches the company** (website, "
+        "LinkedIn, news, filings, funding databases) → produces a **2-3 page "
+        "Prospect Brief Google Doc** you can share with the team. The brief tells you:"
     )
     st.markdown(
         "- **What they have** — business model, tech stack, channels, AI maturity (confidence tagged)\n"
@@ -257,16 +258,16 @@ with left:
             placeholder="e.g.\nRavi Kumar — CTO\nPriya Sharma — VP Sales\nAnil Mehta — CFO",
         )
         research_text = st.text_area(
-            "Research notes (paste anything: website blurb, LinkedIn, prior emails, "
-            "industry profile, news clippings, screenshots-of-PDFs as text)",
+            "Research notes (optional — Claude will web-research the company itself; "
+            "paste anything you already have to ground or steer the search: prior emails, "
+            "internal context, notes from previous meetings, conflicting figures you've seen)",
             key="brief_research_text",
-            height=300,
+            height=240,
             placeholder="e.g.\n"
-                        "- HQ in Mumbai, ~$290M revenue (Euromonitor) vs $50-100M (LeadIQ) — conflicting\n"
-                        "- ~19,000 dealers on credit terms, distributor network across 8 states\n"
-                        "- SAP since 2015, Salesforce CRM, proprietary field app\n"
-                        "- Saw on LinkedIn: hiring head of e-commerce; CTO posted about agentic AI in March\n"
-                        "- Possible champion: VP Sales (met at retail summit Apr 24)",
+                        "- Met VP Sales at retail summit Apr 24 — possible champion\n"
+                        "- Heard CFO is sensitive on DSO; recent earnings call mentioned receivables\n"
+                        "- Two sources disagree on revenue — flag the conflict\n"
+                        "- (Leave blank to let Claude research from public sources)",
         )
         existing_brief_id = ""
         call_notes = ""
@@ -360,17 +361,28 @@ def _build_new_brief_prompt(
         f"Today is {today}. Set the status line to *Pre-call draft*. "
         f"In the header, set Date prepared = {today}"
         f"{f', Meeting date = {meeting_date}' if meeting_date else ''}.\n\n"
+        f"**You have the `web_search` tool. Use it.** Before filling the brief, run the "
+        f"searches you'd need a junior analyst to run: company website + investor pages, "
+        f"recent news (last 12 months), LinkedIn for the attendees (when provided), funding "
+        f"history (Crunchbase / Tracxn / DealStreetAsia), industry coverage (Economic "
+        f"Times, Mint, Reuters, Tech in Asia). Apply the source hierarchy from the skill: "
+        f"company filings/website = Confirmed; news = Confirmed for the event reported; "
+        f"aggregators (LeadIQ/Lusha/Euromonitor) = Public estimate. Cite sources inline.\n"
+        f"Geography: start with India; if the company isn't there, check South East Asia "
+        f"(Indonesia, Vietnam, Thailand, Philippines, Malaysia, Singapore) and state the "
+        f"market in the header.\n\n"
         f"Use the HTML scaffold below — replace EVERY [placeholder] with real content "
-        f"derived from the inputs. Delete bracketed hints, filler captions, and any "
-        f"section/option/row that doesn't apply. Keep only the matching Type, Motion, "
-        f"and the matching B2B-or-B2C order-flow line. Output a clean, finished HTML "
-        f"brief — no brackets, no instructions, no scaffold markers. 2-3 pages.\n\n"
-        f"=== INPUTS — RESEARCH ===\n{research or '(no extra research pasted — use the CRM context + your general knowledge of this company)'}\n"
+        f"derived from your research and the inputs. Delete bracketed hints, filler "
+        f"captions, and any section/option/row that doesn't apply. Keep only the matching "
+        f"Type, Motion, and the matching B2B-or-B2C order-flow line. Output a clean, "
+        f"finished HTML brief — no brackets, no instructions, no scaffold markers. 2-3 "
+        f"pages.\n\n"
+        f"=== INPUTS — INTERNAL RESEARCH / CONTEXT ===\n{research or '(no internal notes pasted — research the company from public sources using web_search)'}\n"
         f"{crm_block}{meeting_block}\n\n"
         f"=== HTML SCAFFOLD ===\n{TEMPLATE_HTML}\n\n"
-        f"Return ONLY the filled HTML brief. No prose before or after, no markdown code "
-        f"fences. The output must start with `<html>` (or `<!DOCTYPE html>`) and be a "
-        f"single self-contained HTML document."
+        f"Return ONLY the filled HTML brief as your final message. No prose before or "
+        f"after, no markdown code fences. The output must start with `<html>` (or "
+        f"`<!DOCTYPE html>`) and be a single self-contained HTML document."
     )
 
 
@@ -453,14 +465,15 @@ with right:
             if not company_name:
                 st.error("Pick or type a company name first.")
                 st.stop()
-            # When the company isn't in CRM, we have no fallback context — require research.
+            # Web search is enabled, so a bare company name is enough — but warn so
+            # the salesperson knows what's about to happen.
             if not crm_data and not research_text.strip():
-                st.error(
-                    f"**{company_name}** isn't in the CRM, so I have no prior context to fall back on. "
-                    "Paste at least a few lines of research (website blurb, LinkedIn, news, prior emails) "
-                    "into the **Research notes** box and try again."
+                st.info(
+                    f"**{company_name}** isn't in the CRM and no notes were pasted — "
+                    "Claude will research from public sources (website, LinkedIn, news, "
+                    "filings). Quality depends on what's publicly findable. Paste any "
+                    "internal context next time to ground or steer the search."
                 )
-                st.stop()
             user_prompt = _build_new_brief_prompt(
                 crm_data, research_text, company_name,
                 meeting_date=meeting_date,
@@ -482,19 +495,48 @@ with right:
                 st.stop()
             user_prompt = _build_update_prompt(existing_html, call_notes, company_name or "<this prospect>")
 
-        # Call Claude
-        with st.spinner(f"{'Building' if mode.startswith('🆕') else 'Updating'} brief — researching, classifying, drafting…"):
+        # Call Claude. For "new brief" we hand Claude the web_search tool so it can
+        # actually research the company. For "update from notes" we don't — the existing
+        # brief + new notes are the source of truth, no fresh research needed.
+        spinner_msg = (
+            f"Researching {company_name} on the web — reading filings, news, LinkedIn, then drafting…"
+            if mode.startswith("🆕")
+            else "Diffing call notes against the discovery agenda, updating the brief…"
+        )
+        with st.spinner(spinner_msg):
             try:
                 import anthropic
                 client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
                 system_prompt = SKILL_TEXT
-                response = client.messages.create(
+                kwargs = dict(
                     model="claude-sonnet-4-20250514",
-                    max_tokens=6000,
+                    max_tokens=8000,
                     system=system_prompt,
                     messages=[{"role": "user", "content": user_prompt}],
                 )
-                raw_text = response.content[0].text
+                if mode.startswith("🆕"):
+                    kwargs["tools"] = [{
+                        "type": "web_search_20250305",
+                        "name": "web_search",
+                        "max_uses": 10,
+                    }]
+                response = client.messages.create(**kwargs)
+                # Multi-block response: skip web_search_tool_use / _tool_result blocks,
+                # concatenate text blocks (usually just one final text block).
+                text_parts = []
+                for block in response.content:
+                    if getattr(block, "type", None) == "text":
+                        text_parts.append(block.text)
+                    elif hasattr(block, "text"):  # fallback for SDK shape variations
+                        text_parts.append(block.text)
+                raw_text = "\n".join(p for p in text_parts if p).strip()
+                if not raw_text:
+                    st.error(
+                        "Claude returned no text — only tool calls. This usually means the "
+                        "model burned all its budget on web search and ran out of tokens. "
+                        "Try again, or paste some research notes to reduce the search scope."
+                    )
+                    st.stop()
                 brief_html = _clean_brief_html(raw_text)
                 # Guard: if Claude refused or returned prose instead of HTML, surface it
                 # honestly instead of silently rendering a malformed brief.
