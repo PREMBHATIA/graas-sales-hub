@@ -343,7 +343,12 @@ BRIEF_JSON_SCHEMA = """{
     "market": "India / Indonesia / Vietnam / Thailand / Philippines / Malaysia / Singapore — primary",
     "status": "Pre-call draft  (post-call: 'Pre-call draft → Post call-1 — YYYY-MM-DD …')"
   },
-  "executive_summary": "ONE paragraph, 3-4 sentences: (1) who they are + parent group, (2) scale in their numbers with inline citation, (3) channel/motion shape, (4) the meeting hypothesis specific to this customer.",
+  "executive_summary": {
+    "category": "vertical + business model in one line — e.g. 'Industrial gases distributor; B2B/GT'",
+    "comps": "2-3 named competitors with one-clause positioning — e.g. 'Linde (premium), Aboitiz Power (regional scale), Bharat Petroleum (state-owned challenger)'",
+    "history": "founding / trajectory / recent inflection in one line — e.g. 'Founded 1972; family-owned; expanded into specialty gases 2019; now 3rd-largest by volume'",
+    "maturity": "AI & systems maturity assessment in one line — e.g. 'Mid: SAP-ERP since 2018, Salesforce CRM, no agents deployed; piloting GenAI for support tickets (2025)'"
+  },
   "stat_band": [
     {"label": "Revenue", "value": "value, prefix estimates with ~"},
     {"label": "SKUs", "value": "..."},
@@ -365,12 +370,12 @@ BRIEF_JSON_SCHEMA = """{
     {"dimension": "External-facing agents", "what_we_know": "agents/chatbots deployed? — the All-e vs KG signal", "confidence": "...", "source": "..."},
     {"dimension": "AI maturity", "what_we_know": "...", "confidence": "...", "source": "..."}
   ],
-  "recent_news": ["Event with inline citation. e.g. 'Raised Series D at $1.2B (Economic Times, Mar 2024).'", "..."],
-  "order_flow": "ONE line tracing the order end-to-end for the matching motion (B2B or B2C), flagging manual/leak points.",
+  "recent_news": ["MAX 2 bullets, the most material events in the last 12 months. With inline citation."],
   "what_missing": ["Gap phrased as a question or honest gap statement.", "..."],
-  "other_signals": ["M&A / leadership / regulatory / competitor-displacement signals.  Omit array if empty."],
   "product_route": "All-e / Knowledge Graph / Layered — 2-3 lines on why this follows from motion + signals; name wedge vs expansion.",
-  "persona_map": [{"persona": "Distributors", "count": "~50-100", "surface": "WhatsApp / SFA"}],
+  "persona_map": [
+    {"persona": "Dealers", "count": "~500", "surface": "WhatsApp / phone today", "flow_and_leaks": "Phone order → SFA → ERP → invoice → delivery. *Leak: ~20% orders miss SFA same day; 3-day credit-check delay*"}
+  ],
   "pain_capability_cfo": [{"pain": "pain in their language", "capability": "All-e/KG capability", "metric": "DSO / revenue per rep / cost per order / ..."}],
   "metric_that_matters": "The metric this moves for [CFO or decision-maker name, role] is [single literal metric].",
   "discovery": {
@@ -380,16 +385,17 @@ BRIEF_JSON_SCHEMA = """{
     "commercial_authority": ["Who owns the budget and the metric? Who signs?"],
     "motion_specific": {"label": "If B2B / General Trade  OR  If B2C / eCommerce", "questions": ["..."]}
   },
+  "people_path_in": [
+    {"name": "...", "role": "...", "why_matter": "1-line relevance", "type": "Decision-maker | Champion | Finance buyer | Meeting attendee", "linkedin": "ONE optional line (background + prior companies). Omit field if no useful info."}
+  ],
+  "entry_wedge": "lowest-friction way in",
+  "next_step": {"action": "another discovery call | demo | POC scoping | solutioning | park", "why": "one-line rationale", "gate_met": false, "still_open": "what's missing (motion / route / customer-confirmed CFO metric / data / DM)"},
+  "opening_hook": "one or two lines grounded in their actual numbers — phrase as a question, no quote marks (we add them).",
   "conflicts_unknowns": {
     "conflicting": "conflicting figures, both numbers shown",
     "unverified": "load-bearing unverified facts",
     "key_fact": "the one fact that would most change the recommendation"
-  },
-  "meeting_attendees": [{"name": "...", "title": "...", "linkedin_summary": "2-3 lines: background, prior companies, current focus. 'LinkedIn profile not publicly available' if not found.", "angle": "why this conversation matters to them"}],
-  "people_path_in": [{"name": "...", "role": "...", "why_matter": "...", "type": "Decision-maker | Champion | Finance buyer"}],
-  "entry_wedge": "lowest-friction way in",
-  "next_step": {"action": "another discovery call | demo | POC scoping | solutioning | park", "why": "one-line rationale", "gate_met": false, "still_open": "what's missing (motion / route / customer-confirmed CFO metric / data / DM)"},
-  "opening_hook": "one or two lines grounded in their actual numbers — phrase as a question, no quote marks (we add them)."
+  }
 }"""
 
 
@@ -434,19 +440,27 @@ def _build_new_brief_prompt(
         f"PHRASE, 5-15 words, not a sentence — the rendered brief is a tight 2-pager. "
         f"Compress lists with commas and semicolons. Strip filler ('the company', 'they "
         f"also have', 'is a leading').\n\n"
-        f"**DO NOT DROP MANDATORY FIELDS.** Every brief must include: executive_summary, "
-        f"stat_band (all 5), type, motion, what_they_have (all 10 dimensions: "
-        f"Business model · Scale · **Funding status** · **Top brands** · **Top competitors** · "
+        f"**DO NOT DROP MANDATORY FIELDS.** Every brief must include: "
+        f"executive_summary (4 labelled lines: category/comps/history/maturity — NOT a "
+        f"paragraph), stat_band (all 5), type, motion, what_they_have (all 10 dimensions: "
+        f"Business model · Scale · Funding status · Top brands · Top competitors · "
         f"Channel structure · Catalogue size / SKU count · Tech stack · External-facing "
-        f"agents · AI maturity), recent_news (2-4 items or one honest 'Nothing material in "
-        f"the last 12 months from public sources'), order_flow, what_missing, "
-        f"product_route, persona_map, pain_capability_cfo, metric_that_matters, "
-        f"discovery (all 4 buckets + motion_specific), conflicts_unknowns, people_path_in, "
-        f"entry_wedge, next_step, opening_hook. If a fact is genuinely not findable, set "
-        f"the value to *\"Info not publicly available\"* and confidence to *\"Unknown\"* "
-        f"— **never drop the row**.\n\n"
-        f"**Conditional fields:** include meeting_attendees only if attendees were "
-        f"provided in inputs; include other_signals only if there's genuine material.\n\n"
+        f"agents · AI maturity), recent_news (**MAX 2 bullets**, the most material; or "
+        f"one honest 'Nothing material in the last 12 months from public sources'), "
+        f"what_missing, product_route, persona_map (each row contains the current order "
+        f"flow + leak points for THAT persona — split into per-motion rows: Dealers, "
+        f"Retailers via SFA, B2B customers, etc.), pain_capability_cfo, "
+        f"metric_that_matters, discovery (all 4 buckets + motion_specific), "
+        f"people_path_in (merge meeting attendees here; use type='Meeting attendee' + "
+        f"the optional linkedin field for any attendees the user provided), entry_wedge, "
+        f"next_step, opening_hook, conflicts_unknowns (appendix at the end — keep it "
+        f"terse). If a fact is genuinely not findable, set the value to *\"Info not "
+        f"publicly available\"* and confidence to *\"Unknown\"* — **never drop the "
+        f"row**.\n\n"
+        f"**REMOVED FIELDS (do not include):** order_flow (now rolled into persona_map "
+        f"as a column per persona), other_signals (dropped — promote material findings to "
+        f"recent_news or what_missing), meeting_attendees (merged into people_path_in "
+        f"with type='Meeting attendee').\n\n"
         f"=== INPUTS — INTERNAL RESEARCH / CONTEXT ===\n{research or '(no internal notes pasted — research the company from public sources using web_search)'}\n"
         f"{crm_block}{meeting_block}\n\n"
         f"=== JSON SCHEMA (fill exactly this shape) ===\n{BRIEF_JSON_SCHEMA}\n\n"

@@ -262,9 +262,18 @@ def render_brief_docx(data: dict) -> bytes:
         _add_status(doc, f"Status: {header['status']}")
 
     # ── Executive Summary ────────────────────────────────────────────────────
-    if data.get("executive_summary"):
+    # Accept either the new structured shape (dict with category/comps/history/maturity)
+    # or the legacy string (rendered as a single paragraph) so older briefs still work.
+    es = data.get("executive_summary")
+    if isinstance(es, dict) and any(es.values()):
         _add_h2(doc, "Executive Summary")
-        _add_para(doc, data["executive_summary"], size=10)
+        for label, key in [("Category", "category"), ("Comps", "comps"),
+                           ("History", "history"), ("Maturity", "maturity")]:
+            if es.get(key):
+                _add_kv_para(doc, label, es[key], size=10)
+    elif isinstance(es, str) and es.strip():
+        _add_h2(doc, "Executive Summary")
+        _add_para(doc, es, size=10)
 
     # ── Stat band ────────────────────────────────────────────────────────────
     stat_band = data.get("stat_band") or []
@@ -308,22 +317,11 @@ def render_brief_docx(data: dict) -> bytes:
         _add_h2(doc, "Recent news (last 12 months)")
         _add_bullets(doc, recent)
 
-    # ── Order flow ───────────────────────────────────────────────────────────
-    if data.get("order_flow"):
-        _add_h2(doc, "Order flow today")
-        _add_para(doc, data["order_flow"])
-
     # ── What they're missing ─────────────────────────────────────────────────
     missing = data.get("what_missing") or []
     if missing:
         _add_h2(doc, "What they're likely missing")
         _add_bullets(doc, missing)
-
-    # ── Other signals (conditional) ──────────────────────────────────────────
-    other = data.get("other_signals") or []
-    if other:
-        _add_h2(doc, "Other signals")
-        _add_bullets(doc, other)
 
     # ── Product fit & CFO lens ───────────────────────────────────────────────
     _add_h2(doc, "Product fit & CFO lens")
@@ -333,16 +331,22 @@ def render_brief_docx(data: dict) -> bytes:
 
     persona_map = data.get("persona_map") or []
     if persona_map:
-        _add_h3(doc, "Persona map")
+        _add_h3(doc, "Persona & order flow")
+        # Each persona row = one sales motion: who they sell to, surface, current flow.
         rows = [
-            [r.get("persona", ""), r.get("count", ""), r.get("surface", "")]
+            [
+                r.get("persona", ""),
+                r.get("count", ""),
+                r.get("surface", ""),
+                r.get("flow_and_leaks", r.get("flow", "")),
+            ]
             for r in persona_map
         ]
         _add_table(
             doc,
-            headers=["Persona", "Est. count", "Primary surface"],
+            headers=["Persona", "Count", "Surface today", "Current flow & leaks"],
             rows=rows,
-            col_widths_cm=[7.5, 4.5, 7.5],
+            col_widths_cm=[3.5, 2.0, 4.0, 10.0],
         )
 
     pain_map = data.get("pain_capability_cfo") or []
@@ -385,44 +389,32 @@ def render_brief_docx(data: dict) -> bytes:
             _add_h4(doc, motion_block.get("label") or "Motion-specific")
             _add_bullets(doc, motion_block["questions"])
 
-    # ── Conflicts & unknowns ─────────────────────────────────────────────────
-    conflicts = data.get("conflicts_unknowns") or {}
-    if any(conflicts.values()) if conflicts else False:
-        _add_h3(doc, "Conflicts & unknowns")
-        _add_callout_box(doc, [
-            ("Conflicting figures", conflicts.get("conflicting", "")),
-            ("Unverified, load-bearing", conflicts.get("unverified", "")),
-            ("The one fact that would most change the recommendation", conflicts.get("key_fact", "")),
-        ])
+    # ── People & path in (merges old Meeting Attendees) ──────────────────────
+    # Each row: Name | Role | Why they matter (+ optional LinkedIn line) | Type
+    # Type = Decision-maker | Champion | Finance buyer | Meeting attendee
+    # If a row has a "linkedin" field, append it as a 2nd line inside the why-matter
+    # cell so attendee context stays visible without a separate section.
+    people = list(data.get("people_path_in") or [])
+    # Back-compat: fold any legacy meeting_attendees rows in as type='Meeting attendee'
+    legacy_attendees = data.get("meeting_attendees") or []
+    for a in legacy_attendees:
+        people.append({
+            "name": a.get("name", ""),
+            "role": a.get("title", ""),
+            "why_matter": a.get("angle", ""),
+            "type": "Meeting attendee",
+            "linkedin": a.get("linkedin_summary", ""),
+        })
 
-    # ── Meeting attendees (conditional) ──────────────────────────────────────
-    attendees = data.get("meeting_attendees") or []
-    if attendees:
-        _add_h3(doc, "Meeting attendees")
-        rows = [
-            [
-                a.get("name", ""),
-                a.get("title", ""),
-                a.get("linkedin_summary", ""),
-                a.get("angle", ""),
-            ]
-            for a in attendees
-        ]
-        _add_table(
-            doc,
-            headers=["Name", "Title", "LinkedIn summary", "Likely angle on Graas"],
-            rows=rows,
-            col_widths_cm=[3.2, 3.2, 8.6, 4.5],
-        )
-
-    # ── People & path in ─────────────────────────────────────────────────────
-    people = data.get("people_path_in") or []
     if people:
         _add_h3(doc, "People & path in")
-        rows = [
-            [p.get("name", ""), p.get("role", ""), p.get("why_matter", ""), p.get("type", "")]
-            for p in people
-        ]
+        rows = []
+        for p in people:
+            why = p.get("why_matter", "") or ""
+            li = (p.get("linkedin") or "").strip()
+            if li:
+                why = f"{why}\nLinkedIn: {li}" if why else f"LinkedIn: {li}"
+            rows.append([p.get("name", ""), p.get("role", ""), why, p.get("type", "")])
         _add_table(
             doc,
             headers=["Name", "Role", "Why they matter", "Type"],
@@ -450,6 +442,16 @@ def render_brief_docx(data: dict) -> bytes:
     if data.get("opening_hook"):
         _add_h3(doc, "Opening hook")
         _add_para(doc, f"“{data['opening_hook']}”", italic=True)
+
+    # ── Appendix: Conflicts & unknowns (de-emphasised, ends the doc) ─────────
+    conflicts = data.get("conflicts_unknowns") or {}
+    if conflicts and any(conflicts.values()):
+        _add_h3(doc, "Appendix: Conflicts & unknowns")
+        _add_callout_box(doc, [
+            ("Conflicting figures", conflicts.get("conflicting", "")),
+            ("Unverified, load-bearing", conflicts.get("unverified", "")),
+            ("Fact that would most change the recommendation", conflicts.get("key_fact", "")),
+        ])
 
     # Output bytes
     buf = io.BytesIO()
@@ -502,9 +504,16 @@ th { background: #eef1ff; font-weight: bold; }
     if header.get("status"):
         parts.append(f"<p class='status'>Status: {_esc(header['status'])}</p>")
 
-    if data.get("executive_summary"):
+    _es = data.get("executive_summary")
+    if isinstance(_es, dict) and any(_es.values()):
         parts.append("<h2>Executive Summary</h2>")
-        parts.append(f"<p>{_esc(data['executive_summary'])}</p>")
+        for label, key in [("Category", "category"), ("Comps", "comps"),
+                           ("History", "history"), ("Maturity", "maturity")]:
+            if _es.get(key):
+                parts.append(f"<p><strong>{label}:</strong> {_esc(_es[key])}</p>")
+    elif isinstance(_es, str) and _es.strip():
+        parts.append("<h2>Executive Summary</h2>")
+        parts.append(f"<p>{_esc(_es)}</p>")
 
     stat_band = data.get("stat_band") or []
     if stat_band:
@@ -540,20 +549,10 @@ th { background: #eef1ff; font-weight: bold; }
             parts.append(f"<li>{_esc(n)}</li>")
         parts.append("</ul>")
 
-    if data.get("order_flow"):
-        parts.append("<h2>Order flow today</h2>")
-        parts.append(f"<p>{_esc(data['order_flow'])}</p>")
-
     if data.get("what_missing"):
         parts.append("<h2>What they're likely missing</h2><ul>")
         for m in data["what_missing"]:
             parts.append(f"<li>{_esc(m)}</li>")
-        parts.append("</ul>")
-
-    if data.get("other_signals"):
-        parts.append("<h2>Other signals</h2><ul>")
-        for s in data["other_signals"]:
-            parts.append(f"<li>{_esc(s)}</li>")
         parts.append("</ul>")
 
     parts.append("<h2>Product fit &amp; CFO lens</h2>")
@@ -562,13 +561,15 @@ th { background: #eef1ff; font-weight: bold; }
         parts.append(f"<p>{_esc(data['product_route'])}</p>")
 
     if data.get("persona_map"):
-        parts.append("<h3>Persona map</h3><table>")
-        parts.append("<tr><th>Persona</th><th>Est. count</th><th>Primary surface</th></tr>")
+        parts.append("<h3>Persona &amp; order flow</h3><table>")
+        parts.append("<tr><th>Persona</th><th>Count</th><th>Surface today</th><th>Current flow &amp; leaks</th></tr>")
         for r in data["persona_map"]:
+            flow = r.get("flow_and_leaks", r.get("flow", ""))
             parts.append(
                 f"<tr><td>{_esc(r.get('persona'))}</td>"
                 f"<td>{_esc(r.get('count'))}</td>"
-                f"<td>{_esc(r.get('surface'))}</td></tr>"
+                f"<td>{_esc(r.get('surface'))}</td>"
+                f"<td>{_esc(flow)}</td></tr>"
             )
         parts.append("</table>")
 
@@ -610,38 +611,30 @@ th { background: #eef1ff; font-weight: bold; }
                 parts.append(f"<li>{_esc(q)}</li>")
             parts.append("</ul>")
 
-    conflicts = data.get("conflicts_unknowns") or {}
-    if any(conflicts.values()) if conflicts else False:
-        parts.append("<h3>Conflicts &amp; unknowns</h3>")
-        parts.append("<table class='callout'><tr><td>")
-        if conflicts.get("conflicting"):
-            parts.append(f"<strong>Conflicting figures:</strong> {_esc(conflicts['conflicting'])}<br>")
-        if conflicts.get("unverified"):
-            parts.append(f"<strong>Unverified, load-bearing:</strong> {_esc(conflicts['unverified'])}<br>")
-        if conflicts.get("key_fact"):
-            parts.append(f"<strong>The one fact that would most change the recommendation:</strong> {_esc(conflicts['key_fact'])}")
-        parts.append("</td></tr></table>")
-
-    if data.get("meeting_attendees"):
-        parts.append("<h3>Meeting attendees</h3><table>")
-        parts.append("<tr><th>Name</th><th>Title</th><th>LinkedIn summary</th><th>Likely angle on Graas</th></tr>")
-        for a in data["meeting_attendees"]:
-            parts.append(
-                f"<tr><td>{_esc(a.get('name'))}</td>"
-                f"<td>{_esc(a.get('title'))}</td>"
-                f"<td>{_esc(a.get('linkedin_summary'))}</td>"
-                f"<td>{_esc(a.get('angle'))}</td></tr>"
-            )
-        parts.append("</table>")
-
-    if data.get("people_path_in"):
+    # People & path in (merges legacy meeting_attendees)
+    _people = list(data.get("people_path_in") or [])
+    for a in (data.get("meeting_attendees") or []):
+        _people.append({
+            "name": a.get("name", ""),
+            "role": a.get("title", ""),
+            "why_matter": a.get("angle", ""),
+            "type": "Meeting attendee",
+            "linkedin": a.get("linkedin_summary", ""),
+        })
+    if _people:
         parts.append("<h3>People &amp; path in</h3><table>")
         parts.append("<tr><th>Name</th><th>Role</th><th>Why they matter</th><th>Type</th></tr>")
-        for p in data["people_path_in"]:
+        for p in _people:
+            why = p.get("why_matter", "") or ""
+            li = (p.get("linkedin") or "").strip()
+            if li:
+                why = f"{why}<br><em>LinkedIn:</em> {_esc(li)}" if why else f"<em>LinkedIn:</em> {_esc(li)}"
+            else:
+                why = _esc(why)
             parts.append(
                 f"<tr><td>{_esc(p.get('name'))}</td>"
                 f"<td>{_esc(p.get('role'))}</td>"
-                f"<td>{_esc(p.get('why_matter'))}</td>"
+                f"<td>{why}</td>"
                 f"<td>{_esc(p.get('type'))}</td></tr>"
             )
         parts.append("</table>")
@@ -665,6 +658,19 @@ th { background: #eef1ff; font-weight: bold; }
     if data.get("opening_hook"):
         parts.append("<h3>Opening hook</h3>")
         parts.append(f"<p class='hook'>“{_esc(data['opening_hook'])}”</p>")
+
+    # Appendix: Conflicts & unknowns (end of brief, de-emphasised)
+    conflicts = data.get("conflicts_unknowns") or {}
+    if conflicts and any(conflicts.values()):
+        parts.append("<h3>Appendix: Conflicts &amp; unknowns</h3>")
+        parts.append("<table class='callout'><tr><td>")
+        if conflicts.get("conflicting"):
+            parts.append(f"<strong>Conflicting figures:</strong> {_esc(conflicts['conflicting'])}<br>")
+        if conflicts.get("unverified"):
+            parts.append(f"<strong>Unverified, load-bearing:</strong> {_esc(conflicts['unverified'])}<br>")
+        if conflicts.get("key_fact"):
+            parts.append(f"<strong>Fact that would most change the recommendation:</strong> {_esc(conflicts['key_fact'])}")
+        parts.append("</td></tr></table>")
 
     parts.append("</body></html>")
     return "".join(parts)

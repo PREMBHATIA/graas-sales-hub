@@ -76,18 +76,20 @@ The salesperson opens the same brief every time, and a missing section reads as 
 - Header line + Status line + **Executive Summary** (one paragraph)
 - Stat band, Type line, Motion line
 - The **What they have** ledger — every required row: Business model · Scale · **Funding status** · **Top brands** · **Top competitors** · Channel structure · Catalogue size/SKU count · Tech stack · External-facing agents · AI maturity. If you can't find a fact, put *"Info not publicly available"* in the *What we know* column with Confidence = Unknown.
-- **Recent news (last 12 months)** — at least 2-4 bullets, or one honest bullet *"Nothing material in the last 12 months from public sources"* if genuinely empty
-- Order flow today (one line that matches the motion)
-- **Product fit & CFO lens** (Product route, Persona map, Pain → Capability → CFO metric, "The metric that matters")
-- **Discovery & next move** (Double-click in discovery — all four sub-groups + the motion-specific block, Conflicts & unknowns, People & path in, Next step, Opening hook)
+- **Recent news (last 12 months)** — **MAX 2 bullets**, the most material; or one honest bullet *"Nothing material in the last 12 months from public sources"* if genuinely empty
+- **Product fit & CFO lens** (Product route, **Persona & order flow** [each row carries the current flow + leaks for that sales motion], Pain → Capability → CFO metric, "The metric that matters")
+- **Discovery & next move** (Double-click in discovery — all four sub-groups + the motion-specific block, **People & path in** [merges meeting attendees], Next step, Opening hook)
+- **Appendix: Conflicts & unknowns** at the very end — conflicting figures, unverified load-bearing facts, the one fact that would most change the recommendation
 
 **Conditional (delete only if not applicable):**
 - *Type* options — keep only the matching one, delete the other two
 - *Motion* options — same
-- *Order flow* line — keep only the matching B2B-or-B2C line
-- *Meeting attendees* — keep only if attendee names were provided as input
-- *Other signals* — keep only if there's genuine material to add (M&A, leadership change, etc.)
 - *B2B-specific vs B2C-specific discovery block* — keep only the matching one
+
+**Removed sections (do NOT include):**
+- *Order flow today* (separate section) → rolled into Persona & order flow as a per-row column
+- *Other signals* → dropped; promote anything material to Recent news or What's missing
+- *Meeting attendees* (separate table) → merged into People & path in with `type="Meeting attendee"` and an optional one-line LinkedIn note
 
 If you're tempted to skip a mandatory row because "there's no data" — that's exactly the signal to write *"Info not publicly available"* and turn the gap into a discovery question. A complete brief with honest gaps is far more useful than a tidy brief that quietly skipped half the fields.
 
@@ -95,7 +97,7 @@ If you're tempted to skip a mandatory row because "there's no data" — that's e
 
 ## Density rule — every cell is a phrase, not a sentence
 
-The brief is a **tight 2-pager** (3 absolute max). The number-one failure mode is sprawling cells full of full sentences, which then wrap across multiple lines in Google Docs and double the page count. Apply these rules in every table cell and every bullet:
+The brief is a **tight 2-3 pager** — 3 pages is the **hard limit**, not the target. The number-one failure mode is sprawling cells full of full sentences, which then wrap across multiple lines in Google Docs and double the page count. Apply these rules in every table cell and every bullet:
 
 - **Phrases, not sentences.** Target 5-15 words per cell. No "the company …", "they also have …", "it is worth noting that …". Strip filler.
 - **Compress lists.** Use commas and semicolons — never one bullet per item when a comma-list works.
@@ -206,34 +208,36 @@ Research turns up material that maps to no field — an acquisition, fresh fundi
 
 ---
 
-## The brief, page by page (2-3 pages)
+## The brief, page by page (target 2 pages, hard cap 3)
 
 Fill `assets/brief_template.html`. The template carries placeholder text and filler captions to guide you — strip all of it when you fill it. The delivered Doc shows real content only: no brackets, no instructions, no unused options.
 
 **Page 1 — Snapshot**
 - **Header** — Company name; *Date prepared* (today); *Meeting date* (the upcoming meeting, if known); *Prepared by: Graas Enterprise Team*. One line each.
 - **Status line** — *Pre-call draft* / *Post call-1 — [date]* / *Post call-2 — [date]* …
-- **Executive Summary** — one paragraph, 3-4 sentences, ~4-6 lines. Names *(a)* who they are (parent group if relevant, what they do), *(b)* scale in their own numbers (revenue + the scale figure that matters for this play — dealers / outlets / FSAs / traffic), *(c)* channel/motion shape in one clause, *(d)* the meeting hypothesis — why this conversation matters for Graas in one specific line, not boilerplate. This is what anyone opening the Doc reads first; it must stand on its own. Cite inline. Skip filler ("the company", "is a leading", "well-positioned").
+- **Executive Summary** — **four labelled lines**, NOT a paragraph. Each line is one phrase, no filler:
+  - *Category:* vertical + business model (e.g. "Industrial gases distributor; B2B/GT").
+  - *Comps:* 2-3 named competitors with one-clause positioning (e.g. "Linde (premium), Aboitiz Power (regional scale), Bharat Petroleum (state-owned)").
+  - *History:* founding / trajectory / recent inflection in one line (e.g. "Founded 1972; family-owned; expanded into specialty gases 2019; now 3rd by volume").
+  - *Maturity:* AI & systems maturity assessment in one line (e.g. "Mid: SAP-ERP since 2018, Salesforce CRM, no agents deployed; piloting GenAI for support 2025").
+  - Do **not** repeat what's in the ledger or the stat band — this is the analytical frame, not a re-statement of facts.
 - **Stat band** (one row): Revenue | SKUs | Channel touchpoints | Field force | Geography — prefix estimates with `~`, no per-cell tag. *(B2C: swap Channel touchpoints and Field force for Monthly traffic and Conversion %.)*
 - **Type** — OEM/Principal/Brand · Multi-brand distributor · Multi-brand retailer. One line.
 - **Motion** — B2B/GT or B2C (or both, wedge named). One line.
 - **What they have** (table): Dimension | What we know | Confidence | Source. Required rows: **business model**, **scale**, **funding status** (listed/PE-backed/VC-funded/bootstrapped + profitable/loss-making — name the round, year, lead if applicable), **top brands** (the brands they own or carry — the ones the customer's market would recognise), **top 2-3 competitors** (the names that come up in their category — useful for positioning), **channel structure**, **catalogue size / SKU count**, **tech stack**, **external-facing agents** (the All-e-vs-KG signal), **AI maturity**.
-- **Recent news** — 2-4 bullets covering significant events in the last 12 months: expansion, acquisition, leadership change, new product line, regulatory action, major funding. Cite source inline. Use this to find the *why now*. Omit only if genuinely nothing material has happened.
-- **Order flow today** — a one-line end-to-end trace with manual steps and leak points flagged. The clearest single picture of where the product inserts; sets up the Pain → Capability → CFO rows.
+- **Recent news** — **MAX 2 bullets** covering the most material event(s) in the last 12 months: expansion, acquisition, leadership change, new product line, regulatory action, major funding. Cite source inline. Use this to find the *why now*. Pick the two highest-signal items — don't list five.
 - **What they're likely missing** — short bullets; soft/unverified gaps phrased as questions.
-- **Other signals** — catch-all for material that matters but fits no field. Omit if empty.
 
 **Page 2 — Product fit & CFO lens**
 - **Product route** — All-e / KG / layered, two or three lines on why (carries the fit rationale), and the wedge vs. the expansion.
-- **Persona map** (table): Persona | Est. count | Primary surface. Personas follow the type — OEM: distributors + field force + retailers below; distributor: field force + retailers; retailer: store staff + consumers.
+- **Persona & order flow** (table): Persona | Count | Surface today | Current flow & leaks. ONE ROW PER SALES MOTION (e.g. *To Dealers*, *To Retailers via SFA*, *To B2B customers*) — the *Current flow & leaks* column captures the end-to-end order trace AND the manual steps / leak points for that motion. This replaces the old separate "Order flow today" section. Personas follow the type — OEM: distributors + field force + retailers below; distributor: field force + retailers; retailer: store staff + consumers.
 - **Pain → Capability → CFO metric** (table) — the money table. One row per top pain, in the customer's language, mapped to the capability and the single metric it moves.
 - **The metric that matters** — one literal, named line: "The metric this moves for [CEO/CFO name] is ___."
 
 **Page 3 — Discovery & next move**
 - **Double-click in discovery** — grouped questions (Business model / Data readiness / Tech & integration / Commercial authority) plus a motion-specific block: *B2C* → storefront URL, traffic, conversion %, AOV, ad spend/ROAS; *B2B/GT* → support-ticket system + volume/AHT, order/claim flow. This is the agenda, not a full questionnaire. Post-call, answered questions move up into the tables; the rest carry forward.
-- **Conflicts & unknowns** (callout) — conflicting figures, what's unverified, and the one fact that would most change the recommendation.
-- **Meeting attendees** (table, when the calendar invite is known): Name | Title | LinkedIn summary (2-3 lines: background, prior companies, current focus) | Likely angle on Graas. One row per *external* attendee (skip the Graas team). If LinkedIn isn't findable, write *"LinkedIn profile not publicly available"* — don't guess. This table is what gets read in the 5 minutes before the call.
-- **People & path in** (table — the strategic map across the account, broader than just this meeting): Name | Role | Why they matter | DM / Champion / Finance buyer; plus the entry wedge. Overlaps with attendees are fine — this table captures who matters across the deal, not just who's in the room.
+- **People & path in** (single table, merges who-was-in-the-meeting with who-matters-across-the-deal): Name | Role | Why they matter | Type. *Type* = Decision-maker | Champion | Finance buyer | **Meeting attendee**. For meeting attendees, optionally add an inline LinkedIn note (1 line: background + prior companies) appended after the "why they matter" cell. If LinkedIn isn't findable for an attendee, omit the LinkedIn line (don't pad with *"LinkedIn profile not publicly available"*). One row per person; if the same person is both a decision-maker and a meeting attendee, pick the more strategically relevant type.
+- **Appendix: Conflicts & unknowns** — last block in the brief, after Opening hook. Callout box with: conflicting figures, what's unverified and load-bearing, the one fact that would most change the recommendation. De-emphasised on purpose — it's reference, not the lead-in.
 - **Next step** — the decided next action + one line on why, and whether the qualification gate is met. Pre-first-call this is the opening hook below.
 - **Opening hook** — one or two lines grounded in their actual numbers (most relevant before the first call).
 
@@ -269,10 +273,12 @@ On the post-call pass, edit the same Doc — don't spin up a new file — so ver
 
 - Are **type and motion** classified (value-chain position + B2B/GT vs B2C), and does the route follow from them?
 - Is the **status line** set correctly? Is the **header** filled (date prepared, meeting date if known, prepared by)?
-- Is there a **one-paragraph Executive Summary** at the top — 3-4 sentences naming who they are, the scale numbers that matter, the channel shape, and the meeting hypothesis (no boilerplate)?
+- Is the **Executive Summary** four labelled lines (Category / Comps / History / Maturity) — NOT a paragraph, NOT a re-statement of the ledger?
 - Does the **ledger** cover the required rows — including funding status, top brands, top competitors, plus the standard business/scale/channel/SKU/tech-stack/agents/AI-maturity rows?
-- Is there a **Recent news** block with at least 2-4 events from the last 12 months (or an honest *"nothing material in the last 12 months"*)?
-- For an upcoming meeting with known external attendees: is the **Meeting attendees** table populated with LinkedIn summaries (or *"LinkedIn profile not publicly available"* per row)?
+- Is there a **Recent news** block with **MAX 2 bullets** (or an honest *"nothing material in the last 12 months"*)?
+- Does the **Persona & order flow** table have one row per sales motion (Dealers, Retailers, B2B etc.) with the *Current flow & leaks* column populated for each?
+- For external meeting attendees: are they merged into **People & path in** with `type=Meeting attendee` and (optionally) a one-line LinkedIn note appended to "why they matter"?
+- Is **Conflicts & unknowns** the LAST block (Appendix), not in the middle of the brief?
 - Do the **load-bearing** figures carry a confidence read (ledger column; `~` in the stat band; inline flags elsewhere) — without tagging the obvious?
 - Are sources **cited inline** for load-bearing facts (annual report / Economic Times / aggregator-with-tag)?
 - Did any load-bearing Inferred/Unknown fact slip in as a statement instead of a discovery question?
