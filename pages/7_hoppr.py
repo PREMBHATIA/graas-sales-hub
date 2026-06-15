@@ -1634,7 +1634,7 @@ Answer questions by referencing the data below. Be specific — use seller IDs, 
                             system += f"\n\n=== DETAILED DATA FOR MENTIONED SELLERS ===\n{extra}"
                         ai = _anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
                         result = ai.messages.create(
-                            model="claude-sonnet-4-20250514",
+                            model="claude-sonnet-4-6",
                             max_tokens=2048,
                             system=system,
                             messages=[{"role": m["role"], "content": m["content"]}

@@ -811,7 +811,7 @@ def _render_chat(
                     ]
 
                     response = client.messages.create(
-                        model="claude-sonnet-4-20250514",
+                        model="claude-sonnet-4-6",
                         max_tokens=2048,
                         system=system_prompt,
                         messages=messages,

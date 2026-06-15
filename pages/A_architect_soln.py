@@ -335,7 +335,7 @@ if user_input:
                 messages = [{"role": m["role"], "content": m["content"]}
                             for m in st.session_state[HIST][-20:]]
                 response = client.messages.create(
-                    model="claude-sonnet-4-20250514",
+                    model="claude-sonnet-4-6",
                     max_tokens=2500,
                     system=system_prompt,
                     messages=messages,

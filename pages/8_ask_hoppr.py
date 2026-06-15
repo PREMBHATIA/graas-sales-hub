@@ -583,7 +583,7 @@ if user_q:
                 system = SYSTEM + (f"\n\n=== DETAILED DATA ===\n{extra}" if extra else "")
                 ai = _anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
                 result = ai.messages.create(
-                    model="claude-sonnet-4-20250514",
+                    model="claude-sonnet-4-6",
                     max_tokens=2048,
                     system=system,
                     messages=[{"role": m["role"], "content": m["content"]}

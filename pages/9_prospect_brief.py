@@ -608,7 +608,7 @@ with right:
             client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
             system_prompt = SKILL_TEXT
             kwargs = dict(
-                model="claude-sonnet-4-20250514",
+                model="claude-sonnet-4-6",
                 max_tokens=8000,
                 system=system_prompt,
                 messages=[{"role": "user", "content": user_prompt}],
