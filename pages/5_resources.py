@@ -156,6 +156,9 @@ else:
             _list_folder_subfolders.clear()
             st.rerun()
 
+    def _drive_folder_url(folder_id: str) -> str:
+        return f"https://drive.google.com/drive/folders/{folder_id}"
+
     for _bucket in _buckets:
         _bucket_label = _clean_bucket_label(_bucket["name"])
         _files = _list_folder_files(_bucket["id"])
@@ -165,6 +168,16 @@ else:
         if _subfolders:
             _hdr += f" ({len(_subfolders)} subfolder{'s' if len(_subfolders) != 1 else ''})"
         with st.expander(_hdr, expanded=True):
+            # Bucket-level Drive link — click to open the folder in Drive and
+            # drag-drop files in.
+            st.markdown(
+                f"<div style='font-size: 0.8em; color: #666; margin-bottom: 8px;'>"
+                f"➕ To add: <a href='{_drive_folder_url(_bucket['id'])}' target='_blank'>"
+                f"open this folder in Drive →</a> and drag a file in. "
+                f"Hit 🔄 Refresh KB above to see it appear here.</div>",
+                unsafe_allow_html=True,
+            )
+
             # Bucket's own files first
             if _files:
                 _render_file_tiles(_files, key_prefix=f"bkt_{_bucket['id']}")
@@ -173,8 +186,19 @@ else:
             for _sub in _subfolders:
                 _sub_label = _clean_bucket_label(_sub["name"])
                 _sub_files = _list_folder_files(_sub["id"])
-                st.markdown(f"##### 📁 {_sub_label}  ·  {len(_sub_files)} item(s)")
-                _render_file_tiles(_sub_files, key_prefix=f"sub_{_sub['id']}")
+                st.markdown(
+                    f"##### 📁 {_sub_label}  ·  {len(_sub_files)} item(s)  "
+                    f"<a href='{_drive_folder_url(_sub['id'])}' target='_blank' "
+                    f"style='font-size: 0.6em; font-weight: normal;'>open in Drive →</a>",
+                    unsafe_allow_html=True,
+                )
+                if _sub_files:
+                    _render_file_tiles(_sub_files, key_prefix=f"sub_{_sub['id']}")
+                else:
+                    st.caption(
+                        f"_Empty — [open in Drive]({_drive_folder_url(_sub['id'])}) "
+                        f"and drag files in._"
+                    )
 
             if not _files and not _subfolders:
                 st.caption("_Empty — drop a Doc or subfolder into this bucket to populate it._")
