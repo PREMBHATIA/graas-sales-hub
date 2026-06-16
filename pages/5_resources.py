@@ -82,16 +82,62 @@ def _list_kb_buckets() -> list:
 
 
 @st.cache_data(ttl=300)
-def _list_bucket_docs(bucket_id: str) -> list:
-    """Docs in a bucket folder, newest first."""
-    from services.sheets_client import list_drive_folder_docs
-    return list_drive_folder_docs(bucket_id)
+def _list_folder_files(folder_id: str) -> list:
+    """All non-folder files in a Drive folder, with mime + canonical web URL."""
+    from services.sheets_client import list_drive_folder_all_files
+    return list_drive_folder_all_files(folder_id)
+
+
+@st.cache_data(ttl=300)
+def _list_folder_subfolders(folder_id: str) -> list:
+    """Subfolders inside a Drive folder."""
+    from services.sheets_client import list_drive_subfolders
+    return list_drive_subfolders(folder_id)
+
+
+_MIME_ICON = {
+    "application/vnd.google-apps.document": "📄",
+    "application/vnd.google-apps.presentation": "📊",
+    "application/vnd.google-apps.spreadsheet": "📈",
+    "application/pdf": "📑",
+    "text/html": "🌐",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation": "📊",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "📄",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "📈",
+}
+
+
+def _render_file_tiles(files: list, key_prefix: str, n_cols: int = 4):
+    """Render a list of Drive files as a grid of small tiles."""
+    if not files:
+        st.caption("_Empty — drop a file into this folder to populate it._")
+        return
+    _rows = [files[i:i + n_cols] for i in range(0, len(files), n_cols)]
+    for _row in _rows:
+        _cols = st.columns(n_cols)
+        for _col, _d in zip(_cols, _row):
+            _mime = _d.get("mime_type", "application/vnd.google-apps.document")
+            _icon = _MIME_ICON.get(_mime, "🔗")
+            # Canonical link: prefer Drive's webViewLink; fall back to the Doc URL
+            _url = _d.get("web_view_link") or f"https://docs.google.com/document/d/{_d['id']}/edit"
+            _mod = (_d.get("modified_time") or "")[:10]
+            with _col:
+                with st.container(border=True):
+                    st.markdown(
+                        f"<div style='font-size: 0.9em; font-weight: 600; "
+                        f"line-height: 1.25; margin-bottom: 2px;'>{_icon} {_d['name']}</div>"
+                        f"<div style='font-size: 0.7em; color: #888; "
+                        f"margin-bottom: 4px;'>Last modified: {_mod}</div>"
+                        f"<a href='{_url}' target='_blank' "
+                        f"style='font-size: 0.78em;'>Open →</a>",
+                        unsafe_allow_html=True,
+                    )
 
 
 st.markdown("### 🧠 Knowledge Base")
 st.caption(
-    f"Curated reference Docs in the SalesHub Shared Drive. To add: drop a Google "
-    f"Doc in the appropriate bucket subfolder, then refresh."
+    f"Curated reference Docs in the SalesHub Shared Drive. To add: drop a file "
+    f"in the appropriate bucket (or subfolder), then refresh."
 )
 
 _buckets = _list_kb_buckets()
@@ -106,34 +152,32 @@ else:
     with _kb_refresh_col:
         if st.button("🔄 Refresh KB", key="kb_refresh"):
             _list_kb_buckets.clear()
-            _list_bucket_docs.clear()
+            _list_folder_files.clear()
+            _list_folder_subfolders.clear()
             st.rerun()
 
     for _bucket in _buckets:
         _bucket_label = _clean_bucket_label(_bucket["name"])
-        _docs = _list_bucket_docs(_bucket["id"])
-        with st.expander(f"**{_bucket_label}**  ·  {len(_docs)} doc(s)", expanded=True):
-            if not _docs:
-                st.caption("_Empty — drop a Doc into this bucket to populate it._")
-            else:
-                # 4-col tiles, compact
-                _rows = [_docs[i:i + 4] for i in range(0, len(_docs), 4)]
-                for _row in _rows:
-                    _cols = st.columns(4)
-                    for _col, _d in zip(_cols, _row):
-                        _url = f"https://docs.google.com/document/d/{_d['id']}/edit"
-                        _mod = (_d.get("modified_time") or "")[:10]  # YYYY-MM-DD slice
-                        with _col:
-                            with st.container(border=True):
-                                st.markdown(
-                                    f"<div style='font-size: 0.9em; font-weight: 600; "
-                                    f"line-height: 1.25; margin-bottom: 2px;'>{_d['name']}</div>"
-                                    f"<div style='font-size: 0.7em; color: #888; "
-                                    f"margin-bottom: 4px;'>Last modified: {_mod}</div>"
-                                    f"<a href='{_url}' target='_blank' "
-                                    f"style='font-size: 0.78em;'>Open →</a>",
-                                    unsafe_allow_html=True,
-                                )
+        _files = _list_folder_files(_bucket["id"])
+        _subfolders = _list_folder_subfolders(_bucket["id"])
+        _total = len(_files) + sum(len(_list_folder_files(s["id"])) for s in _subfolders)
+        _hdr = f"**{_bucket_label}**  ·  {_total} item(s)"
+        if _subfolders:
+            _hdr += f" ({len(_subfolders)} subfolder{'s' if len(_subfolders) != 1 else ''})"
+        with st.expander(_hdr, expanded=True):
+            # Bucket's own files first
+            if _files:
+                _render_file_tiles(_files, key_prefix=f"bkt_{_bucket['id']}")
+
+            # Then each subfolder as a nested section
+            for _sub in _subfolders:
+                _sub_label = _clean_bucket_label(_sub["name"])
+                _sub_files = _list_folder_files(_sub["id"])
+                st.markdown(f"##### 📁 {_sub_label}  ·  {len(_sub_files)} item(s)")
+                _render_file_tiles(_sub_files, key_prefix=f"sub_{_sub['id']}")
+
+            if not _files and not _subfolders:
+                st.caption("_Empty — drop a Doc or subfolder into this bucket to populate it._")
 
 st.markdown("---")
 

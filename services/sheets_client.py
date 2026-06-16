@@ -309,6 +309,52 @@ def list_drive_subfolders(folder_id: str) -> list:
     return []
 
 
+def list_drive_folder_all_files(folder_id: str) -> list:
+    """List every non-folder file inside a Drive folder (Shared Drive supported).
+
+    Returns [{id, name, modified_time, mime_type, web_view_link}] sorted
+    newest-first. Unlike list_drive_folder_docs (which restricts to Google
+    Docs), this returns Docs, Slides, Sheets, raw HTML/PDF/PPTX, etc. —
+    used by the KB panel to render mixed-content subfolders.
+
+    web_view_link is Drive's canonical "open in browser" URL for the file
+    type, so callers don't have to guess the docs.google vs drive.google
+    URL pattern per mime type.
+    """
+    creds = _get_drive_credentials()
+    if creds is None:
+        return []
+    try:
+        import urllib.parse
+        session = greq.AuthorizedSession(creds)
+        q = urllib.parse.quote(
+            f"'{folder_id}' in parents "
+            f"and mimeType!='application/vnd.google-apps.folder' "
+            f"and trashed=false"
+        )
+        url = (
+            f"https://www.googleapis.com/drive/v3/files"
+            f"?q={q}&supportsAllDrives=true&includeItemsFromAllDrives=true"
+            f"&pageSize=100&orderBy=modifiedTime desc"
+            f"&fields=files(id,name,modifiedTime,mimeType,webViewLink)"
+        )
+        r = session.get(url, timeout=15)
+        if r.status_code == 200:
+            return [
+                {
+                    "id": f["id"],
+                    "name": f["name"],
+                    "modified_time": f.get("modifiedTime", ""),
+                    "mime_type": f.get("mimeType", ""),
+                    "web_view_link": f.get("webViewLink", ""),
+                }
+                for f in r.json().get("files", [])
+            ]
+    except Exception:
+        pass
+    return []
+
+
 def list_drive_folder_docs(folder_id: str) -> list:
     """List Google Docs inside a Drive folder (Shared Drive supported).
 
