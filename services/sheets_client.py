@@ -278,6 +278,37 @@ def create_google_doc_from_html(
                 "mime_type": None, "error": f"{type(e).__name__}: {e}"}
 
 
+def list_drive_subfolders(folder_id: str) -> list:
+    """List subfolders inside a Drive folder (Shared Drive supported).
+
+    Returns [{id, name}] sorted by name asc. Used by the KB panel to
+    discover bucket subfolders before listing each bucket's docs.
+    """
+    creds = _get_drive_credentials()
+    if creds is None:
+        return []
+    try:
+        import urllib.parse
+        session = greq.AuthorizedSession(creds)
+        q = urllib.parse.quote(
+            f"'{folder_id}' in parents "
+            f"and mimeType='application/vnd.google-apps.folder' "
+            f"and trashed=false"
+        )
+        url = (
+            f"https://www.googleapis.com/drive/v3/files"
+            f"?q={q}&supportsAllDrives=true&includeItemsFromAllDrives=true"
+            f"&pageSize=100&orderBy=name"
+            f"&fields=files(id,name)"
+        )
+        r = session.get(url, timeout=15)
+        if r.status_code == 200:
+            return [{"id": f["id"], "name": f["name"]} for f in r.json().get("files", [])]
+    except Exception:
+        pass
+    return []
+
+
 def list_drive_folder_docs(folder_id: str) -> list:
     """List Google Docs inside a Drive folder (Shared Drive supported).
 

@@ -1,9 +1,31 @@
-"""Resources — Key decks, docs and reference materials for the Graas sales team."""
+"""Resources — Knowledge Base (Drive-backed) + Manual decks & docs.
 
+Top section is the Knowledge Base, auto-populated from Drive:
+  SalesHub Shared Drive / KB /
+    1. eCom/
+    2. GT-Offline/
+    3. Graas Products/
+
+Each bucket subfolder lists its Google Docs as tiles. To add to the KB,
+drop a Doc in the appropriate Drive subfolder — it appears here on the
+next 5-min cache refresh.
+
+Bottom section is the existing manual resources grid (decks, docs from
+content/resources.json), kept for slide decks / external links that
+aren't Google Docs.
+"""
+
+import os
+import re
+import sys
 import streamlit as st
 import json
 from pathlib import Path
 from datetime import datetime
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from dotenv import load_dotenv
+load_dotenv(dotenv_path=str(Path(__file__).resolve().parent.parent / ".env"))
 
 st.set_page_config(page_title="Resources | Graas", page_icon="📚", layout="wide")
 
@@ -26,7 +48,102 @@ def save_resources(data):
 # ── Page ──────────────────────────────────────────────────────────────────────
 
 st.markdown("## 📚 Resources")
-st.caption("Key decks, business reviews, and reference documents for the sales team")
+st.caption("Knowledge Base (Drive-backed, auto) + manual decks & docs")
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# KNOWLEDGE BASE — auto-populated from Drive (top section)
+# ═════════════════════════════════════════════════════════════════════════════
+
+KB_FOLDER_ID = os.getenv(
+    "KB_FOLDER_ID",
+    "1gP7i2I6oKzXVKtD-nNZyCkiSM3imNANh",  # SalesHub Shared Drive / KB
+)
+
+
+def _clean_bucket_label(name: str) -> str:
+    """Strip 'N. ' prefix and trailing slash from a bucket folder name."""
+    s = re.sub(r"^\s*\d+\.\s*", "", name).strip()
+    if s.endswith("/"):
+        s = s[:-1].strip()
+    return s
+
+
+@st.cache_data(ttl=300)
+def _list_kb_buckets() -> list:
+    """Return KB bucket subfolders sorted by their numbered prefix."""
+    from services.sheets_client import list_drive_subfolders
+    subs = list_drive_subfolders(KB_FOLDER_ID)
+    # Sort by numbered prefix when present, else alphabetical
+    def _sort_key(s):
+        m = re.match(r"^\s*(\d+)\.", s["name"])
+        return (int(m.group(1)) if m else 999, s["name"].lower())
+    return sorted(subs, key=_sort_key)
+
+
+@st.cache_data(ttl=300)
+def _list_bucket_docs(bucket_id: str) -> list:
+    """Docs in a bucket folder, newest first."""
+    from services.sheets_client import list_drive_folder_docs
+    return list_drive_folder_docs(bucket_id)
+
+
+st.markdown("### 🧠 Knowledge Base")
+st.caption(
+    f"Curated reference Docs in the SalesHub Shared Drive. To add: drop a Google "
+    f"Doc in the appropriate bucket subfolder, then refresh."
+)
+
+_buckets = _list_kb_buckets()
+if not _buckets:
+    st.warning(
+        f"No bucket subfolders found in the KB folder (`{KB_FOLDER_ID}`). "
+        f"Check the folder exists in the Shared Drive and the service account "
+        f"has access."
+    )
+else:
+    _kb_refresh_col, _ = st.columns([1, 8])
+    with _kb_refresh_col:
+        if st.button("🔄 Refresh KB", key="kb_refresh"):
+            _list_kb_buckets.clear()
+            _list_bucket_docs.clear()
+            st.rerun()
+
+    for _bucket in _buckets:
+        _bucket_label = _clean_bucket_label(_bucket["name"])
+        _docs = _list_bucket_docs(_bucket["id"])
+        with st.expander(f"**{_bucket_label}**  ·  {len(_docs)} doc(s)", expanded=True):
+            if not _docs:
+                st.caption("_Empty — drop a Doc into this bucket to populate it._")
+            else:
+                # 4-col tiles, compact
+                _rows = [_docs[i:i + 4] for i in range(0, len(_docs), 4)]
+                for _row in _rows:
+                    _cols = st.columns(4)
+                    for _col, _d in zip(_cols, _row):
+                        _url = f"https://docs.google.com/document/d/{_d['id']}/edit"
+                        _mod = (_d.get("modified_time") or "")[:10]  # YYYY-MM-DD slice
+                        with _col:
+                            with st.container(border=True):
+                                st.markdown(
+                                    f"<div style='font-size: 0.9em; font-weight: 600; "
+                                    f"line-height: 1.25; margin-bottom: 2px;'>{_d['name']}</div>"
+                                    f"<div style='font-size: 0.7em; color: #888; "
+                                    f"margin-bottom: 4px;'>Last modified: {_mod}</div>"
+                                    f"<a href='{_url}' target='_blank' "
+                                    f"style='font-size: 0.78em;'>Open →</a>",
+                                    unsafe_allow_html=True,
+                                )
+
+st.markdown("---")
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# MANUAL RESOURCES — existing card grid (decks, slides, external links)
+# ═════════════════════════════════════════════════════════════════════════════
+
+st.markdown("### 📂 Decks & Docs")
+st.caption("Manually-curated decks, slides, and external links")
 
 resources = load_resources()
 decks = resources.get("decks", [])
