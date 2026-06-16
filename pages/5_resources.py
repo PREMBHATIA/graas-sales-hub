@@ -232,18 +232,27 @@ with st.expander("➕ Add a resource", expanded=False):
 
         submitted = st.form_submit_button("Add Resource", use_container_width=True)
         if submitted and new_title and new_url:
-            new_entry = {
-                "title": new_title.strip(),
-                "description": new_description.strip(),
-                "url": new_url.strip(),
-                "type": new_type,
-                "added": datetime.now().strftime("%Y-%m-%d"),
-                "tags": [t.strip() for t in new_tags.split(",") if t.strip()],
+            # Guard against duplicates: same (title, url) tuple already in either list
+            new_key = (new_title.lower().strip(), new_url.strip())
+            existing_keys = {
+                (d.get("title", "").lower().strip(), d.get("url", "").strip())
+                for d in (resources.get("decks", []) + resources.get("docs", []))
             }
-            resources["decks"].append(new_entry)
-            save_resources(resources)
-            st.success(f"Added: **{new_title}**")
-            st.rerun()
+            if new_key in existing_keys:
+                st.warning(f"**{new_title}** is already in the list — not adding a duplicate.")
+            else:
+                new_entry = {
+                    "title": new_title.strip(),
+                    "description": new_description.strip(),
+                    "url": new_url.strip(),
+                    "type": new_type,
+                    "added": datetime.now().strftime("%Y-%m-%d"),
+                    "tags": [t.strip() for t in new_tags.split(",") if t.strip()],
+                }
+                resources["decks"].append(new_entry)
+                save_resources(resources)
+                st.success(f"Added: **{new_title}**")
+                st.rerun()
 
 st.markdown("---")
 
@@ -276,7 +285,17 @@ def _tag_badge(tag: str) -> str:
 
 # ── Render decks ──────────────────────────────────────────────────────────────
 
-all_items = resources.get("decks", []) + resources.get("docs", [])
+_all_raw = resources.get("decks", []) + resources.get("docs", [])
+# Dedupe by (title lowercase, url) — first occurrence wins. Defensive: catches
+# any pre-existing duplicates in the file (e.g. from earlier double-clicks).
+_seen = set()
+all_items = []
+for _item in _all_raw:
+    _key = (_item.get("title", "").lower().strip(), _item.get("url", "").strip())
+    if _key in _seen:
+        continue
+    _seen.add(_key)
+    all_items.append(_item)
 
 if not all_items:
     st.info("No resources yet. Add one above.")
