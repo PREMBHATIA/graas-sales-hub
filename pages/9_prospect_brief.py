@@ -381,7 +381,7 @@ BRIEF_JSON_SCHEMA = """{
   "metric_that_matters": "The metric this moves for [CFO or decision-maker name, role] is [single literal metric].",
   "discovery": {
     "business_model": ["Walk-me-through-one-order question, plus 1-2 motion questions."],
-    "data_readiness": ["SKU count + catalogue cleanliness questions; sell-out data agent-readiness."],
+    "data_readiness": ["SKU count + catalogue cleanliness questions; sell-out data agent-readiness; **API-build effort**: who builds the APIs (in-house IT, vendor, partner) and how long — direct from systems (ERP, Loyalty, DMS) or via a data warehouse; existing layer or built from scratch."],
     "tech_integration": ["Existing agents? Channels live? System of record + API? WABA?"],
     "commercial_authority": ["Who owns the budget and the metric? Who signs?"],
     "motion_specific": {"label": "If B2B / General Trade  OR  If B2C / eCommerce", "questions": ["..."]}
