@@ -171,7 +171,7 @@ Then route to a product shape:
 4. **Gap analysis.** Against what good looks like for their motion, what's missing? Write soft/unverified gaps as questions.
 5. **Route to a product** — All-e / KG / layered, with the CFO metric.
 6. **Write the discovery agenda** — prioritised, prospect-specific questions to confirm on the call, grouped (Business model / Data readiness / Tech & integration / Commercial authority) plus a motion-specific block. Every load-bearing Inferred/Unknown fact appears here as a question.
-7. **Assemble the brief** from `assets/brief_template.html` — it's a scaffold, not a form. Replace every `[placeholder]` with real content; delete the bracketed hints and the grey filler captions; keep only the Type and Motion that apply (delete the other options) and only the matching B2B-or-B2C order-flow line; turn `[confidence]` into the actual tag; drop any section left empty (e.g. Other signals). **The salesperson receives a clean, finished brief — never the scaffold with brackets showing.** Status = *Pre-call draft*. Keep to 2-3 pages.
+7. **Assemble the brief** by returning a JSON object that matches the schema the calling page supplies. The page renders that JSON into the final DOCX (and an HTML preview) via `services/brief_renderer.py` — you don't author HTML or markdown. Populate every mandatory field; for genuinely unknown values write *"Info not publicly available"* with confidence *Unknown* — never drop a row. Status = *Pre-call draft*. Keep to a hard 3 pages.
 8. **Produce the Google Doc** (see "Producing the Google Doc") and verify the conversion.
 
 **After each call:**
@@ -210,7 +210,7 @@ Research turns up material that maps to no field — an acquisition, fresh fundi
 
 ## The brief, page by page (target 2 pages, hard cap 3)
 
-Fill `assets/brief_template.html`. The template carries placeholder text and filler captions to guide you — strip all of it when you fill it. The delivered Doc shows real content only: no brackets, no instructions, no unused options.
+Return a JSON object matching the schema in the calling page. The renderer (`services/brief_renderer.py`) turns the JSON into a tight 2-3 page Google Doc — you don't author HTML or worry about layout, just supply the structured content.
 
 **Page 1 — Snapshot**
 - **Header** — Company name; *Date prepared* (today); *Meeting date* (the upcoming meeting, if known); *Prepared by: Graas Enterprise Team*. One line each.

@@ -12,8 +12,9 @@ team can build + maintain Prospect Briefs without the CLI. Workflow:
   confirmed facts, resolves conflicts, decides the next step → re-upload to
   the same Doc (history preserved).
 
-The skill itself lives in content/skills/prospect-research-brief/SKILL.md;
-the HTML scaffold in content/skills/prospect-research-brief/assets/.
+The skill (system prompt) lives in content/skills/prospect-research-brief/SKILL.md;
+the JSON-schema target shape is defined inline in BRIEF_JSON_SCHEMA below; the
+DOCX + HTML renderers live in services/brief_renderer.py.
 """
 
 import os
@@ -120,22 +121,18 @@ SKILL_DIR = Path(__file__).parent.parent / "content" / "skills" / "prospect-rese
 
 
 @st.cache_data(ttl=60)
-def load_skill() -> tuple[str, str]:
-    """Return (SKILL.md text, brief_template.html text). Cached for 60s so
-    template edits surface quickly after a deploy without a manual restart."""
+def load_skill() -> str:
+    """Return SKILL.md text as the system prompt. Cached for 60s so edits
+    surface quickly after a deploy without a manual restart."""
     skill_md = SKILL_DIR / "SKILL.md"
-    tmpl = SKILL_DIR / "assets" / "brief_template.html"
-    if not skill_md.exists() or not tmpl.exists():
-        return "", ""
-    return skill_md.read_text(encoding="utf-8"), tmpl.read_text(encoding="utf-8")
+    if not skill_md.exists():
+        return ""
+    return skill_md.read_text(encoding="utf-8")
 
 
-SKILL_TEXT, TEMPLATE_HTML = load_skill()
-if not SKILL_TEXT or not TEMPLATE_HTML:
-    st.error(
-        f"Could not load skill files from `{SKILL_DIR}`. "
-        f"Expected `SKILL.md` and `assets/brief_template.html`."
-    )
+SKILL_TEXT = load_skill()
+if not SKILL_TEXT:
+    st.error(f"Could not load `SKILL.md` from `{SKILL_DIR}`.")
     st.stop()
 
 
