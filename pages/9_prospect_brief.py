@@ -986,26 +986,41 @@ _recent = _list_recent_briefs(DEFAULT_DRIVE_FOLDER)
 if not _recent:
     st.caption("_No briefs saved to this Drive folder yet._")
 else:
-    # 4-column tiles, 2 rows max = 8 tiles shown; rest collapsed
-    _tiles = _recent[:8]
-    _rows = [_tiles[i:i + 4] for i in range(0, len(_tiles), 4)]
+    # Parse company + date from each filename, then dedupe by company
+    # (case-insensitive) — newest wins since the source list is already
+    # sorted modifiedTime-desc.
+    _parsed = []
+    _seen_companies: set = set()
+    for _d in _recent:
+        _name = _d["name"]
+        _m = re.match(r"Prospect Brief\s*[—\-]\s*(.+?)\s*[—\-]\s*(\d{4}-\d{2}-\d{2})", _name)
+        if _m:
+            _company, _date_str = _m.group(1).strip(), _m.group(2)
+        else:
+            _company = (_name.replace("Prospect Brief —", "")
+                            .replace("Prospect Brief -", "").strip() or _name)
+            _date_str = ""
+        _key = _company.lower().strip()
+        if _key in _seen_companies:
+            continue
+        _seen_companies.add(_key)
+        _parsed.append({"company": _company, "date": _date_str, "id": _d["id"]})
+
+    # 6-column tiles, 2 rows max = 12 unique-company tiles shown
+    _tiles = _parsed[:12]
+    _rows = [_tiles[i:i + 6] for i in range(0, len(_tiles), 6)]
     for _row in _rows:
-        _cols = st.columns(4)
-        for _col, _d in zip(_cols, _row):
-            # Parse company + date from "Prospect Brief — Foo Co — 2026-06-15"
-            _name = _d["name"]
-            _company, _date_str = "", ""
-            _m = re.match(r"Prospect Brief\s*[—\-]\s*(.+?)\s*[—\-]\s*(\d{4}-\d{2}-\d{2})", _name)
-            if _m:
-                _company, _date_str = _m.group(1).strip(), _m.group(2)
-            else:
-                _company = _name.replace("Prospect Brief —", "").replace("Prospect Brief -", "").strip() or _name
-            _url = f"https://docs.google.com/document/d/{_d['id']}/edit"
+        _cols = st.columns(6)
+        for _col, _p in zip(_cols, _row):
+            _url = f"https://docs.google.com/document/d/{_p['id']}/edit"
             with _col:
                 with st.container(border=True):
-                    st.markdown(f"**{_company}**")
-                    if _date_str:
-                        st.caption(_date_str)
-                    st.markdown(f"[Open Doc →]({_url})")
-    if len(_recent) > 8:
-        st.caption(f"_+{len(_recent) - 8} older briefs — open the Drive folder to see more._")
+                    st.markdown(
+                        f"<div style='font-size: 0.85em; font-weight: 600; line-height: 1.2; "
+                        f"margin-bottom: 2px;'>{_p['company']}</div>"
+                        f"<div style='font-size: 0.7em; color: #888;'>{_p['date']}</div>"
+                        f"<a href='{_url}' target='_blank' style='font-size: 0.75em;'>Open →</a>",
+                        unsafe_allow_html=True,
+                    )
+    if len(_parsed) > 12:
+        st.caption(f"_+{len(_parsed) - 12} older briefs — open the Drive folder to see more._")
