@@ -907,3 +907,57 @@ with right:
 
         if st.session_state.get("last_brief_doc_url"):
             st.caption(f"📄 Latest Doc: {st.session_state['last_brief_doc_url']}")
+
+            # ── Share panel — fires a Drive notification email to recipients ──
+            with st.expander("📧 Share with the team", expanded=True):
+                st.caption(
+                    "Adds the recipient as a Doc editor AND sends Google's "
+                    "share-notification email so they actually see it."
+                )
+                preset_emails = [
+                    ("Prem", "prem@graas.ai"),
+                    ("Amruta", "amruta@graas.ai"),
+                ]
+                share_cols = st.columns(len(preset_emails))
+                selected_presets: list = []
+                for i, (label, email) in enumerate(preset_emails):
+                    with share_cols[i]:
+                        if st.checkbox(f"{label} ({email})", value=True, key=f"share_preset_{email}"):
+                            selected_presets.append(email)
+
+                extras_raw = st.text_input(
+                    "Other emails (optional, comma-separated)",
+                    key="share_extra_emails",
+                    placeholder="e.g. cofounder@graas.ai, sales@graas.ai",
+                )
+                extras = [e.strip() for e in (extras_raw or "").split(",") if e.strip() and "@" in e]
+
+                msg = st.text_area(
+                    "Message (optional — appended to Google's notification email)",
+                    key="share_msg",
+                    height=70,
+                    placeholder=f"e.g. 'Pre-call brief for {st.session_state.get('last_brief_company', '<company>')}. "
+                                f"Please scan before our meeting.'",
+                )
+
+                share_btn_col, _ = st.columns([2, 5])
+                with share_btn_col:
+                    if st.button("📨 Send share notification", type="primary",
+                                 use_container_width=True, key="share_send_btn"):
+                        recipients = list(dict.fromkeys(selected_presets + extras))  # dedupe, keep order
+                        if not recipients:
+                            st.warning("Pick at least one recipient.")
+                        else:
+                            from services.sheets_client import share_drive_file_with_notification
+                            with st.spinner(f"Sharing with {len(recipients)} recipient(s)…"):
+                                res = share_drive_file_with_notification(
+                                    doc_id=st.session_state.get("last_brief_doc_id")
+                                            or _extract_doc_id(st.session_state["last_brief_doc_url"]),
+                                    emails=recipients,
+                                    message=msg.strip(),
+                                )
+                            if res["sent"]:
+                                st.success(f"✅ Notified: {', '.join(res['sent'])}")
+                            if res["failed"]:
+                                for f in res["failed"]:
+                                    st.error(f"❌ {f['email']}: {f['error']}")

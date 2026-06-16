@@ -466,6 +466,61 @@ def create_google_doc_from_docx(
                 "mime_type": None, "error": f"{type(e).__name__}: {e}"}
 
 
+def share_drive_file_with_notification(
+    doc_id: str,
+    emails: list,
+    message: str = "",
+    role: str = "writer",
+) -> dict:
+    """Grant access to a Drive file AND send Google's share-notification email.
+
+    Different from the silent share inside create_google_doc_from_docx (which
+    uses sendNotificationEmail=false). This is the explicit "tell the team
+    there's a new brief" path — used by the Share button after Save.
+
+    Idempotent: re-sharing with someone who already has access generally
+    returns 200 and (usefully) re-sends the notification, so it doubles as
+    a re-ping when the team didn't notice the first email.
+
+    Returns {"ok": bool, "sent": [...], "failed": [{email, error}, ...]}.
+    """
+    creds = _get_drive_credentials()
+    if creds is None:
+        return {"ok": False, "sent": [], "failed": [{"email": "*", "error": "Drive credentials unavailable"}]}
+    sent: list = []
+    failed: list = []
+    try:
+        session = greq.AuthorizedSession(creds)
+        for email in emails:
+            email = (email or "").strip()
+            if not email or "@" not in email:
+                continue
+            body = {"type": "user", "role": role, "emailAddress": email}
+            params = "?sendNotificationEmail=true&supportsAllDrives=true"
+            if message:
+                params += "&emailMessage=" + _url_quote(message)
+            try:
+                resp = session.post(
+                    f"https://www.googleapis.com/drive/v3/files/{doc_id}/permissions{params}",
+                    json=body,
+                    timeout=20,
+                )
+                if resp.status_code in (200, 201):
+                    sent.append(email)
+                else:
+                    failed.append({"email": email, "error": f"HTTP {resp.status_code} — {resp.text[:200]}"})
+            except Exception as e:
+                failed.append({"email": email, "error": f"{type(e).__name__}: {e}"})
+        return {"ok": len(failed) == 0, "sent": sent, "failed": failed}
+    except Exception as e:
+        return {"ok": False, "sent": sent, "failed": failed + [{"email": "*", "error": f"{type(e).__name__}: {e}"}]}
+
+
+def _url_quote(s: str) -> str:
+    from urllib.parse import quote
+    return quote(s, safe="")
+
+
 def update_google_doc_docx(doc_id: str, docx_bytes: bytes) -> dict:
     """Replace the contents of an existing Google Doc by uploading new DOCX.
 
