@@ -745,7 +745,10 @@ with right:
             system_prompt = SKILL_TEXT
             kwargs = dict(
                 model="claude-sonnet-4-6",
-                max_tokens=8000,
+                # Brief expanded to ~12 mandatory sections (game plan, asset map,
+                # proof points, etc.) — at 8K Claude was hitting max_tokens
+                # mid-JSON, leaving the parser with just an opening "{".
+                max_tokens=16000,
                 system=system_prompt,
                 messages=[{"role": "user", "content": user_prompt}],
             )
@@ -883,10 +886,27 @@ with right:
                 brief_data = _extract_json_object(raw_text)
             except Exception as parse_err:
                 status_box.update(label="❌ Couldn't parse JSON", state="error", expanded=True)
+                stop_reason = getattr(final_message, "stop_reason", "unknown")
+                hint = ""
+                if stop_reason == "max_tokens":
+                    hint = (
+                        "\n\n**Diagnosis:** Claude hit `max_tokens` mid-JSON — "
+                        "the response was cut off before the closing brace. "
+                        "Bump `max_tokens` in the API call or trim the brief schema."
+                    )
+                elif stop_reason == "end_turn":
+                    hint = (
+                        "\n\n**Diagnosis:** Claude finished cleanly but wrapped "
+                        "the JSON in commentary. Tighten the 'JSON ONLY' "
+                        "instruction at the end of the prompt."
+                    )
                 st.error(
                     "Claude didn't return valid JSON. This usually means the model "
                     "wrapped the response in commentary or got cut off mid-output.\n\n"
                     f"**Parse error:** {parse_err}\n\n"
+                    f"**Stop reason:** `{stop_reason}` · **Output length:** "
+                    f"{len(raw_text):,} chars"
+                    f"{hint}\n\n"
                     f"**First 1500 chars of response:**\n\n{raw_text[:1500]}"
                 )
                 st.stop()
