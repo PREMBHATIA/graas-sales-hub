@@ -340,6 +340,7 @@ BRIEF_JSON_SCHEMA = """{
     "market": "India / Indonesia / Vietnam / Thailand / Philippines / Malaysia / Singapore — primary",
     "status": "Pre-call draft  (post-call: 'Pre-call draft → Post call-1 — YYYY-MM-DD …')"
   },
+  "strategic_hook": "ONE line, MAX 25 words. The X→Y mapping pitch frame — what they've already built (their assets) → the Graas layer that sits on top. Renders at the top of the brief, sets the meeting frame. e.g. 'You've built KALCare + EMOS + KlikDokter. Graas adds the agentic intelligence layer — without ripping out a single system you run today.' Must reference real assets you found in research.",
   "executive_summary": {
     "category": "vertical + business model in one line — e.g. 'Industrial gases distributor'",
     "type": "ONE of: 'OEM / Principal / Brand' | 'Multi-brand distributor' | 'Multi-brand retailer'",
@@ -384,7 +385,10 @@ BRIEF_JSON_SCHEMA = """{
     "motion_specific": {"label": "If B2B / General Trade  OR  If B2C / eCommerce", "questions": ["..."]}
   },
   "people_path_in": [
-    {"name": "...", "role": "...", "why_matter": "1-line relevance", "type": "Decision-maker | Champion | Finance buyer | Meeting attendee", "linkedin": "ONE optional line (background + prior companies). Omit field if no useful info."}
+    {"name": "...", "role": "...", "why_matter": "1-line relevance", "type": "Decision-maker | Champion | Finance buyer | Meeting attendee", "linkedin": "ONE optional line (background + prior companies). Omit field if no useful info.", "lead_with": "ONE phrase, 8-20 words — for THIS person specifically, which product/section to lead with and ONE reason grounded in their LinkedIn signal. e.g. 'Lead with hoppr + cite SOC2/PDPA up front — he's a Certified Ethical Hacker.' Only populate for meeting attendees; omit field for non-attendees."}
+  ],
+  "objection_handling": [
+    {"objection": "likely objection in their words, e.g. 'We already built EMOS / KALCare / KlikDokter.'", "response": "Graas response — 1-2 phrases, lead with the reframe. e.g. 'Exactly why this is low-risk. Graas is the intelligence layer ON TOP — we integrate with your systems of record, we don't replace them.'"}
   ],
   "entry_wedge": "lowest-friction way in",
   "next_step": {"action": "another discovery call | demo | POC scoping | solutioning | park", "why": "one-line rationale", "gate_met": false, "still_open": "what's missing (motion / route / customer-confirmed CFO metric / data / DM)"},
@@ -448,6 +452,9 @@ def _build_new_brief_prompt(
         f"~IDR 33.0T FY2025 (per enseval.com)'. Put the source detail in the ledger "
         f"row instead.\n\n"
         f"**DO NOT DROP MANDATORY FIELDS.** Every brief must include: "
+        f"strategic_hook (one-line X→Y frame at the top — what they've already "
+        f"built mapped to the Graas layer that sits on top; MUST reference real "
+        f"assets surfaced in research, not generic claims), "
         f"executive_summary (6 fields rendered as two stacked box rows: "
         f"category/type/motion on row 1, comps/history/maturity on row 2 — NOT a "
         f"paragraph, NOT labelled lines), stat_band (all 5), what_they_have (all 10 dimensions: "
@@ -460,7 +467,12 @@ def _build_new_brief_prompt(
         f"Retailers via SFA, B2B customers, etc.), pain_capability_cfo, "
         f"metric_that_matters, discovery (all 4 buckets + motion_specific), "
         f"people_path_in (merge meeting attendees here; use type='Meeting attendee' + "
-        f"the optional linkedin field for any attendees the user provided), entry_wedge, "
+        f"the optional linkedin field for any attendees the user provided; for each "
+        f"Meeting attendee, ALSO populate lead_with — the product/section to lead "
+        f"with for that person and ONE reason grounded in their LinkedIn signal), "
+        f"objection_handling (3-5 likely objections the room will raise + crisp "
+        f"Graas responses — anticipate based on their tech stack, prior digital "
+        f"investments, and audience seniority), entry_wedge, "
         f"next_step, opening_hook, conflicts_unknowns (appendix at the end — keep it "
         f"terse). If a fact is genuinely not findable, set the value to *\"Info not "
         f"publicly available\"* and confidence to *\"Unknown\"* — **never drop the "
@@ -778,8 +790,9 @@ with right:
                 st.stop()
 
             # Sanity-check mandatory fields are populated
-            required_keys = ("executive_summary", "stat_band", "what_they_have",
-                             "product_route", "pain_capability_cfo", "opening_hook")
+            required_keys = ("strategic_hook", "executive_summary", "stat_band",
+                             "what_they_have", "product_route", "pain_capability_cfo",
+                             "objection_handling", "opening_hook")
             missing_required = [k for k in required_keys if not brief_data.get(k)]
             if missing_required:
                 st.warning(

@@ -283,6 +283,10 @@ def render_brief_docx(data: dict) -> bytes:
     if header.get("status"):
         _add_status(doc, f"Status: {header['status']}")
 
+    # ── Strategic hook (sets the meeting frame, one line) ───────────────────
+    if data.get("strategic_hook"):
+        _add_para(doc, f"“{data['strategic_hook']}”", italic=True, size=10.5)
+
     # ── Executive Summary ────────────────────────────────────────────────────
     # Two stacked 3-col tables that look like the stat band — Category/Type/Motion
     # on row 1, Comps/History/Maturity on row 2. Type and Motion live INSIDE the
@@ -456,12 +460,15 @@ def render_brief_docx(data: dict) -> bytes:
         for p in people:
             why = p.get("why_matter", "") or ""
             li = (p.get("linkedin") or "").strip()
+            lead = (p.get("lead_with") or "").strip()
             if li:
                 why = f"{why}\nLinkedIn: {li}" if why else f"LinkedIn: {li}"
+            if lead:
+                why = f"{why}\n→ Lead with: {lead}" if why else f"→ Lead with: {lead}"
             rows.append([p.get("name", ""), p.get("role", ""), why, p.get("type", "")])
         _add_table(
             doc,
-            headers=["Name", "Role", "Why they matter", "Type"],
+            headers=["Name", "Role", "Why they matter & how to play them", "Type"],
             rows=rows,
             col_widths_cm=[3.2, 3.2, 8.4, 3.2],
         )
@@ -486,6 +493,18 @@ def render_brief_docx(data: dict) -> bytes:
     if data.get("opening_hook"):
         _add_h3(doc, "Opening hook")
         _add_para(doc, f"“{data['opening_hook']}”", italic=True)
+
+    # ── Objection handling (anticipated objections + Graas response) ────────
+    objections = data.get("objection_handling") or []
+    if objections:
+        _add_h3(doc, "Objection handling")
+        rows = [[o.get("objection", ""), o.get("response", "")] for o in objections]
+        _add_table(
+            doc,
+            headers=["Likely objection", "Response"],
+            rows=rows,
+            col_widths_cm=[7.0, 11.0],
+        )
 
     # ── Appendix: Conflicts & unknowns (de-emphasised, ends the doc) ─────────
     conflicts = data.get("conflicts_unknowns") or {}
@@ -548,6 +567,9 @@ td.src { font-size: 7pt; font-style: italic; color: #777; }
     parts.append(f"<p class='sub'>{' · '.join(sub_parts)}</p>")
     if header.get("status"):
         parts.append(f"<p class='status'>Status: {_esc(header['status'])}</p>")
+
+    if data.get("strategic_hook"):
+        parts.append(f"<p class='hook'>“{_esc(data['strategic_hook'])}”</p>")
 
     _es = data.get("executive_summary")
     _top_type = _esc(data.get("type") or "")
@@ -682,18 +704,20 @@ td.src { font-size: 7pt; font-style: italic; color: #777; }
         })
     if _people:
         parts.append("<h3>People &amp; path in</h3><table>")
-        parts.append("<tr><th>Name</th><th>Role</th><th>Why they matter</th><th>Type</th></tr>")
+        parts.append("<tr><th>Name</th><th>Role</th><th>Why they matter &amp; how to play them</th><th>Type</th></tr>")
         for p in _people:
-            why = p.get("why_matter", "") or ""
+            why_raw = p.get("why_matter", "") or ""
             li = (p.get("linkedin") or "").strip()
+            lead = (p.get("lead_with") or "").strip()
+            cell = _esc(why_raw)
             if li:
-                why = f"{why}<br><em>LinkedIn:</em> {_esc(li)}" if why else f"<em>LinkedIn:</em> {_esc(li)}"
-            else:
-                why = _esc(why)
+                cell = f"{cell}<br><em>LinkedIn:</em> {_esc(li)}" if cell else f"<em>LinkedIn:</em> {_esc(li)}"
+            if lead:
+                cell = f"{cell}<br><strong>→ Lead with:</strong> {_esc(lead)}" if cell else f"<strong>→ Lead with:</strong> {_esc(lead)}"
             parts.append(
                 f"<tr><td>{_esc(p.get('name'))}</td>"
                 f"<td>{_esc(p.get('role'))}</td>"
-                f"<td>{why}</td>"
+                f"<td>{cell}</td>"
                 f"<td>{_esc(p.get('type'))}</td></tr>"
             )
         parts.append("</table>")
@@ -717,6 +741,17 @@ td.src { font-size: 7pt; font-style: italic; color: #777; }
     if data.get("opening_hook"):
         parts.append("<h3>Opening hook</h3>")
         parts.append(f"<p class='hook'>“{_esc(data['opening_hook'])}”</p>")
+
+    _objs = data.get("objection_handling") or []
+    if _objs:
+        parts.append("<h3>Objection handling</h3><table>")
+        parts.append("<tr><th>Likely objection</th><th>Response</th></tr>")
+        for o in _objs:
+            parts.append(
+                f"<tr><td>{_esc(o.get('objection'))}</td>"
+                f"<td>{_esc(o.get('response'))}</td></tr>"
+            )
+        parts.append("</table>")
 
     # Appendix: Conflicts & unknowns (end of brief, de-emphasised)
     conflicts = data.get("conflicts_unknowns") or {}
