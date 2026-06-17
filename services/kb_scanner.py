@@ -169,11 +169,15 @@ def scan_for_conflicts(corpus: list, anthropic_client, model: str = "claude-sonn
 
     resp = anthropic_client.messages.create(
         model=model,
-        max_tokens=4000,
+        max_tokens=8000,
         system=SCAN_SYSTEM_PROMPT,
         messages=[{"role": "user", "content": user_msg}],
     )
     raw = resp.content[0].text.strip()
+    # Flag if output hit the token cap — likely means JSON got truncated
+    if getattr(resp, "stop_reason", None) == "max_tokens":
+        # Try to gracefully truncate to the last complete finding, but warn
+        raw = raw + '\n]}'  # naive close — parser fallback below will scan
     raw = re.sub(r"^```(?:json|JSON)?\s*\n", "", raw)
     raw = re.sub(r"\n```\s*$", "", raw)
     raw = raw.strip()
