@@ -385,14 +385,28 @@ BRIEF_JSON_SCHEMA = """{
   "pain_capability_cfo": [{"pain": "pain in their language", "capability": "All-e/KG capability", "metric": "DSO / revenue per rep / cost per order / ..."}],
   "metric_that_matters": "The metric this moves for [CFO or decision-maker name, role] is [single literal metric].",
   "discovery": {
-    "business_model": ["Walk-me-through-one-order question, plus 1-2 motion questions."],
-    "data_readiness": ["SKU count + catalogue cleanliness questions; sell-out data agent-readiness; **API-build effort**: who builds the APIs (in-house IT, vendor, partner) and how long — direct from systems (ERP, Loyalty, DMS) or via a data warehouse; existing layer or built from scratch."],
-    "tech_integration": ["Existing agents? Channels live? System of record + API? WABA?"],
-    "commercial_authority": ["Who owns the budget and the metric? Who signs?"],
-    "motion_specific": {"label": "If B2B / General Trade  OR  If B2C / eCommerce", "questions": ["..."]}
+    "_TOTAL_CAP": "HARD CAP: 12 questions TOTAL across all 5 buckets combined. Quality over quantity — each question must be one a seasoned AE would actually ask. Aim for 2-3 per bucket, not 5. Cut anything generic or restate-the-obvious.",
+    "business_model": ["Walk-me-through-one-order question + 1-2 motion-specific questions. MAX 3."],
+    "data_readiness": ["SKU/catalogue cleanliness; sell-out data agent-readiness; API-build effort (who builds, how long, direct or via warehouse). MAX 3."],
+    "tech_integration": ["Existing agents? Channels live? System of record + API? WABA? MAX 3."],
+    "commercial_authority": ["Who owns the budget? Who owns the success metric? Who signs? MAX 2."],
+    "motion_specific": {"label": "If B2B / General Trade  OR  If B2C / eCommerce", "questions": ["1-2 motion-specific questions only."]}
   },
   "people_path_in": [
     {"name": "...", "role": "...", "why_matter": "1-line relevance", "type": "Decision-maker | Champion | Finance buyer | Meeting attendee", "linkedin": "ONE optional line (background + prior companies). Omit field if no useful info.", "lead_with": "ONE phrase, 8-20 words — for THIS person specifically, which product/section to lead with and ONE reason grounded in their LinkedIn signal. e.g. 'Lead with hoppr + cite SOC2/PDPA up front — he's a Certified Ethical Hacker.' Only populate for meeting attendees; omit field for non-attendees."}
+  ],
+  "why_now": [
+    "2-4 phrases — the macro / regulatory / segment-momentum reasons this prospect should act NOW (not in 6 months). e.g. 'IDR depreciation + softer consumer = 2026 is an efficiency year, not a growth year — hoppr/All-e attack cost-to-serve directly.'",
+    "'Health Law 17/2023 mandates pharmacy distribution digitalisation — EMOS is their response; Graas accelerates the mandate.'",
+    "'Distribution +21% YoY is their fastest-growing segment — the segment most exposed to manual ordering leakage.'"
+  ],
+  "meeting_game_plan": [
+    {"minute": "0-5", "segment": "Open on their growth signal", "talking_point": "Lead with the sharpest data point or quote — e.g. 'Distribution is +21% YoY in a tough macro — that's where intelligence pays back fastest.' Name the attendee who'll resonate most."},
+    {"minute": "5-15", "segment": "Asset map / strategic frame", "talking_point": "Walk the asset_graas_map: 'You've built X + Y + Z. Graas adds the layer on top — without ripping anything out.' (lead attendee name)"},
+    {"minute": "15-30", "segment": "Product-fit-1 + proof point", "talking_point": "Deep on the first Graas product fit, with the relevant graas_proof_points customer as proof. (lead attendee name)"},
+    {"minute": "30-45", "segment": "Product-fit-2 + proof point", "talking_point": "Second product fit, second proof point. (lead attendee name)"},
+    {"minute": "45-55", "segment": "Discovery + objection handle", "talking_point": "Run 3-5 of the sharpest discovery questions live; anticipate top 1-2 objections from objection_handling."},
+    {"minute": "55-60", "segment": "Close on next step", "talking_point": "Propose the next_step.action explicitly, name a follow-up date."}
   ],
   "graas_proof_points": [
     {
@@ -415,6 +429,36 @@ BRIEF_JSON_SCHEMA = """{
 }"""
 
 
+REFERENCE_PROPOSALS_FOLDER_ID = "1tBMrcpiIDVhg5e0-N1ytjuzbDexQyheX"
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def _fetch_proof_points_block() -> str:
+    """Scan the Reference Proposals folder and build the prompt block listing
+    every customer/POC we have a proposal for + a snippet of each.
+
+    This is the SOLE source of truth for graas_proof_points — the bot must
+    only cite from this list (no fabricating customers). Cached 1h per
+    session to avoid re-scanning on every brief gen.
+    """
+    from services.sheets_client import list_drive_folder_docs, fetch_drive_doc_text
+
+    docs = list_drive_folder_docs(REFERENCE_PROPOSALS_FOLDER_ID)
+    if not docs:
+        return ("(No proposals available — graas_proof_points must be left empty. "
+                "Do NOT invent customers.)")
+    lines = []
+    for d in docs:
+        title = d["name"].replace("Copy of ", "").strip()
+        try:
+            body = (fetch_drive_doc_text(d["id"]) or "").strip()
+            snippet = " ".join(body.split())[:700]
+        except Exception:
+            snippet = ""
+        lines.append(f"- **{title}** — {snippet}")
+    return "\n".join(lines)
+
+
 def _build_new_brief_prompt(
     crm_data: dict,
     research: str,
@@ -424,6 +468,7 @@ def _build_new_brief_prompt(
 ) -> str:
     """Compose the user-turn prompt for a fresh pre-call brief."""
     today = datetime.now().strftime("%Y-%m-%d")
+    proof_points_block = _fetch_proof_points_block()
     crm_block = ""
     if crm_data:
         crm_block = (
@@ -465,6 +510,15 @@ def _build_new_brief_prompt(
         f"USD) FY2025 (Kalbe consolidated, per Yahoo Finance TTM); Enseval standalone "
         f"~IDR 33.0T FY2025 (per enseval.com)'. Put the source detail in the ledger "
         f"row instead.\n\n"
+        f"**SALES ↔ SOLUTIONING BALANCE.** This is a SALES brief that ALSO "
+        f"contains solutioning + discovery — NOT a solutioning doc with a sales "
+        f"intro. Target ratio: ~35% sales (strategic_hook, asset_graas_map, "
+        f"why_now, graas_proof_points, meeting_game_plan, objection_handling, "
+        f"opening_hook, lead_with per attendee) / ~65% solutioning + discovery "
+        f"(what_they_have, persona_map, pain_capability_cfo, discovery, "
+        f"conflicts_unknowns). Keep solutioning sections DENSE — phrases not "
+        f"paragraphs — so the sales sections carry visual weight. A meeting-"
+        f"ready brief reads like a play-script, not an analyst report.\n\n"
         f"**RESEARCH DEPTH RULES — apply these before filling the brief:**\n"
         f"1. **Per-segment / per-division growth.** For any multi-segment / "
         f"multi-division company (pharma w/ Rx+OTC+Nutrition+Distribution; "
@@ -479,24 +533,15 @@ def _build_new_brief_prompt(
         f"apps, DTC web, mobile apps, field-force apps, marketplace seller "
         f"centres. Don't stop at one or two. Each digital surface is a potential "
         f"Graas entry point and MUST be enumerated in asset_graas_map.\n\n"
-        f"**KNOWN GRAAS WINS** — use ONLY these for graas_proof_points; do NOT "
-        f"invent or guess customer names or figures. Pick 2-4 that map directly "
-        f"to THIS prospect's assets/pains:\n"
-        f"- Tata 1mg (India, e-pharmacy): All-e Prescription Intelligence — "
-        f"78% accuracy on prescription→product POC; cart time 4-6 min → <2 min; "
-        f"INR 62-103 Cr/yr projected revenue uplift; PDPA/DPDP-compliant "
-        f"self-hosted vision models; milestone-gated + 2% revenue share "
-        f"commercial.\n"
-        f"- PI Industries (India, ag inputs): All-e WhatsApp ordering agent — "
-        f"$4.5M/month in reorders; ordering cycle 5 days → 5 min; 75% repeat "
-        f"rate.\n"
-        f"- Canon India (consumer electronics): hoppr + Turbo marketplace "
-        f"unification — 3× traffic-to-qualified-lead conversion after unifying "
-        f"channel data.\n"
-        f"- Indonesia field-agent OCR pilot (~400 reps): All-e Field Agent OCR "
-        f"— photo of order list / invoice → ERP-ready order; 48 hrs → 4 mins.\n"
-        f"- Schneider Electric (SmartO! demo): All-e for industrial B2B — "
-        f"reference architecture; available on request.\n\n"
+        f"**AVAILABLE GRAAS PROOF POINTS — STRICT RULE.** You may cite ONLY "
+        f"customers/POCs from the list below (these are the proposals we have on "
+        f"file in the Reference Proposals folder — every name + outcome here is "
+        f"verified). NEVER invent or guess customer names, results, or figures. "
+        f"If a fact about a customer isn't in the snippet below, do not state "
+        f"it. If no proposal maps cleanly to this prospect's pains, leave "
+        f"graas_proof_points empty — better than fabricating. 'Working with' "
+        f"includes POCs and pilots, not just live customers.\n\n"
+        f"{proof_points_block}\n\n"
         f"**DO NOT DROP MANDATORY FIELDS.** Every brief must include: "
         f"strategic_hook (one-line X→Y frame at the top — what they've already "
         f"built mapped to the Graas layer that sits on top; MUST reference real "
@@ -504,9 +549,14 @@ def _build_new_brief_prompt(
         f"asset_graas_map (enumerate ALL their digital surfaces — 3+ rows "
         f"typical — each mapped to the Graas layer that fits; this is the "
         f"structured unpack of strategic_hook), "
-        f"graas_proof_points (2-4 wins from the KNOWN GRAAS WINS list above, "
-        f"each tied to one of this prospect's assets or pains; never fabricate "
-        f"customers), "
+        f"why_now (2-4 phrases on macro/regulatory/segment-momentum reasons "
+        f"this prospect should act THIS quarter, not later — sales weight), "
+        f"graas_proof_points (2-4 entries chosen from AVAILABLE GRAAS PROOF "
+        f"POINTS list above, each tied to one of this prospect's assets or "
+        f"pains; NEVER fabricate — leave empty if no proposal maps cleanly), "
+        f"meeting_game_plan (6-row minute-by-minute run-sheet for the meeting, "
+        f"each row naming the lead attendee and a concrete talking point — "
+        f"sales weight), "
         f"executive_summary (6 fields rendered as two stacked box rows: "
         f"category/type/motion on row 1, comps/history/maturity on row 2 — NOT a "
         f"paragraph, NOT labelled lines), stat_band (all 5), what_they_have (all 10 dimensions: "
@@ -842,11 +892,11 @@ with right:
                 st.stop()
 
             # Sanity-check mandatory fields are populated
-            required_keys = ("strategic_hook", "asset_graas_map",
+            required_keys = ("strategic_hook", "asset_graas_map", "why_now",
                              "executive_summary", "stat_band", "what_they_have",
                              "product_route", "graas_proof_points",
-                             "pain_capability_cfo", "objection_handling",
-                             "opening_hook")
+                             "pain_capability_cfo", "meeting_game_plan",
+                             "objection_handling", "opening_hook")
             missing_required = [k for k in required_keys if not brief_data.get(k)]
             if missing_required:
                 st.warning(

@@ -302,6 +302,12 @@ def render_brief_docx(data: dict) -> bytes:
             col_widths_cm=[5.0, 7.5, 5.5],
         )
 
+    # ── Why now (macro / regulatory / segment-momentum, bulleted) ───────────
+    why_now = data.get("why_now") or []
+    if why_now:
+        _add_h3(doc, "Why now")
+        _add_bullets(doc, why_now)
+
     # ── Executive Summary ────────────────────────────────────────────────────
     # Two stacked 3-col tables that look like the stat band — Category/Type/Motion
     # on row 1, Comps/History/Maturity on row 2. Type and Motion live INSIDE the
@@ -518,6 +524,21 @@ def render_brief_docx(data: dict) -> bytes:
             gate_line += f" — still open: {next_step['still_open']}"
         _add_kv_para(doc, "Ready to solution?", gate_line)
 
+    # ── Meeting game plan (minute-by-minute run-sheet) ──────────────────────
+    game_plan = data.get("meeting_game_plan") or []
+    if game_plan:
+        _add_h3(doc, "Meeting game plan")
+        rows = [
+            [g.get("minute", ""), g.get("segment", ""), g.get("talking_point", "")]
+            for g in game_plan
+        ]
+        _add_table(
+            doc,
+            headers=["Min", "Segment", "Talking point / owner"],
+            rows=rows,
+            col_widths_cm=[1.8, 4.7, 11.5],
+        )
+
     # ── Opening hook ─────────────────────────────────────────────────────────
     if data.get("opening_hook"):
         _add_h3(doc, "Opening hook")
@@ -611,6 +632,13 @@ td.src { font-size: 7pt; font-style: italic; color: #777; }
                 f"<td>{_esc(a.get('graas_layer'))}</td></tr>"
             )
         parts.append("</table>")
+
+    _why_now = data.get("why_now") or []
+    if _why_now:
+        parts.append("<h3>Why now</h3><ul>")
+        for w in _why_now:
+            parts.append(f"<li>{_esc(w)}</li>")
+        parts.append("</ul>")
 
     _es = data.get("executive_summary")
     _top_type = _esc(data.get("type") or "")
@@ -790,6 +818,18 @@ td.src { font-size: 7pt; font-style: italic; color: #777; }
         if next_step.get("still_open"):
             gate_line += f" — still open: {_esc(next_step['still_open'])}"
         parts.append(f"<p><strong>Ready to solution?</strong> {gate_line}</p>")
+
+    _gp = data.get("meeting_game_plan") or []
+    if _gp:
+        parts.append("<h3>Meeting game plan</h3><table>")
+        parts.append("<tr><th>Min</th><th>Segment</th><th>Talking point / owner</th></tr>")
+        for g in _gp:
+            parts.append(
+                f"<tr><td>{_esc(g.get('minute'))}</td>"
+                f"<td>{_esc(g.get('segment'))}</td>"
+                f"<td>{_esc(g.get('talking_point'))}</td></tr>"
+            )
+        parts.append("</table>")
 
     if data.get("opening_hook"):
         parts.append("<h3>Opening hook</h3>")
