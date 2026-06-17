@@ -140,6 +140,76 @@ st.caption(
     f"in the appropriate bucket (or subfolder), then refresh."
 )
 
+
+# ── KB Health panel ──────────────────────────────────────────────────────────
+# Runs an LLM-driven conflict scan over the whole KB on demand. Writes a
+# Findings Doc to KB/_Reviews/. Surfaces last-scan date + a Run-scan button.
+
+@st.cache_data(ttl=300)
+def _latest_scan_meta(kb_id: str) -> dict:
+    from services.kb_scanner import latest_scan_report
+    rep = latest_scan_report(kb_id)
+    if not rep:
+        return {}
+    return {
+        "name": rep["name"],
+        "url": rep.get("web_view_link") or f"https://docs.google.com/document/d/{rep['id']}/edit",
+        "modified_time": rep.get("modified_time", ""),
+    }
+
+
+with st.container(border=True):
+    _hc1, _hc2 = st.columns([5, 2])
+    with _hc1:
+        st.markdown("**🩺 KB Health** — LLM-driven scan for conflicts, drift, stale content, overlap")
+        _meta = _latest_scan_meta(KB_FOLDER_ID)
+        if _meta:
+            _mod = (_meta.get("modified_time") or "")[:10]
+            st.caption(
+                f"Latest scan: **{_mod}** · [open report →]({_meta['url']})"
+            )
+        else:
+            st.caption("_No scan run yet — click below to run the first one._")
+    with _hc2:
+        _scan_clicked = st.button(
+            "🔍 Run conflict scan",
+            type="secondary",
+            use_container_width=True,
+            key="kb_run_scan",
+            help="Reads every KB Doc (skips raw HTML/PDFs), sends to Claude with a "
+                 "structured prompt, writes a Findings Doc to KB/_Reviews/. Takes ~30-60s.",
+        )
+
+    if _scan_clicked:
+        # Pull the API key (same pattern as other pages)
+        _api_key = os.getenv("ANTHROPIC_API_KEY", "")
+        try:
+            if hasattr(st, "secrets") and "ANTHROPIC_API_KEY" in st.secrets:
+                _api_key = st.secrets["ANTHROPIC_API_KEY"]
+        except Exception:
+            pass
+        if not _api_key:
+            st.error("ANTHROPIC_API_KEY missing — can't run the scan.")
+        else:
+            with st.spinner("Scanning KB — fetching Docs, sending to Claude, writing report…"):
+                from services.kb_scanner import run_scan
+                try:
+                    _res = run_scan(KB_FOLDER_ID, _api_key)
+                except Exception as _e:
+                    st.error(f"Scan failed: {_e}")
+                    _res = None
+            if _res and _res.get("ok"):
+                _n = _res.get("n_findings", 0)
+                _cs = _res.get("corpus_size", {}) or {}
+                st.success(
+                    f"✅ Scanned {_cs.get('docs', '?')} Doc(s) across "
+                    f"{_cs.get('buckets', '?')} location(s) — {_n} finding(s). "
+                    f"[Open report →]({_res['findings_doc_url']})"
+                )
+                _latest_scan_meta.clear()
+            elif _res:
+                st.error(f"Scan completed but report save failed: {_res.get('error') or 'unknown'}")
+
 _buckets = _list_kb_buckets()
 if not _buckets:
     st.warning(

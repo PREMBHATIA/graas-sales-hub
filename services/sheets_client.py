@@ -278,6 +278,40 @@ def create_google_doc_from_html(
                 "mime_type": None, "error": f"{type(e).__name__}: {e}"}
 
 
+def ensure_subfolder_exists(parent_id: str, name: str) -> Optional[str]:
+    """Find or create a subfolder by name under parent. Returns its id, or None on failure.
+
+    Used by the KB scanner to lazily create the _Reviews/ folder. Idempotent —
+    if a folder with this exact name already exists, returns its id without
+    creating a duplicate.
+    """
+    # First look for an existing subfolder with this name
+    for sub in list_drive_subfolders(parent_id):
+        if sub.get("name", "").strip() == name.strip():
+            return sub["id"]
+    # Not found — create
+    creds = _get_drive_credentials()
+    if creds is None:
+        return None
+    try:
+        session = greq.AuthorizedSession(creds)
+        metadata = {
+            "name": name,
+            "mimeType": "application/vnd.google-apps.folder",
+            "parents": [parent_id],
+        }
+        r = session.post(
+            "https://www.googleapis.com/drive/v3/files?supportsAllDrives=true&fields=id",
+            json=metadata,
+            timeout=15,
+        )
+        if r.status_code in (200, 201):
+            return r.json().get("id")
+    except Exception:
+        pass
+    return None
+
+
 def list_drive_subfolders(folder_id: str) -> list:
     """List subfolders inside a Drive folder (Shared Drive supported).
 
