@@ -287,6 +287,21 @@ def render_brief_docx(data: dict) -> bytes:
     if data.get("strategic_hook"):
         _add_para(doc, f"“{data['strategic_hook']}”", italic=True, size=10.5)
 
+    # ── Asset → Graas-layer map (the structured unpack of the hook) ─────────
+    asset_map = data.get("asset_graas_map") or []
+    if asset_map:
+        _add_h2(doc, "Their digital assets → Graas layer that fits")
+        rows = [
+            [a.get("asset", ""), a.get("what_it_does", ""), a.get("graas_layer", "")]
+            for a in asset_map
+        ]
+        _add_table(
+            doc,
+            headers=["Asset (already live)", "What it does today", "Graas layer"],
+            rows=rows,
+            col_widths_cm=[5.0, 7.5, 5.5],
+        )
+
     # ── Executive Summary ────────────────────────────────────────────────────
     # Two stacked 3-col tables that look like the stat band — Category/Type/Motion
     # on row 1, Comps/History/Maturity on row 2. Type and Motion live INSIDE the
@@ -374,6 +389,20 @@ def render_brief_docx(data: dict) -> bytes:
     if data.get("product_route"):
         _add_h3(doc, "Product route")
         _add_para(doc, data["product_route"])
+
+    proof_points = data.get("graas_proof_points") or []
+    if proof_points:
+        _add_h3(doc, "Graas proof points relevant to this account")
+        rows = [
+            [p.get("customer", ""), p.get("result", ""), p.get("applies_here", "")]
+            for p in proof_points
+        ]
+        _add_table(
+            doc,
+            headers=["Customer", "Result", "Applies here because…"],
+            rows=rows,
+            col_widths_cm=[4.0, 7.0, 7.0],
+        )
 
     persona_map = data.get("persona_map") or []
     if persona_map:
@@ -571,6 +600,18 @@ td.src { font-size: 7pt; font-style: italic; color: #777; }
     if data.get("strategic_hook"):
         parts.append(f"<p class='hook'>“{_esc(data['strategic_hook'])}”</p>")
 
+    _asset_map = data.get("asset_graas_map") or []
+    if _asset_map:
+        parts.append("<h2>Their digital assets &rarr; Graas layer that fits</h2><table>")
+        parts.append("<tr><th>Asset (already live)</th><th>What it does today</th><th>Graas layer</th></tr>")
+        for a in _asset_map:
+            parts.append(
+                f"<tr><td>{_esc(a.get('asset'))}</td>"
+                f"<td>{_esc(a.get('what_it_does'))}</td>"
+                f"<td>{_esc(a.get('graas_layer'))}</td></tr>"
+            )
+        parts.append("</table>")
+
     _es = data.get("executive_summary")
     _top_type = _esc(data.get("type") or "")
     _top_motion = _esc(data.get("motion") or "")
@@ -639,6 +680,18 @@ td.src { font-size: 7pt; font-style: italic; color: #777; }
     if data.get("product_route"):
         parts.append("<h3>Product route</h3>")
         parts.append(f"<p>{_esc(data['product_route'])}</p>")
+
+    _pp = data.get("graas_proof_points") or []
+    if _pp:
+        parts.append("<h3>Graas proof points relevant to this account</h3><table>")
+        parts.append("<tr><th>Customer</th><th>Result</th><th>Applies here because…</th></tr>")
+        for p in _pp:
+            parts.append(
+                f"<tr><td>{_esc(p.get('customer'))}</td>"
+                f"<td>{_esc(p.get('result'))}</td>"
+                f"<td>{_esc(p.get('applies_here'))}</td></tr>"
+            )
+        parts.append("</table>")
 
     if data.get("persona_map"):
         parts.append("<h3>Persona &amp; order flow</h3><table>")

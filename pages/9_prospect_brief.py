@@ -341,6 +341,13 @@ BRIEF_JSON_SCHEMA = """{
     "status": "Pre-call draft  (post-call: 'Pre-call draft → Post call-1 — YYYY-MM-DD …')"
   },
   "strategic_hook": "ONE line, MAX 25 words. The X→Y mapping pitch frame — what they've already built (their assets) → the Graas layer that sits on top. Renders at the top of the brief, sets the meeting frame. e.g. 'You've built KALCare + EMOS + KlikDokter. Graas adds the agentic intelligence layer — without ripping out a single system you run today.' Must reference real assets you found in research.",
+  "asset_graas_map": [
+    {
+      "asset": "Their digital surface name + parenthetical scope. MUST be a real product/platform they own. e.g. 'KALCare / Kalbe Store (B2C omnichannel)', 'KlikDokter (telemedicine + e-pharmacy)', 'EMOS / MOSTRANS (Enseval B2B order + transport)'",
+      "what_it_does": "ONE phrase, 8-18 words. What the asset does today, including channels/marketplaces/touchpoints. e.g. 'Official stores on Tokopedia, Shopee, Lazada, Bukalapak, Blibli, JD.id + own webstore'",
+      "graas_layer": "ONE phrase, 6-15 words. Which Graas product/layer sits on top. e.g. 'hoppr + Turbo — unify marketplace data, instant analyst' or 'All-e Prescription Intelligence (Tata 1mg pattern)' or 'All-e for Distributors / Retailers / Field Agents'"
+    }
+  ],
   "executive_summary": {
     "category": "vertical + business model in one line — e.g. 'Industrial gases distributor'",
     "type": "ONE of: 'OEM / Principal / Brand' | 'Multi-brand distributor' | 'Multi-brand retailer'",
@@ -386,6 +393,13 @@ BRIEF_JSON_SCHEMA = """{
   },
   "people_path_in": [
     {"name": "...", "role": "...", "why_matter": "1-line relevance", "type": "Decision-maker | Champion | Finance buyer | Meeting attendee", "linkedin": "ONE optional line (background + prior companies). Omit field if no useful info.", "lead_with": "ONE phrase, 8-20 words — for THIS person specifically, which product/section to lead with and ONE reason grounded in their LinkedIn signal. e.g. 'Lead with hoppr + cite SOC2/PDPA up front — he's a Certified Ethical Hacker.' Only populate for meeting attendees; omit field for non-attendees."}
+  ],
+  "graas_proof_points": [
+    {
+      "customer": "Customer name + 1-3 word context. MUST be from the KNOWN GRAAS WINS list in the prompt — do NOT invent customers. e.g. 'Tata 1mg (e-pharmacy)' or 'PI Industries (ag inputs)'",
+      "result": "ONE phrase, 6-15 words. The measurable outcome with figures. e.g. '78% prescription→product accuracy; cart time 4-6 min → <2 min'",
+      "applies_here": "ONE phrase, 8-18 words. WHY this win is relevant for THIS prospect specifically — tie it to one of their assets or pains. e.g. 'Drop-in for KlikDokter — same telemedicine + e-pharmacy pattern, PDP-Law compliant'"
+    }
   ],
   "objection_handling": [
     {"objection": "likely objection in their words, e.g. 'We already built EMOS / KALCare / KlikDokter.'", "response": "Graas response — 1-2 phrases, lead with the reframe. e.g. 'Exactly why this is low-risk. Graas is the intelligence layer ON TOP — we integrate with your systems of record, we don't replace them.'"}
@@ -451,10 +465,48 @@ def _build_new_brief_prompt(
         f"USD) FY2025 (Kalbe consolidated, per Yahoo Finance TTM); Enseval standalone "
         f"~IDR 33.0T FY2025 (per enseval.com)'. Put the source detail in the ledger "
         f"row instead.\n\n"
+        f"**RESEARCH DEPTH RULES — apply these before filling the brief:**\n"
+        f"1. **Per-segment / per-division growth.** For any multi-segment / "
+        f"multi-division company (pharma w/ Rx+OTC+Nutrition+Distribution; "
+        f"conglomerate; multi-vertical group), find revenue + YoY growth PER "
+        f"segment. The fastest-growing segment is usually the meeting opener "
+        f"(e.g. 'Distribution is your fastest-growing segment +21% YoY' is far "
+        f"sharper than 'group revenue +8%'). Surface this in the Scale row of "
+        f"what_they_have AND in the opening_hook.\n"
+        f"2. **Enumerate ALL digital surfaces.** Pharma / distribution / retail "
+        f"prospects usually run 3+ digital products: B2C eCom (their own store + "
+        f"each marketplace presence), B2B ordering platforms, telemedicine/health "
+        f"apps, DTC web, mobile apps, field-force apps, marketplace seller "
+        f"centres. Don't stop at one or two. Each digital surface is a potential "
+        f"Graas entry point and MUST be enumerated in asset_graas_map.\n\n"
+        f"**KNOWN GRAAS WINS** — use ONLY these for graas_proof_points; do NOT "
+        f"invent or guess customer names or figures. Pick 2-4 that map directly "
+        f"to THIS prospect's assets/pains:\n"
+        f"- Tata 1mg (India, e-pharmacy): All-e Prescription Intelligence — "
+        f"78% accuracy on prescription→product POC; cart time 4-6 min → <2 min; "
+        f"INR 62-103 Cr/yr projected revenue uplift; PDPA/DPDP-compliant "
+        f"self-hosted vision models; milestone-gated + 2% revenue share "
+        f"commercial.\n"
+        f"- PI Industries (India, ag inputs): All-e WhatsApp ordering agent — "
+        f"$4.5M/month in reorders; ordering cycle 5 days → 5 min; 75% repeat "
+        f"rate.\n"
+        f"- Canon India (consumer electronics): hoppr + Turbo marketplace "
+        f"unification — 3× traffic-to-qualified-lead conversion after unifying "
+        f"channel data.\n"
+        f"- Indonesia field-agent OCR pilot (~400 reps): All-e Field Agent OCR "
+        f"— photo of order list / invoice → ERP-ready order; 48 hrs → 4 mins.\n"
+        f"- Schneider Electric (SmartO! demo): All-e for industrial B2B — "
+        f"reference architecture; available on request.\n\n"
         f"**DO NOT DROP MANDATORY FIELDS.** Every brief must include: "
         f"strategic_hook (one-line X→Y frame at the top — what they've already "
         f"built mapped to the Graas layer that sits on top; MUST reference real "
         f"assets surfaced in research, not generic claims), "
+        f"asset_graas_map (enumerate ALL their digital surfaces — 3+ rows "
+        f"typical — each mapped to the Graas layer that fits; this is the "
+        f"structured unpack of strategic_hook), "
+        f"graas_proof_points (2-4 wins from the KNOWN GRAAS WINS list above, "
+        f"each tied to one of this prospect's assets or pains; never fabricate "
+        f"customers), "
         f"executive_summary (6 fields rendered as two stacked box rows: "
         f"category/type/motion on row 1, comps/history/maturity on row 2 — NOT a "
         f"paragraph, NOT labelled lines), stat_band (all 5), what_they_have (all 10 dimensions: "
@@ -790,9 +842,11 @@ with right:
                 st.stop()
 
             # Sanity-check mandatory fields are populated
-            required_keys = ("strategic_hook", "executive_summary", "stat_band",
-                             "what_they_have", "product_route", "pain_capability_cfo",
-                             "objection_handling", "opening_hook")
+            required_keys = ("strategic_hook", "asset_graas_map",
+                             "executive_summary", "stat_band", "what_they_have",
+                             "product_route", "graas_proof_points",
+                             "pain_capability_cfo", "objection_handling",
+                             "opening_hook")
             missing_required = [k for k in required_keys if not brief_data.get(k)]
             if missing_required:
                 st.warning(
