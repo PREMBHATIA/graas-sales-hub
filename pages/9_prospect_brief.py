@@ -948,6 +948,79 @@ with right:
             else:
                 st.session_state["last_brief_doc_id"] = ""
             st.session_state["last_brief_doc_url"] = ""
+
+            # ── Auto-save to Drive ──────────────────────────────────────────
+            # The "last generated brief for each customer" should land on the
+            # Recent briefs tile (and the Doc) without a separate click. We
+            # look up any existing brief for this company in the target
+            # folder; if found → update in place (URL + version history
+            # preserved); else → create new.
+            try:
+                from services.sheets_client import (
+                    create_google_doc_from_docx,
+                    update_google_doc_docx,
+                    list_drive_folder_docs,
+                )
+                target_folder = drive_folder or DEFAULT_DRIVE_FOLDER
+                existing_doc_id = ""
+                if mode.startswith("🔁"):
+                    # Post-call: we already know which doc to update
+                    existing_doc_id = st.session_state.get("last_brief_doc_id", "")
+                else:
+                    # Pre-call: search the folder for a prior brief for this
+                    # company. Title pattern: "Prospect Brief — {company} — YYYY-MM-DD"
+                    _existing = list_drive_folder_docs(target_folder)
+                    _co_lower = company_name.lower().strip()
+                    for _d in _existing:  # already modifiedTime-desc
+                        _nm = _d.get("name", "").lower()
+                        if _nm.startswith("prospect brief") and _co_lower in _nm:
+                            existing_doc_id = _d["id"]
+                            break
+
+                if existing_doc_id:
+                    _res = update_google_doc_docx(existing_doc_id, brief_docx)
+                    if _res.get("ok"):
+                        _url = f"https://docs.google.com/document/d/{existing_doc_id}/edit"
+                        st.session_state["last_brief_doc_id"] = existing_doc_id
+                        st.session_state["last_brief_doc_url"] = _url
+                        st.session_state["last_brief_autosave_status"] = (
+                            "updated", _url
+                        )
+                else:
+                    _title = (
+                        f"Prospect Brief — {company_name} — "
+                        f"{datetime.now():%Y-%m-%d}"
+                    )
+                    _res = create_google_doc_from_docx(
+                        docx_bytes=brief_docx,
+                        title=_title,
+                        parent_folder_id=target_folder,
+                        share_with=None,
+                    )
+                    if _res.get("ok"):
+                        st.session_state["last_brief_doc_id"] = _res.get("doc_id", "")
+                        st.session_state["last_brief_doc_url"] = _res.get("doc_url", "")
+                        st.session_state["last_brief_autosave_status"] = (
+                            "created", _res.get("doc_url", "")
+                        )
+                    else:
+                        st.session_state["last_brief_autosave_status"] = (
+                            "failed", _res.get("error") or "unknown error"
+                        )
+                # Bust the Recent-briefs tile cache so the new/updated doc
+                # appears immediately on the page below. The function is
+                # defined further down the script, so on the first rerun
+                # where this branch fires, it won't be in this scope yet —
+                # st.cache_data.clear() invalidates all caches as a fallback.
+                try:
+                    _list_recent_briefs.clear()
+                except NameError:
+                    st.cache_data.clear()
+            except Exception as _save_err:
+                st.session_state["last_brief_autosave_status"] = (
+                    "failed", str(_save_err)
+                )
+
             _should_rerun = True
         except Exception as e:
             # Streamlit's flow-control exceptions (RerunException, StopException) must
@@ -975,10 +1048,28 @@ with right:
     if st.session_state["last_brief_html"]:
         st.markdown("---")
         st.markdown("### Save")
+
+        # Surface the auto-save status that ran during generation. The
+        # brief lands in Drive (and on the Recent briefs tile) without a
+        # click; the manual button below stays as a re-save fallback.
+        _autosave = st.session_state.get("last_brief_autosave_status")
+        if _autosave:
+            _kind, _payload = _autosave
+            if _kind == "updated":
+                st.success(f"✅ Auto-updated existing Doc in Drive. [Open it →]({_payload})")
+            elif _kind == "created":
+                st.success(f"✅ Auto-saved new Doc to Drive. [Open it →]({_payload})")
+            elif _kind == "failed":
+                st.warning(
+                    f"⚠️ Auto-save to Drive failed: {_payload}. "
+                    f"Use the manual save button below."
+                )
+
         save_cols = st.columns([2, 2, 1])
 
-        # Save to Drive (new doc) — only meaningful for pre-call mode OR if the
-        # update was generated and the user wants a fresh copy
+        # Manual save (re-save / overwrite) — auto-save already ran above, this
+        # is the fallback when auto-save failed or the user wants to force a
+        # fresh copy with a different share list / parent folder.
         with save_cols[0]:
             save_label = (
                 "🔁 Re-upload to existing Doc"
@@ -1047,7 +1138,8 @@ with right:
             if st.button("🗑 Clear", use_container_width=True, key="brief_clear_btn"):
                 for k in ("last_brief_data", "last_brief_html", "last_brief_docx",
                           "last_brief_company", "last_brief_mode",
-                          "last_brief_doc_url", "last_brief_doc_id"):
+                          "last_brief_doc_url", "last_brief_doc_id",
+                          "last_brief_autosave_status"):
                     st.session_state.pop(k, None)
                 st.rerun()
 
