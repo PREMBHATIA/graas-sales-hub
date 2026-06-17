@@ -172,6 +172,19 @@ def _add_table(
     table.autofit = False
     table.style = "Table Grid"
 
+    # Force fixed table layout — without this OOXML flag, Word and Google Docs
+    # auto-fit columns based on cell content length, ignoring our cm widths.
+    # Long-content cells then squish other columns, producing "scrambled"
+    # tables. With type="fixed", widths are respected.
+    tbl_pr = table._tbl.tblPr
+    layout_el = OxmlElement("w:tblLayout")
+    layout_el.set(qn("w:type"), "fixed")
+    tbl_pr.append(layout_el)
+    tbl_w = OxmlElement("w:tblW")
+    tbl_w.set(qn("w:w"), str(int(sum(col_widths_cm) * 567)))  # 567 twips ≈ 1cm
+    tbl_w.set(qn("w:type"), "dxa")
+    tbl_pr.append(tbl_w)
+
     # Set widths on every cell of every row (DOCX needs this redundantly)
     for col_idx, w in enumerate(col_widths_cm):
         for row in table.rows:

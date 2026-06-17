@@ -349,11 +349,11 @@ BRIEF_JSON_SCHEMA = """{
     "maturity": "AI & systems maturity assessment in one line — e.g. 'Mid: SAP-ERP since 2018, Salesforce CRM, no agents deployed; piloting GenAI for support tickets (2025)'"
   },
   "stat_band": [
-    {"label": "Revenue", "value": "value, prefix estimates with ~"},
-    {"label": "SKUs", "value": "..."},
-    {"label": "Channel touchpoints", "value": "..."},
-    {"label": "Field force", "value": "..."},
-    {"label": "Geography", "value": "..."}
+    {"label": "Revenue", "value": "ONE concise value, 3-8 words MAX. Just figure + unit + maybe one qualifier. No sources, no parentheticals. e.g. '~IDR 35T FY25', NOT '~IDR 35.3T (~$2.2B USD) FY2025 (Kalbe consolidated, per Yahoo Finance TTM)'"},
+    {"label": "SKUs", "value": "3-8 words. e.g. '~1,000+ across 6 therapy classes'"},
+    {"label": "Channel touchpoints", "value": "3-8 words. e.g. '>1M outlets · 100+ EMOS users'"},
+    {"label": "Field force", "value": "3-8 words. e.g. '~5K Enseval · ~17K Group'"},
+    {"label": "Geography", "value": "3-8 words. e.g. 'Indonesia + 71 branches + SEA export'"}
   ],
   "_type_motion_note": "type and motion now live INSIDE executive_summary (above) — they render as boxes in the Exec Summary section. Top-level keys are kept here only for back-compat with existing briefs in session state; do not populate them in new output.",
   "what_they_have": [
@@ -438,6 +438,15 @@ def _build_new_brief_prompt(
         f"PHRASE, 5-15 words, not a sentence — the rendered brief is a tight 2-pager. "
         f"Compress lists with commas and semicolons. Strip filler ('the company', 'they "
         f"also have', 'is a leading').\n\n"
+        f"**STAT BAND CELLS ARE TIGHTER STILL — 3-8 WORDS MAX EACH.** The stat band is a "
+        f"header strip, not a paragraph. Put the figure + unit + maybe one qualifier — "
+        f"nothing more. Source attribution belongs in the *What they have* ledger's "
+        f"Source column, NEVER in stat band cells. Long-form prose in stat band cells "
+        f"stretches the table row height in Google Docs and squishes other columns — "
+        f"the table renders scrambled. Right: '~IDR 35T FY25'. Wrong: '~IDR 35.3T (~$2.2B "
+        f"USD) FY2025 (Kalbe consolidated, per Yahoo Finance TTM); Enseval standalone "
+        f"~IDR 33.0T FY2025 (per enseval.com)'. Put the source detail in the ledger "
+        f"row instead.\n\n"
         f"**DO NOT DROP MANDATORY FIELDS.** Every brief must include: "
         f"executive_summary (6 fields rendered as two stacked box rows: "
         f"category/type/motion on row 1, comps/history/maturity on row 2 — NOT a "
