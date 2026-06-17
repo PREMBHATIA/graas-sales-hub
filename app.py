@@ -24,11 +24,15 @@ pg = st.navigation(
             st.Page("pages/9_prospect_brief.py",  title="📋 Create Prospect Brief",   url_path="prospect-brief"),
             st.Page("pages/A_architect_soln.py",  title="🏗️ Architect a Soln",         url_path="architect"),
             st.Page("pages/6_proposal.py",        title="📝 Create Proposal",         url_path="proposal"),
-            st.Page("pages/5_resources.py",       title="📚 Resources",                url_path="resources"),
         ],
         "Hoppr": [
             st.Page("pages/7_hoppr.py",      title="📊 Hoppr",      url_path="hoppr"),
             st.Page("pages/8_ask_hoppr.py",  title="💬 Ask Hoppr",  url_path="ask-hoppr"),
+        ],
+        # Shared / cross-product reference material — kept at the bottom so it
+        # reads as "the team's library", not as an All-e-specific page.
+        "Knowledge": [
+            st.Page("pages/5_resources.py",  title="📚 Resources",  url_path="resources"),
         ],
     },
     position="sidebar",
