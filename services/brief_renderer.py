@@ -303,14 +303,14 @@ def render_brief_docx(data: dict) -> bytes:
             doc,
             headers=["Category", "Type", "Motion"],
             rows=[[es.get("category", ""), es_type, es_motion]],
-            col_widths_cm=[6.5, 6.5, 6.5],
+            col_widths_cm=[6.0, 6.0, 6.0],
         )
         # Row 2 — Comps | History | Maturity
         _add_table(
             doc,
             headers=["Comps", "History", "Maturity"],
             rows=[[es.get("comps", ""), es.get("history", ""), es.get("maturity", "")]],
-            col_widths_cm=[6.5, 6.5, 6.5],
+            col_widths_cm=[6.0, 6.0, 6.0],
         )
     elif isinstance(es, str) and es.strip():
         _add_h2(doc, "Executive Summary")
@@ -323,7 +323,7 @@ def render_brief_docx(data: dict) -> bytes:
         values = [s.get("value", "") for s in stat_band]
         # Distribute 19.5cm of usable width across cells
         n = max(1, len(headers))
-        col_w = round(19.5 / n, 2)
+        col_w = round(18.0 / n, 2)
         _add_table(doc, headers, [values], [col_w] * n, header_size=9.5, cell_size=9.5)
 
     # Type / Motion now live INSIDE Executive Summary as boxes — no standalone
@@ -348,7 +348,7 @@ def render_brief_docx(data: dict) -> bytes:
             doc,
             headers=["Dimension", "What we know", "Confidence", "Source"],
             rows=rows,
-            col_widths_cm=[3.2, 10.8, 2.5, 3.0],
+            col_widths_cm=[3.0, 10.0, 2.3, 2.7],
             # Source column = small, italic, grey — reads as a footnote
             col_styles={3: {"size": 6.5, "italic": True, "color": GREY}},
         )
@@ -388,7 +388,7 @@ def render_brief_docx(data: dict) -> bytes:
             doc,
             headers=["Persona", "Count", "Surface today", "Current flow & leaks"],
             rows=rows,
-            col_widths_cm=[3.5, 2.0, 4.0, 10.0],
+            col_widths_cm=[3.2, 1.9, 3.7, 9.2],
         )
         # Caption: flag flow & leaks as critical and pending verification.
         _add_sub(doc, "(critical — to be further verified)")
@@ -404,7 +404,7 @@ def render_brief_docx(data: dict) -> bytes:
             doc,
             headers=["Pain (their language)", "Product capability", "CFO metric it moves"],
             rows=rows,
-            col_widths_cm=[7.0, 7.0, 5.5],
+            col_widths_cm=[6.5, 6.5, 5.0],
         )
 
     if data.get("metric_that_matters"):
@@ -463,7 +463,7 @@ def render_brief_docx(data: dict) -> bytes:
             doc,
             headers=["Name", "Role", "Why they matter", "Type"],
             rows=rows,
-            col_widths_cm=[3.5, 3.5, 9.0, 3.5],
+            col_widths_cm=[3.2, 3.2, 8.4, 3.2],
         )
     if data.get("entry_wedge"):
         _add_kv_para(doc, "Entry wedge", data["entry_wedge"])
