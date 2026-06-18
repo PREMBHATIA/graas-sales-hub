@@ -68,14 +68,11 @@ with st.expander("ℹ️ How to use this — read once, then collapse", expanded
         )
     with m2:
         st.markdown("##### 🔁 Update existing (post-call)")
-        st.caption("After every call")
+        st.caption("After every call · 4-card wizard guides you through it")
         st.markdown(
-            "Paste the brief's **Doc URL** (grab it from the Recent briefs "
-            "tile or the auto-save banner) **plus your call notes as text** "
-            "(Granola summary, Zoom transcript, or hand-typed — no file upload). "
-            "Both **Google Doc URLs and .docx-in-Drive URLs** work. "
-            "The brief amends in place — answers move into facts, confidence "
-            "upgrades to *Confirmed*, the route firms up."
+            "The wizard takes a prior brief Doc URL + your call notes and "
+            "amends the brief in place. Each card validates before the next "
+            "one unlocks — no upfront instructions needed."
         )
 
     st.markdown("#### The living-document workflow")
@@ -91,15 +88,13 @@ with st.expander("ℹ️ How to use this — read once, then collapse", expanded
 
     st.markdown("#### What happens after a post-call update")
     st.markdown(
-        "- The brief saves back to the **same Doc URL** (overwrites in place; "
-        "Drive's version history keeps the prior version if you ever need to diff).\n"
-        "- The top of the brief now carries a **Post-call analysis** section "
-        "showing what THIS call added — what you learned, what's now confirmed, "
-        "what's newly surfaced, what's still open, what shifted in route or next "
-        "step. Most recent call on top. No need to compare against the prior "
-        "version to see what's new.\n"
-        "- The Recent briefs tile keeps pointing to the same Doc, so links you "
-        "shared with the team don't break."
+        "- **Same Doc URL** gets updated (Drive keeps the prior version).\n"
+        "- A **Post-call analysis** section appears at the top showing what "
+        "THIS call added (newest first).\n"
+        "- **Rows that changed are highlighted yellow** so you can scan the "
+        "brief and see what's new without diffing.\n"
+        "- The Recent briefs tile keeps pointing to the same Doc — shared "
+        "links don't break."
     )
 
     st.markdown("#### Tips that change output quality")
@@ -290,23 +285,115 @@ with left:
         existing_brief_id = ""
         call_notes = ""
     else:
-        existing_brief_id = st.text_input(
-            "Existing brief — paste the Google Doc URL or ID",
-            key="brief_existing_id",
-            placeholder="https://docs.google.com/document/d/<DOC_ID>/edit  (or just the ID)",
-        )
-        call_notes = st.text_area(
-            "New call notes (Granola summary, Zoom transcript, or paste your own)",
-            key="brief_call_notes",
-            height=300,
-            placeholder="e.g.\n"
-                        "Met Ravi (CTO) and Priya (VP Sales) on 28 Apr.\n"
-                        "Confirmed: 19K dealers, 400 FSAs across 3 regions; SAP ERP; no DMS.\n"
-                        "New: champion is Priya, budget owner is CFO (Anil), Q3 budget cycle.\n"
-                        "Pushback: 'we've tried a chatbot before — didn't work'.\n"
-                        "Asked for: a 60-day pilot proposal, one region only.",
-        )
+        # ── Post-call wizard — 4 side-by-side cards. Cards 1+2 must be valid
+        # before card 3's button enables. Card 4 shows the result after build.
+        meeting_date = ""
+        attendees_raw = ""
         research_text = ""
+
+        # Live URL validation for card 1 — probe Drive metadata so we can
+        # tell the user "we can see it" vs "SA can't read this" vs "not a
+        # Doc" without making them guess.
+        _pc_url = st.session_state.get("brief_existing_id", "")
+        _pc_url_status = ("⏳", "Paste the prior brief's Doc URL above")
+        _pc_doc_title = ""
+        if _pc_url.strip():
+            _m = re.search(r"/d(?:ocument)?/d?/?([A-Za-z0-9_-]{20,})", _pc_url)
+            _did = _m.group(1) if _m else (_pc_url.strip() if re.match(r"^[A-Za-z0-9_-]{20,}$", _pc_url.strip()) else "")
+            if not _did:
+                _pc_url_status = ("❌", "Couldn't parse a Doc ID from that URL")
+            else:
+                try:
+                    import google.auth.transport.requests as _greq
+                    from services.sheets_client import _get_drive_credentials
+                    _sess = _greq.AuthorizedSession(_get_drive_credentials())
+                    _resp = _sess.get(
+                        f"https://www.googleapis.com/drive/v3/files/{_did}"
+                        "?fields=name,mimeType&supportsAllDrives=true",
+                        timeout=10,
+                    )
+                    if _resp.status_code == 200:
+                        _meta = _resp.json()
+                        _pc_doc_title = _meta.get("name", "(no name)")
+                        _pc_url_status = ("✅", _pc_doc_title)
+                    else:
+                        _pc_url_status = ("❌", f"SA can't read this file (HTTP {_resp.status_code})")
+                except Exception as _e:
+                    _pc_url_status = ("❌", f"Fetch failed: {type(_e).__name__}")
+
+        _card1_valid = _pc_url_status[0] == "✅"
+        _pc_notes = st.session_state.get("brief_call_notes", "")
+        _card2_valid = len(_pc_notes.strip()) >= 30
+        _ready = _card1_valid and _card2_valid
+
+        c1, c2, c3, c4 = st.columns(4)
+        with c1:
+            with st.container(border=True):
+                _b = "✅" if _card1_valid else ("❌" if _pc_url.strip() else "1.")
+                st.markdown(f"**{_b} Prior brief**")
+                st.caption("Paste the URL of the previous version")
+                st.text_input(
+                    "Doc URL",
+                    key="brief_existing_id",
+                    label_visibility="collapsed",
+                    placeholder="docs.google.com/document/d/…",
+                )
+                st.caption(f"{_pc_url_status[0]} {_pc_url_status[1]}")
+        with c2:
+            with st.container(border=True):
+                _b = "✅" if _card2_valid else "2."
+                st.markdown(f"**{_b} Call notes**")
+                st.caption("Granola / Zoom export, or paste your own")
+                st.text_area(
+                    "Notes",
+                    key="brief_call_notes",
+                    label_visibility="collapsed",
+                    height=200,
+                    placeholder="Paste raw notes — don't pre-summarise",
+                )
+                _msg = (f"✅ {len(_pc_notes.strip())} chars" if _card2_valid
+                        else f"⏳ {len(_pc_notes.strip())} chars (need ≥30)")
+                st.caption(_msg)
+        with c3:
+            with st.container(border=True):
+                _b = "▶️" if _ready else "🔒"
+                st.markdown(f"**{_b} Update brief**")
+                st.caption("Folds the notes into the existing brief")
+                build_clicked = st.button(
+                    "Update brief",
+                    type="primary",
+                    use_container_width=True,
+                    key="brief_pc_build_btn",
+                    disabled=not _ready,
+                )
+                if _ready:
+                    st.caption("✅ Ready to build")
+                elif _card1_valid:
+                    st.caption("🔒 Need call notes (card 2)")
+                elif _card2_valid:
+                    st.caption("🔒 Need a valid Doc URL (card 1)")
+                else:
+                    st.caption("🔒 Fill cards 1 + 2")
+        with c4:
+            with st.container(border=True):
+                _autosave = st.session_state.get("last_brief_autosave_status")
+                _done = bool(_autosave and _autosave[0] in ("updated", "created"))
+                _b = "✅" if _done else "📥"
+                st.markdown(f"**{_b} Done**")
+                st.caption("Open + share")
+                if _done:
+                    _, _url = _autosave
+                    st.markdown(f"[Open updated Doc →]({_url})")
+                    _trashed_n = st.session_state.get("last_brief_trashed_count", 0)
+                    if _trashed_n:
+                        st.caption(f"🧹 Trashed {_trashed_n} older")
+                else:
+                    st.caption("⏳ Run step 3 to populate")
+
+        # Mirror wizard state into the var names the downstream generation
+        # code expects (existing_brief_id, call_notes, build_clicked).
+        existing_brief_id = _pc_url
+        call_notes = _pc_notes
 
     st.markdown("### 4. Save destination")
     drive_folder = st.text_input(
@@ -323,13 +410,17 @@ with left:
         help="If omitted, only the service account + folder-share inheritance apply.",
     )
 
-    st.markdown("### 5. Action")
-    build_clicked = st.button(
-        ("📝 Build brief" if mode.startswith("🆕") else "🔁 Update from call notes"),
-        type="primary",
-        use_container_width=True,
-        key="brief_build_btn",
-    )
+    # Pre-call uses a single standalone Build button. Post-call has its own
+    # button inside card 3 of the wizard (assigned to `build_clicked` above)
+    # and does NOT need a second one here.
+    if mode.startswith("🆕"):
+        st.markdown("### 5. Action")
+        build_clicked = st.button(
+            "📝 Build brief",
+            type="primary",
+            use_container_width=True,
+            key="brief_build_btn",
+        )
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -1066,12 +1157,31 @@ with right:
                 )
                 target_folder = drive_folder or DEFAULT_DRIVE_FOLDER
                 existing_doc_id = ""
+
+                # Always scan the target folder for prior briefs matching
+                # this company key (normalized). Used both to pick the
+                # update target AND to trash duplicates after.
+                _existing = list_drive_folder_docs(target_folder)
+                _co_key = _normalize_company_key(company_name)
+                _matches: list = []  # SalesHub matches, modifiedTime-desc
+                for _d in _existing:
+                    _nm = _d.get("name", "")
+                    if not _nm.lower().startswith("prospect brief"):
+                        continue
+                    _m = re.match(
+                        r"Prospect Brief\s*[—\-]\s*(.+?)\s*[—\-]\s*\d{4}-\d{2}-\d{2}",
+                        _nm,
+                    )
+                    if not _m:
+                        continue
+                    if _normalize_company_key(_m.group(1)) == _co_key:
+                        _matches.append(_d["id"])
+
                 if mode.startswith("🔁"):
-                    # Post-call: candidate target is the doc the user pasted.
-                    # But if that doc is a .docx upload or sits OUTSIDE the
-                    # SalesHub Shared Drive, patching it in place hides the
-                    # update from tiles. Probe the source and fall through to
-                    # the create-in-SalesHub path when needed.
+                    # Post-call: prefer the user-pasted source — but only if
+                    # it's a native Google Doc AND in the SalesHub Shared
+                    # Drive (so the update is visible in tiles). Else fall
+                    # back to the latest SalesHub match (or CREATE if none).
                     _src_id = st.session_state.get("last_brief_doc_id", "")
                     if _src_id:
                         import google.auth.transport.requests as _greq
@@ -1087,52 +1197,35 @@ with right:
                                 _meta.get("mimeType") ==
                                 "application/vnd.google-apps.document"
                             )
-                            # SalesHub Shared Drive id matches DEFAULT_DRIVE_FOLDER
                             _in_saleshub = (
                                 _meta.get("driveId") == DEFAULT_DRIVE_FOLDER
                                 or target_folder in (_meta.get("parents") or [])
                             )
                             if _is_native_doc and _in_saleshub:
                                 existing_doc_id = _src_id
-                            # else: leave existing_doc_id="" → CREATE path runs,
-                            # producing a fresh native Doc in SalesHub
                         except Exception:
-                            # Probe failed → fall through to safe CREATE path
                             pass
-                else:
-                    # Pre-call: search the folder for prior briefs for this
-                    # company. Uses _normalize_company_key so "Kalbe Enseval
-                    # Indonesia" and "kalbe and enseval indonesia" both resolve
-                    # to the same prior doc (and overwrite instead of dupe).
-                    # Keeps the latest match, then trashes any OLDER matches
-                    # so only ONE brief per customer survives in Drive.
-                    _existing = list_drive_folder_docs(target_folder)
-                    _co_key = _normalize_company_key(company_name)
-                    _matches: list = []  # all matches, modifiedTime-desc
-                    for _d in _existing:
-                        _nm = _d.get("name", "")
-                        if not _nm.lower().startswith("prospect brief"):
+
+                # If we still don't have a target (pre-call OR post-call
+                # where source was external), take the most-recent SalesHub
+                # match for this company.
+                if not existing_doc_id and _matches:
+                    existing_doc_id = _matches[0]
+
+                # Trash any SalesHub matches other than the one we're about
+                # to write — keeps "one brief per customer" in both tiles
+                # and Drive, in both pre-call AND post-call.
+                if _matches:
+                    from services.sheets_client import trash_drive_file
+                    _trashed = 0
+                    for _stale_id in _matches:
+                        if _stale_id == existing_doc_id:
                             continue
-                        _m = re.match(
-                            r"Prospect Brief\s*[—\-]\s*(.+?)\s*[—\-]\s*\d{4}-\d{2}-\d{2}",
-                            _nm,
-                        )
-                        if not _m:
-                            continue
-                        if _normalize_company_key(_m.group(1)) == _co_key:
-                            _matches.append(_d["id"])
-                    if _matches:
-                        existing_doc_id = _matches[0]
-                        # Trash older duplicates so the tile + Drive folder
-                        # carry only the latest brief for this company.
-                        from services.sheets_client import trash_drive_file
-                        _trashed = 0
-                        for _stale_id in _matches[1:]:
-                            _tr = trash_drive_file(_stale_id)
-                            if _tr.get("ok"):
-                                _trashed += 1
-                        if _trashed:
-                            st.session_state["last_brief_trashed_count"] = _trashed
+                        _tr = trash_drive_file(_stale_id)
+                        if _tr.get("ok"):
+                            _trashed += 1
+                    if _trashed:
+                        st.session_state["last_brief_trashed_count"] = _trashed
 
                 if existing_doc_id:
                     _res = update_google_doc_docx(existing_doc_id, brief_docx)
