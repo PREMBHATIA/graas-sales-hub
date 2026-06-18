@@ -248,6 +248,17 @@ def _add_table(
             if style.get("color"):
                 run.font.color.rgb = style["color"]
 
+    # Tiny trailing spacer paragraph — without this, Word and Google Docs
+    # visually merge consecutive <w:tbl> blocks into one continuous table
+    # with no border break (Exec Summary rows fused with the stat band).
+    # A 4pt-font empty paragraph forces a clean disconnect between tables
+    # without adding noticeable vertical space.
+    _spacer = doc.add_paragraph()
+    _spacer.paragraph_format.space_before = Pt(0)
+    _spacer.paragraph_format.space_after = Pt(0)
+    _spacer_run = _spacer.add_run("")
+    _spacer_run.font.size = Pt(4)
+
 
 def _add_callout_box(doc: Document, lines: list) -> None:
     """Single-cell amber-tinted callout box for Conflicts & Unknowns."""
