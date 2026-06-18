@@ -1361,7 +1361,27 @@ with right:
                         e.strip() for e in (share_with_raw or "").split(",")
                         if e.strip() and "@" in e
                     ]
-                    docx_bytes = st.session_state.get("last_brief_docx", b"")
+                    # Re-render from the latest brief_data so the upload
+                    # always reflects the current renderer code. Without this
+                    # step, Re-upload sends stale session bytes (rendered on
+                    # the last Build click) and code-side fixes like the
+                    # table-spacer / tblGrid fixes never reach the saved Doc.
+                    # No LLM call — pure renderer round-trip.
+                    _brief_data = st.session_state.get("last_brief_data", {})
+                    if _brief_data:
+                        try:
+                            from services.brief_renderer import render_brief_docx as _rrd
+                            docx_bytes = _rrd(_brief_data)
+                            st.session_state["last_brief_docx"] = docx_bytes
+                        except Exception as _rerr:
+                            st.warning(
+                                f"Re-render failed ({_rerr}) — falling back to "
+                                f"session-state bytes. Tables may not reflect "
+                                f"the latest renderer code."
+                            )
+                            docx_bytes = st.session_state.get("last_brief_docx", b"")
+                    else:
+                        docx_bytes = st.session_state.get("last_brief_docx", b"")
                     if not docx_bytes:
                         st.error("No DOCX bytes in session — regenerate the brief.")
                         st.stop()
