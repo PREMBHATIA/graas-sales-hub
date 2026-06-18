@@ -426,22 +426,74 @@ def list_drive_folder_docs(folder_id: str) -> list:
 
 
 def fetch_drive_doc_text(doc_id: str) -> str:
-    """Export a Google Doc as plain text — for injecting into LLM prompts.
+    """Fetch the plain-text contents of a Drive file, regardless of type.
 
-    Plain text strips formatting (and the token noise that comes with it) so
-    reference proposals fit more cleanly into a system prompt. For round-trip
-    editing (post-call brief updates), use fetch_drive_doc_html instead.
+    Handles two cases:
+      1. Native Google Doc (mimeType=application/vnd.google-apps.document) —
+         use the export endpoint with mimeType=text/plain.
+      2. Word .docx uploaded to Drive
+         (application/vnd.openxmlformats-officedocument.wordprocessingml.document)
+         — download the raw bytes via alt=media and extract paragraphs +
+         table cells with python-docx.
+
+    Without (2), pasting a .docx URL into the post-call "Existing brief"
+    field gives a confusing "service account has access" red-herring when
+    the real issue is the mimeType.
     """
     creds = _get_drive_credentials()
     if creds is None:
         return ""
     try:
         session = greq.AuthorizedSession(creds)
-        url = (
-            f"https://www.googleapis.com/drive/v3/files/{doc_id}/export"
-            f"?mimeType=text/plain&supportsAllDrives=true"
+        # Probe the file type first so we know which path to take.
+        meta = session.get(
+            f"https://www.googleapis.com/drive/v3/files/{doc_id}"
+            "?fields=mimeType&supportsAllDrives=true",
+            timeout=15,
         )
-        r = session.get(url, timeout=30)
+        mime = ""
+        if meta.status_code == 200:
+            mime = (meta.json() or {}).get("mimeType", "")
+
+        if mime == "application/vnd.google-apps.document":
+            r = session.get(
+                f"https://www.googleapis.com/drive/v3/files/{doc_id}/export"
+                f"?mimeType=text/plain&supportsAllDrives=true",
+                timeout=30,
+            )
+            if r.status_code == 200:
+                return r.text
+            return ""
+
+        if mime == ("application/vnd.openxmlformats-officedocument."
+                    "wordprocessingml.document"):
+            r = session.get(
+                f"https://www.googleapis.com/drive/v3/files/{doc_id}"
+                "?alt=media&supportsAllDrives=true",
+                timeout=30,
+            )
+            if r.status_code != 200:
+                return ""
+            try:
+                from docx import Document
+                import io as _io
+                doc = Document(_io.BytesIO(r.content))
+                parts = [p.text for p in doc.paragraphs if p.text.strip()]
+                for table in doc.tables:
+                    for row in table.rows:
+                        cells = [c.text.strip() for c in row.cells if c.text.strip()]
+                        if cells:
+                            parts.append(" | ".join(cells))
+                return "\n".join(parts)
+            except Exception:
+                return ""
+
+        # Unknown mimeType — fall back to the export endpoint as a best-effort.
+        r = session.get(
+            f"https://www.googleapis.com/drive/v3/files/{doc_id}/export"
+            f"?mimeType=text/plain&supportsAllDrives=true",
+            timeout=30,
+        )
         if r.status_code == 200:
             return r.text
     except Exception:
