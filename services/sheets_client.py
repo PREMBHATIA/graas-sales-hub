@@ -744,16 +744,23 @@ def trash_drive_file(file_id: str) -> dict:
         return {"ok": False, "error": f"{type(e).__name__}: {e}"}
 
 
-def update_google_doc_docx(doc_id: str, docx_bytes: bytes) -> dict:
+def update_google_doc_docx(doc_id: str, docx_bytes: bytes,
+                            new_title: Optional[str] = None) -> dict:
     """Replace the contents of an existing Google Doc by uploading new DOCX.
 
-    Keeps the file ID + URL + sharing intact; only the content is replaced.
+    Keeps the file ID + URL + sharing intact; replaces the content. If
+    `new_title` is provided, also renames the file — useful for correcting
+    stale or malformed titles (e.g., an early save with blank company
+    name) on subsequent saves. Always sets trashed=False so a save also
+    un-trashes (which Drive does on PATCH anyway, but being explicit
+    surfaces the behaviour).
     """
     creds = _get_drive_credentials()
     if creds is None:
         return {"ok": False, "error": "Drive credentials unavailable"}
     try:
         session = greq.AuthorizedSession(creds)
+        # 1) Replace the bytes (media upload).
         update_url = (f"https://www.googleapis.com/upload/drive/v3/files/{doc_id}"
                       f"?uploadType=media&supportsAllDrives=true")
         resp = session.patch(
@@ -764,6 +771,16 @@ def update_google_doc_docx(doc_id: str, docx_bytes: bytes) -> dict:
         )
         if resp.status_code not in (200, 201):
             return {"ok": False, "error": f"Drive update failed: HTTP {resp.status_code} — {resp.text[:300]}"}
+        # 2) Optionally rename the file via a metadata PATCH so a brief that
+        # was originally saved with a stale/empty title gets corrected on
+        # the next save.
+        if new_title:
+            meta_url = (f"https://www.googleapis.com/drive/v3/files/{doc_id}"
+                        f"?supportsAllDrives=true")
+            mresp = session.patch(meta_url, json={"name": new_title}, timeout=15)
+            if mresp.status_code not in (200, 204):
+                # Non-fatal — content updated, just the rename failed
+                return {"ok": True, "error": f"content updated but rename failed: HTTP {mresp.status_code}"}
         return {"ok": True, "error": None}
     except Exception as e:
         return {"ok": False, "error": f"{type(e).__name__}: {e}"}

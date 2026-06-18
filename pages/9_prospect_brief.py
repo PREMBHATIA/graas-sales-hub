@@ -1243,8 +1243,20 @@ with right:
                     "brief_company_key": _co_key,
                 }
 
+                # Compute the expected title up front — used both when
+                # CREATING new (line below) and when UPDATING an existing
+                # doc whose title may be stale (e.g. blank company from an
+                # early aborted Build).
+                _expected_title = (
+                    f"Prospect Brief — {company_name} — "
+                    f"{datetime.now():%Y-%m-%d}"
+                )
+
                 if existing_doc_id:
-                    _res = update_google_doc_docx(existing_doc_id, brief_docx)
+                    _res = update_google_doc_docx(
+                        existing_doc_id, brief_docx,
+                        new_title=_expected_title,
+                    )
                     if _res.get("ok"):
                         _url = f"https://docs.google.com/document/d/{existing_doc_id}/edit"
                         st.session_state["last_brief_doc_id"] = existing_doc_id
@@ -1255,13 +1267,9 @@ with right:
                         from services.sheets_client import set_drive_app_properties
                         set_drive_app_properties(existing_doc_id, _props)
                 else:
-                    _title = (
-                        f"Prospect Brief — {company_name} — "
-                        f"{datetime.now():%Y-%m-%d}"
-                    )
                     _res = create_google_doc_from_docx(
                         docx_bytes=brief_docx,
-                        title=_title,
+                        title=_expected_title,
                         parent_folder_id=target_folder,
                         share_with=None,
                     )
@@ -1409,6 +1417,7 @@ with right:
                         res = update_google_doc_docx(
                             st.session_state["last_brief_doc_id"],
                             docx_bytes,
+                            new_title=title,
                         )
                         if res["ok"]:
                             url = f"https://docs.google.com/document/d/{st.session_state['last_brief_doc_id']}/edit"
