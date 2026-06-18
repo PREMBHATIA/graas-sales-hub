@@ -61,16 +61,21 @@ with st.expander("ℹ️ How to use this — read once, then collapse", expanded
         st.markdown(
             "Paste research notes — website, LinkedIn, news, prior emails, "
             "industry profile. If the company is in the CRM, pick it from "
-            "the dropdown and the form pre-fills with what we already know."
+            "the dropdown and the form pre-fills with what we already know.\n\n"
+            "**Output:** auto-saved to Drive on generation — the live Doc link "
+            "appears under the preview and on the Recent briefs tile below. "
+            "Download as .docx is optional, for a local copy."
         )
     with m2:
         st.markdown("##### 🔁 Update existing (post-call)")
         st.caption("After every call")
         st.markdown(
-            "Paste the existing brief's **Doc URL + your fresh call notes** "
-            "(Granola export, Zoom transcript, or hand-typed). The brief amends "
-            "in place — answers move into facts, confidence upgrades to "
-            "*Confirmed*, the route firms up."
+            "Paste the brief's **Doc URL** (grab it from the Recent briefs "
+            "tile or the auto-save banner) **plus your call notes as text** "
+            "(Granola summary, Zoom transcript, or hand-typed — no file upload). "
+            "Both **Google Doc URLs and .docx-in-Drive URLs** work. "
+            "The brief amends in place — answers move into facts, confidence "
+            "upgrades to *Confirmed*, the route firms up."
         )
 
     st.markdown("#### The living-document workflow")
@@ -78,9 +83,23 @@ with st.expander("ℹ️ How to use this — read once, then collapse", expanded
         "**Pre-call draft → Post call-1 → Post call-2 → … → Ready for solutioning**\n\n"
         "Don't treat this as one-shot. Build it before call 1, then re-open this page "
         "after every call and run the update. The status line at the top of the brief "
-        "tracks the version. When the qualification gate is met (decision-maker known, "
-        "budget identified, data readiness understood, CFO metric confirmed by the customer), "
-        "hand it to the **Create Proposal** page."
+        "tracks the version. **You don't need to download/upload between calls — the "
+        "Doc updates in place at the same URL.** When the qualification gate is met "
+        "(decision-maker known, budget identified, data readiness understood, CFO "
+        "metric confirmed by the customer), hand it to the **Create Proposal** page."
+    )
+
+    st.markdown("#### What happens after a post-call update")
+    st.markdown(
+        "- The brief saves back to the **same Doc URL** (overwrites in place; "
+        "Drive's version history keeps the prior version if you ever need to diff).\n"
+        "- The top of the brief now carries a **Post-call analysis** section "
+        "showing what THIS call added — what you learned, what's now confirmed, "
+        "what's newly surfaced, what's still open, what shifted in route or next "
+        "step. Most recent call on top. No need to compare against the prior "
+        "version to see what's new.\n"
+        "- The Recent briefs tile keeps pointing to the same Doc, so links you "
+        "shared with the team don't break."
     )
 
     st.markdown("#### Tips that change output quality")
@@ -96,9 +115,10 @@ with st.expander("ℹ️ How to use this — read once, then collapse", expanded
 
     st.markdown("#### Where the Doc lives")
     st.markdown(
-        "Saved by default to the **\"Prospect Brief (via SalesHub)\"** Shared Drive. "
-        "Override the folder ID in step 4 for a different destination. The Doc is "
-        "auto-shared with the emails you list, so it shows up in their *Shared with me*."
+        "**Auto-saved** to the **\"Prospect Brief (via SalesHub)\"** Shared Drive on "
+        "every generation — pre-call AND post-call. Override the folder ID in step 4 "
+        "for a different destination. The Doc is auto-shared with the emails you list, "
+        "so it shows up in their *Shared with me*."
     )
     st.markdown("---")
 
@@ -340,6 +360,17 @@ BRIEF_JSON_SCHEMA = """{
     "market": "India / Indonesia / Vietnam / Thailand / Philippines / Malaysia / Singapore — primary",
     "status": "Pre-call draft  (post-call: 'Pre-call draft → Post call-1 — YYYY-MM-DD …')"
   },
+  "post_call_log": [
+    {
+      "call_number": "integer — 1 for the first post-call update, 2 for the second, etc. Pre-call drafts leave this entire array empty.",
+      "date": "YYYY-MM-DD of THIS call",
+      "what_we_learned": "1-2 phrases — the headline outcome of this call. What does the team now know that they didn't before?",
+      "now_confirmed": ["facts previously Inferred/Public estimate that this call nailed down. Each item is one phrase."],
+      "newly_surfaced": ["new pains / people / systems / competitors / budget signals / agents the call revealed. Each item is one phrase."],
+      "still_open": ["open questions from the discovery agenda that this call did NOT answer — they carry forward to the next call."],
+      "route_or_next_step_change": "ONE phrase — what shifted in product_route / metric_that_matters / next_step after this call. If nothing shifted, write 'no change'."
+    }
+  ],
   "strategic_hook": "ONE line, MAX 25 words. The X→Y mapping pitch frame — what they've already built (their assets) → the Graas layer that sits on top. Renders at the top of the brief, sets the meeting frame. e.g. 'You've built KALCare + EMOS + KlikDokter. Graas adds the agentic intelligence layer — without ripping out a single system you run today.' Must reference real assets you found in research.",
   "asset_graas_map": [
     {
@@ -609,6 +640,19 @@ def _build_update_prompt(existing_brief_text: str, call_notes: str, company: str
         f"Decide and record the **next_step** explicitly with one line on why.\n\n"
         f"Update header.status: append `→ Post call-N — {today}` where N is the next "
         f"number after the latest. Keep prior status entries intact in the string.\n\n"
+        f"**POST-CALL LOG (critical for this update flow).** PREPEND a new entry "
+        f"to the `post_call_log` array as the FIRST item (most recent on top). "
+        f"PRESERVE every prior entry verbatim — never delete or rewrite old "
+        f"entries. The new entry must include: call_number = (highest existing "
+        f"call_number + 1, or 1 if empty), date = {today}, what_we_learned "
+        f"(1-2 phrases on the call's headline outcome), now_confirmed (facts "
+        f"upgraded from Inferred to Confirmed because of this call), "
+        f"newly_surfaced (new pains/people/systems/competitors/budget the call "
+        f"revealed), still_open (discovery questions the call did NOT answer), "
+        f"route_or_next_step_change (one phrase on what shifted in route / "
+        f"metric_that_matters / next_step, or 'no change'). This section is "
+        f"what the salesperson reads first when re-opening the brief — make it "
+        f"crisp and load-bearing.\n\n"
         f"Output rules: same 2-pager density (phrases not sentences); keep all mandatory "
         f"fields populated; if a fact stays unverified use *Info not publicly available* "
         f"+ Unknown.\n\n"

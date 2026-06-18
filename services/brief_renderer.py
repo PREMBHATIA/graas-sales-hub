@@ -283,6 +283,33 @@ def render_brief_docx(data: dict) -> bytes:
     if header.get("status"):
         _add_status(doc, f"Status: {header['status']}")
 
+    # ── Post-call analysis (only present after first post-call update) ──────
+    # Most recent entry first. Each entry summarises what THAT call added.
+    # Salesperson re-opening the brief reads this section first to see what
+    # changed without diffing against a prior Doc revision.
+    post_call_log = data.get("post_call_log") or []
+    if post_call_log:
+        _add_h2(doc, "Post-call analysis")
+        for idx, entry in enumerate(post_call_log):
+            tag = "  (latest)" if idx == 0 else "  (prior)"
+            cn = entry.get("call_number") or (idx + 1)
+            dt = entry.get("date") or ""
+            _add_h3(doc, f"Call {cn} — {dt}{tag}")
+            if entry.get("what_we_learned"):
+                _add_kv_para(doc, "What we learned", entry["what_we_learned"])
+            if entry.get("now_confirmed"):
+                _add_kv_para(doc, "Now confirmed", "")
+                _add_bullets(doc, entry["now_confirmed"])
+            if entry.get("newly_surfaced"):
+                _add_kv_para(doc, "Newly surfaced", "")
+                _add_bullets(doc, entry["newly_surfaced"])
+            if entry.get("still_open"):
+                _add_kv_para(doc, "Still open", "")
+                _add_bullets(doc, entry["still_open"])
+            if entry.get("route_or_next_step_change"):
+                _add_kv_para(doc, "Route / next step change",
+                             entry["route_or_next_step_change"])
+
     # ── Strategic hook (sets the meeting frame, one line) ───────────────────
     if data.get("strategic_hook"):
         _add_para(doc, f"“{data['strategic_hook']}”", italic=True, size=10.5)
@@ -617,6 +644,28 @@ td.src { font-size: 7pt; font-style: italic; color: #777; }
     parts.append(f"<p class='sub'>{' · '.join(sub_parts)}</p>")
     if header.get("status"):
         parts.append(f"<p class='status'>Status: {_esc(header['status'])}</p>")
+
+    _pcl = data.get("post_call_log") or []
+    if _pcl:
+        parts.append("<h2>Post-call analysis</h2>")
+        for _i, _e in enumerate(_pcl):
+            _tag = " <em>(latest)</em>" if _i == 0 else " <em>(prior)</em>"
+            _cn = _e.get("call_number") or (_i + 1)
+            _dt = _esc(_e.get("date", ""))
+            parts.append(f"<h3>Call {_cn} — {_dt}{_tag}</h3>")
+            if _e.get("what_we_learned"):
+                parts.append(f"<p><strong>What we learned:</strong> {_esc(_e['what_we_learned'])}</p>")
+            for _key, _label in (("now_confirmed", "Now confirmed"),
+                                 ("newly_surfaced", "Newly surfaced"),
+                                 ("still_open", "Still open")):
+                _items = _e.get(_key) or []
+                if _items:
+                    parts.append(f"<p><strong>{_label}:</strong></p><ul>")
+                    for _it in _items:
+                        parts.append(f"<li>{_esc(_it)}</li>")
+                    parts.append("</ul>")
+            if _e.get("route_or_next_step_change"):
+                parts.append(f"<p><strong>Route / next step change:</strong> {_esc(_e['route_or_next_step_change'])}</p>")
 
     if data.get("strategic_hook"):
         parts.append(f"<p class='hook'>“{_esc(data['strategic_hook'])}”</p>")
