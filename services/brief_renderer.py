@@ -307,6 +307,17 @@ def render_brief_docx(data: dict) -> bytes:
     # changed without diffing against a prior Doc revision.
     post_call_log = data.get("post_call_log") or []
     if post_call_log:
+        # Legend so anyone opening the Doc knows what the yellow shading means
+        _legend_p = doc.add_paragraph()
+        _legend_run = _legend_p.add_run(
+            "▮ Yellow highlights = sections updated in the latest call"
+        )
+        _legend_run.font.size = Pt(8.5)
+        _legend_run.font.italic = True
+        _legend_run.font.color.rgb = GREY
+        _legend_p.paragraph_format.space_before = Pt(0)
+        _legend_p.paragraph_format.space_after = Pt(4)
+
         _add_h2(doc, "Post-call analysis")
         for idx, entry in enumerate(post_call_log):
             tag = "  (latest)" if idx == 0 else "  (prior)"
@@ -327,6 +338,30 @@ def render_brief_docx(data: dict) -> bytes:
             if entry.get("route_or_next_step_change"):
                 _add_kv_para(doc, "Route / next step change",
                              entry["route_or_next_step_change"])
+
+        # Clear divider so it's obvious where post-call notes end and the
+        # standing brief begins. A paragraph with a thick bottom border
+        # renders as a hard horizontal rule in both Word and Google Docs.
+        _div_p = doc.add_paragraph()
+        _div_pPr = _div_p._p.get_or_add_pPr()
+        _pBdr = OxmlElement("w:pBdr")
+        _bottom = OxmlElement("w:bottom")
+        _bottom.set(qn("w:val"), "single")
+        _bottom.set(qn("w:sz"), "12")  # thickness
+        _bottom.set(qn("w:space"), "1")
+        _bottom.set(qn("w:color"), "2742FF")  # Graas blue
+        _pBdr.append(_bottom)
+        _div_pPr.append(_pBdr)
+        _div_p.paragraph_format.space_before = Pt(2)
+        _div_p.paragraph_format.space_after = Pt(8)
+        _div_label = doc.add_paragraph()
+        _div_label_run = _div_label.add_run("— end of post-call notes · standing brief follows —")
+        _div_label_run.font.size = Pt(8)
+        _div_label_run.font.italic = True
+        _div_label_run.font.color.rgb = GREY
+        _div_label.paragraph_format.space_before = Pt(0)
+        _div_label.paragraph_format.space_after = Pt(8)
+        _div_label.paragraph_format.alignment = 1  # CENTER
 
     # ── Strategic hook (sets the meeting frame, one line) ───────────────────
     if data.get("strategic_hook"):
@@ -680,6 +715,12 @@ td.src { font-size: 7pt; font-style: italic; color: #777; }
 
     _pcl = data.get("post_call_log") or []
     if _pcl:
+        parts.append(
+            "<p style='font-size:8.5pt;color:#666;font-style:italic;margin:2pt 0 4pt 0;'>"
+            "<span style='background:#fff4b8;padding:0 6pt;'>&nbsp;</span> "
+            "Yellow highlights = sections updated in the latest call"
+            "</p>"
+        )
         parts.append("<h2>Post-call analysis</h2>")
         for _i, _e in enumerate(_pcl):
             _tag = " <em>(latest)</em>" if _i == 0 else " <em>(prior)</em>"
@@ -699,6 +740,12 @@ td.src { font-size: 7pt; font-style: italic; color: #777; }
                     parts.append("</ul>")
             if _e.get("route_or_next_step_change"):
                 parts.append(f"<p><strong>Route / next step change:</strong> {_esc(_e['route_or_next_step_change'])}</p>")
+        # Close the post-call block with a clear divider
+        parts.append(
+            "<hr style='border:0;border-top:2px solid #2742FF;margin:8pt 0 2pt 0;'>"
+            "<p style='text-align:center;font-size:8pt;color:#666;font-style:italic;"
+            "margin:0 0 8pt 0;'>— end of post-call notes · standing brief follows —</p>"
+        )
 
     if data.get("strategic_hook"):
         parts.append(f"<p class='hook'>“{_esc(data['strategic_hook'])}”</p>")
