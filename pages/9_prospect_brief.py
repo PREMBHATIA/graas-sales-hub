@@ -956,11 +956,16 @@ with right:
                 st.stop()
 
             # Sanity-check mandatory fields are populated
-            required_keys = ("strategic_hook", "asset_graas_map", "why_now",
+            required_keys = ["strategic_hook", "asset_graas_map", "why_now",
                              "executive_summary", "stat_band", "what_they_have",
                              "product_route", "graas_proof_points",
                              "pain_capability_cfo", "meeting_game_plan",
-                             "objection_handling", "opening_hook")
+                             "objection_handling", "opening_hook"]
+            # Post-call updates MUST surface what the call added. Without a
+            # populated post_call_log, the brief renders as a "looks like a
+            # pre-call draft" which is the exact silent-failure we hit earlier.
+            if mode.startswith("🔁"):
+                required_keys.append("post_call_log")
             missing_required = [k for k in required_keys if not brief_data.get(k)]
             if missing_required:
                 st.warning(
@@ -1008,8 +1013,38 @@ with right:
                 target_folder = drive_folder or DEFAULT_DRIVE_FOLDER
                 existing_doc_id = ""
                 if mode.startswith("🔁"):
-                    # Post-call: we already know which doc to update
-                    existing_doc_id = st.session_state.get("last_brief_doc_id", "")
+                    # Post-call: candidate target is the doc the user pasted.
+                    # But if that doc is a .docx upload or sits OUTSIDE the
+                    # SalesHub Shared Drive, patching it in place hides the
+                    # update from tiles. Probe the source and fall through to
+                    # the create-in-SalesHub path when needed.
+                    _src_id = st.session_state.get("last_brief_doc_id", "")
+                    if _src_id:
+                        import google.auth.transport.requests as _greq
+                        from services.sheets_client import _get_drive_credentials
+                        try:
+                            _sess = _greq.AuthorizedSession(_get_drive_credentials())
+                            _meta = _sess.get(
+                                f"https://www.googleapis.com/drive/v3/files/{_src_id}"
+                                "?fields=mimeType,driveId,parents&supportsAllDrives=true",
+                                timeout=15,
+                            ).json() or {}
+                            _is_native_doc = (
+                                _meta.get("mimeType") ==
+                                "application/vnd.google-apps.document"
+                            )
+                            # SalesHub Shared Drive id matches DEFAULT_DRIVE_FOLDER
+                            _in_saleshub = (
+                                _meta.get("driveId") == DEFAULT_DRIVE_FOLDER
+                                or target_folder in (_meta.get("parents") or [])
+                            )
+                            if _is_native_doc and _in_saleshub:
+                                existing_doc_id = _src_id
+                            # else: leave existing_doc_id="" → CREATE path runs,
+                            # producing a fresh native Doc in SalesHub
+                        except Exception:
+                            # Probe failed → fall through to safe CREATE path
+                            pass
                 else:
                     # Pre-call: search the folder for a prior brief for this
                     # company. Title pattern: "Prospect Brief — {company} — YYYY-MM-DD"
