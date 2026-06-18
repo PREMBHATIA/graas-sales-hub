@@ -411,13 +411,18 @@ def list_drive_folder_docs(folder_id: str) -> list:
             f"https://www.googleapis.com/drive/v3/files"
             f"?q={q}&supportsAllDrives=true&includeItemsFromAllDrives=true"
             f"&pageSize=100&orderBy=modifiedTime desc"
-            f"&fields=files(id,name,modifiedTime)"
+            f"&fields=files(id,name,modifiedTime,appProperties)"
         )
         r = session.get(url, timeout=15)
         if r.status_code == 200:
             files = r.json().get("files", [])
             return [
-                {"id": f["id"], "name": f["name"], "modified_time": f.get("modifiedTime", "")}
+                {
+                    "id": f["id"],
+                    "name": f["name"],
+                    "modified_time": f.get("modifiedTime", ""),
+                    "app_properties": f.get("appProperties", {}) or {},
+                }
                 for f in files
             ]
     except Exception:
@@ -682,6 +687,34 @@ def share_drive_file_with_notification(
 def _url_quote(s: str) -> str:
     from urllib.parse import quote
     return quote(s, safe="")
+
+
+def set_drive_app_properties(file_id: str, properties: dict) -> dict:
+    """Set custom appProperties on a Drive file (free-form key-value metadata).
+
+    Used by the brief auto-save to stamp `brief_mode` and `brief_call_count`
+    onto each Doc so the tile renderer can colour pre-call vs post-call
+    differently without re-reading the Doc content.
+
+    Returns {"ok": bool, "error": str | None}.
+    """
+    creds = _get_drive_credentials()
+    if creds is None:
+        return {"ok": False, "error": "Drive credentials unavailable"}
+    try:
+        session = greq.AuthorizedSession(creds)
+        url = (f"https://www.googleapis.com/drive/v3/files/{file_id}"
+               f"?supportsAllDrives=true")
+        resp = session.patch(
+            url,
+            json={"appProperties": {k: str(v) for k, v in properties.items()}},
+            timeout=15,
+        )
+        if resp.status_code not in (200, 204):
+            return {"ok": False, "error": f"Drive appProperties PATCH failed: HTTP {resp.status_code} — {resp.text[:200]}"}
+        return {"ok": True, "error": None}
+    except Exception as e:
+        return {"ok": False, "error": f"{type(e).__name__}: {e}"}
 
 
 def trash_drive_file(file_id: str) -> dict:

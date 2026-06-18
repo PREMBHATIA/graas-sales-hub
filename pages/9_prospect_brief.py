@@ -1227,6 +1227,19 @@ with right:
                     if _trashed:
                         st.session_state["last_brief_trashed_count"] = _trashed
 
+                # Compute the brief mode + call count for stamping into Drive
+                # appProperties — tile renderer reads these to colour pre-call
+                # vs post-call differently.
+                _pcl = brief_data.get("post_call_log") or []
+                _call_count = len(_pcl) if isinstance(_pcl, list) else 0
+                _brief_mode = (f"Post call-{_call_count}" if _call_count > 0
+                               else "Pre-call draft")
+                _props = {
+                    "brief_mode": _brief_mode,
+                    "brief_call_count": _call_count,
+                    "brief_company_key": _co_key,
+                }
+
                 if existing_doc_id:
                     _res = update_google_doc_docx(existing_doc_id, brief_docx)
                     if _res.get("ok"):
@@ -1236,6 +1249,8 @@ with right:
                         st.session_state["last_brief_autosave_status"] = (
                             "updated", _url
                         )
+                        from services.sheets_client import set_drive_app_properties
+                        set_drive_app_properties(existing_doc_id, _props)
                 else:
                     _title = (
                         f"Prospect Brief — {company_name} — "
@@ -1248,11 +1263,15 @@ with right:
                         share_with=None,
                     )
                     if _res.get("ok"):
-                        st.session_state["last_brief_doc_id"] = _res.get("doc_id", "")
+                        _new_id = _res.get("doc_id", "")
+                        st.session_state["last_brief_doc_id"] = _new_id
                         st.session_state["last_brief_doc_url"] = _res.get("doc_url", "")
                         st.session_state["last_brief_autosave_status"] = (
                             "created", _res.get("doc_url", "")
                         )
+                        if _new_id:
+                            from services.sheets_client import set_drive_app_properties
+                            set_drive_app_properties(_new_id, _props)
                     else:
                         st.session_state["last_brief_autosave_status"] = (
                             "failed", _res.get("error") or "unknown error"
@@ -1498,20 +1517,56 @@ else:
         if _key in _seen_companies:
             continue
         _seen_companies.add(_key)
-        _parsed.append({"company": _company, "date": _date_str, "id": _d["id"]})
+        _props = _d.get("app_properties", {}) or {}
+        _parsed.append({
+            "company": _company,
+            "date": _date_str,
+            "id": _d["id"],
+            "mode": _props.get("brief_mode", ""),
+            "call_count": int(_props.get("brief_call_count", "0") or 0),
+        })
 
-    # 6-column tiles, 2 rows max = 12 unique-company tiles shown
+    # Legend above tiles — explains the colour code at a glance.
+    st.caption(
+        "🆕 <span style='background:#f0f0f0;padding:1px 6px;border-radius:4px;"
+        "border:1px solid #ddd;'>Pre-call draft</span> &nbsp;·&nbsp; "
+        "🔁 <span style='background:#e6efff;padding:1px 6px;border-radius:4px;"
+        "border:1px solid #b6cfff;'>Post call-N</span>",
+        unsafe_allow_html=True,
+    )
+
+    # 6-column tiles, 2 rows max = 12 unique-company tiles shown.
+    # Each tile carries a coloured badge for its mode (pre-call vs post-call N)
+    # read from the Doc's Drive appProperties, set at auto-save time.
     _tiles = _parsed[:12]
     _rows = [_tiles[i:i + 6] for i in range(0, len(_tiles), 6)]
     for _row in _rows:
         _cols = st.columns(6)
         for _col, _p in zip(_cols, _row):
             _url = f"https://docs.google.com/document/d/{_p['id']}/edit"
+            _mode = _p.get("mode", "")
+            _cc = _p.get("call_count", 0)
+            if _mode.startswith("Post call") or _cc > 0:
+                _badge_icon = "🔁"
+                _badge_text = _mode or f"Post call-{_cc}"
+                _badge_bg, _badge_border = "#e6efff", "#b6cfff"
+            elif _mode == "Pre-call draft" or not _mode:
+                _badge_icon = "🆕"
+                _badge_text = "Pre-call draft"
+                _badge_bg, _badge_border = "#f0f0f0", "#dddddd"
+            else:
+                _badge_icon = "📄"
+                _badge_text = _mode
+                _badge_bg, _badge_border = "#f0f0f0", "#dddddd"
             with _col:
                 with st.container(border=True):
                     st.markdown(
                         f"<div style='font-size: 0.85em; font-weight: 600; line-height: 1.2; "
                         f"margin-bottom: 2px;'>{_p['company']}</div>"
+                        f"<div style='font-size: 0.65em; margin: 2px 0;'>"
+                        f"<span style='background:{_badge_bg};border:1px solid {_badge_border};"
+                        f"padding:1px 5px;border-radius:4px;'>"
+                        f"{_badge_icon} {_badge_text}</span></div>"
                         f"<div style='font-size: 0.7em; color: #888;'>{_p['date']}</div>"
                         f"<a href='{_url}' target='_blank' style='font-size: 0.75em;'>Open →</a>",
                         unsafe_allow_html=True,
