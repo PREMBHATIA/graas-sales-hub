@@ -191,6 +191,21 @@ def _add_table(
     tbl_w.set(qn("w:type"), "dxa")
     tbl_pr.append(tbl_w)
 
+    # Override <w:tblGrid> with our actual column widths in twips. python-docx
+    # populates this with equal page-width-divided-by-col-count regardless of
+    # what we set on individual cells — and Google Docs uses tblGrid (not tcW)
+    # when laying out tables, so the rendered widths come out wrong without
+    # this. This is what was making Exec Summary (3-col) render narrower than
+    # the stat band (5-col) even though both tblW values were the same.
+    _grid = table._tbl.find(qn("w:tblGrid"))
+    if _grid is not None:
+        for _child in list(_grid):
+            _grid.remove(_child)
+        for _w in col_widths_cm:
+            _gc = OxmlElement("w:gridCol")
+            _gc.set(qn("w:w"), str(int(_w * 567)))
+            _grid.append(_gc)
+
     # Set widths on every cell of every row (DOCX needs this redundantly)
     for col_idx, w in enumerate(col_widths_cm):
         for row in table.rows:
