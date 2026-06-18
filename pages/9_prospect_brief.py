@@ -903,6 +903,9 @@ with right:
                 attendees=attendees_raw,
             )
         else:
+            if not company_name:
+                st.error("Pick or type a company name first (Card 0 / step 2).")
+                st.stop()
             doc_id = _extract_doc_id(existing_brief_id)
             if not doc_id:
                 st.error("Paste a valid Google Doc URL or ID for the existing brief.")
@@ -1385,6 +1388,23 @@ with right:
                     if not docx_bytes:
                         st.error("No DOCX bytes in session — regenerate the brief.")
                         st.stop()
+                    # Compute appProperties from current brief_data so the
+                    # tile badge reflects the latest mode after this manual
+                    # save (auto-save sets these too; the manual paths
+                    # missed them — that's why every tile rendered as
+                    # Pre-call regardless of actual mode).
+                    from services.sheets_client import set_drive_app_properties as _sap
+                    _bd_for_props = st.session_state.get("last_brief_data", {})
+                    _pcl_for_props = _bd_for_props.get("post_call_log") or []
+                    _cc_for_props = (len(_pcl_for_props) if isinstance(_pcl_for_props, list) else 0)
+                    _mp = {
+                        "brief_mode": (f"Post call-{_cc_for_props}" if _cc_for_props > 0
+                                       else "Pre-call draft"),
+                        "brief_call_count": _cc_for_props,
+                        "brief_company_key": _normalize_company_key(
+                            st.session_state.get("last_brief_company", "")
+                        ),
+                    }
                     if st.session_state.get("last_brief_doc_id"):
                         res = update_google_doc_docx(
                             st.session_state["last_brief_doc_id"],
@@ -1393,6 +1413,7 @@ with right:
                         if res["ok"]:
                             url = f"https://docs.google.com/document/d/{st.session_state['last_brief_doc_id']}/edit"
                             st.session_state["last_brief_doc_url"] = url
+                            _sap(st.session_state["last_brief_doc_id"], _mp)
                             st.success(f"✅ Updated existing Doc. [Open it →]({url})")
                         else:
                             st.error(f"Update failed: {res['error']}")
@@ -1405,6 +1426,8 @@ with right:
                         )
                         if res["ok"]:
                             st.session_state["last_brief_doc_url"] = res["doc_url"]
+                            if res.get("doc_id"):
+                                _sap(res["doc_id"], _mp)
                             st.success(f"✅ Created in Drive. [Open it →]({res['doc_url']})")
                         else:
                             err = res.get("error") or "unknown"
