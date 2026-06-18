@@ -1331,8 +1331,11 @@ with right:
 
         # Surface the auto-save status that ran during generation. The
         # brief lands in Drive (and on the Recent briefs tile) without a
-        # click; the manual button below stays as a re-save fallback.
+        # click. After success, the manual save button is demoted into
+        # an expander — it's only needed for the rare re-render-after-
+        # code-fix workflow. On failure, it surfaces as the primary CTA.
         _autosave = st.session_state.get("last_brief_autosave_status")
+        _autosave_ok = bool(_autosave and _autosave[0] in ("updated", "created"))
         if _autosave:
             _kind, _payload = _autosave
             _trashed_n = st.session_state.get("last_brief_trashed_count", 0)
@@ -1347,109 +1350,14 @@ with right:
             elif _kind == "failed":
                 st.warning(
                     f"⚠️ Auto-save to Drive failed: {_payload}. "
-                    f"Use the manual save button below."
+                    f"Use the manual save below."
                 )
 
-        save_cols = st.columns([2, 2, 1])
-
-        # Manual save (re-save / overwrite) — auto-save already ran above, this
-        # is the fallback when auto-save failed or the user wants to force a
-        # fresh copy with a different share list / parent folder.
-        with save_cols[0]:
-            save_label = (
-                "🔁 Re-upload to existing Doc"
-                if st.session_state.get("last_brief_doc_id")
-                else "💾 Create new Google Doc"
-            )
-            if st.button(save_label, type="primary", use_container_width=True, key="brief_save_btn"):
-                with st.spinner("Talking to Drive…"):
-                    from services.sheets_client import create_google_doc_from_docx, update_google_doc_docx
-                    title = (
-                        f"Prospect Brief — {st.session_state['last_brief_company']} — "
-                        f"{datetime.now():%Y-%m-%d}"
-                    )
-                    share_with = [
-                        e.strip() for e in (share_with_raw or "").split(",")
-                        if e.strip() and "@" in e
-                    ]
-                    # Re-render from the latest brief_data so the upload
-                    # always reflects the current renderer code. Without this
-                    # step, Re-upload sends stale session bytes (rendered on
-                    # the last Build click) and code-side fixes like the
-                    # table-spacer / tblGrid fixes never reach the saved Doc.
-                    # No LLM call — pure renderer round-trip.
-                    _brief_data = st.session_state.get("last_brief_data", {})
-                    if _brief_data:
-                        try:
-                            from services.brief_renderer import render_brief_docx as _rrd
-                            docx_bytes = _rrd(_brief_data)
-                            st.session_state["last_brief_docx"] = docx_bytes
-                        except Exception as _rerr:
-                            st.warning(
-                                f"Re-render failed ({_rerr}) — falling back to "
-                                f"session-state bytes. Tables may not reflect "
-                                f"the latest renderer code."
-                            )
-                            docx_bytes = st.session_state.get("last_brief_docx", b"")
-                    else:
-                        docx_bytes = st.session_state.get("last_brief_docx", b"")
-                    if not docx_bytes:
-                        st.error("No DOCX bytes in session — regenerate the brief.")
-                        st.stop()
-                    # Compute appProperties from current brief_data so the
-                    # tile badge reflects the latest mode after this manual
-                    # save (auto-save sets these too; the manual paths
-                    # missed them — that's why every tile rendered as
-                    # Pre-call regardless of actual mode).
-                    from services.sheets_client import set_drive_app_properties as _sap
-                    _bd_for_props = st.session_state.get("last_brief_data", {})
-                    _pcl_for_props = _bd_for_props.get("post_call_log") or []
-                    _cc_for_props = (len(_pcl_for_props) if isinstance(_pcl_for_props, list) else 0)
-                    _mp = {
-                        "brief_mode": (f"Post call-{_cc_for_props}" if _cc_for_props > 0
-                                       else "Pre-call draft"),
-                        "brief_call_count": _cc_for_props,
-                        "brief_company_key": _normalize_company_key(
-                            st.session_state.get("last_brief_company", "")
-                        ),
-                    }
-                    if st.session_state.get("last_brief_doc_id"):
-                        res = update_google_doc_docx(
-                            st.session_state["last_brief_doc_id"],
-                            docx_bytes,
-                            new_title=title,
-                        )
-                        if res["ok"]:
-                            url = f"https://docs.google.com/document/d/{st.session_state['last_brief_doc_id']}/edit"
-                            st.session_state["last_brief_doc_url"] = url
-                            _sap(st.session_state["last_brief_doc_id"], _mp)
-                            st.success(f"✅ Updated existing Doc. [Open it →]({url})")
-                        else:
-                            st.error(f"Update failed: {res['error']}")
-                    else:
-                        res = create_google_doc_from_docx(
-                            docx_bytes=docx_bytes,
-                            title=title,
-                            parent_folder_id=(drive_folder or None),
-                            share_with=share_with or None,
-                        )
-                        if res["ok"]:
-                            st.session_state["last_brief_doc_url"] = res["doc_url"]
-                            if res.get("doc_id"):
-                                _sap(res["doc_id"], _mp)
-                            st.success(f"✅ Created in Drive. [Open it →]({res['doc_url']})")
-                        else:
-                            err = res.get("error") or "unknown"
-                            st.error(
-                                f"Drive create failed: {err}\n\n"
-                                f"If this is a permissions error, share the parent folder "
-                                f"(`{drive_folder}`) with the service account email "
-                                f"(`command-center@prefab-bruin-491807-n0.iam.gserviceaccount.com`) "
-                                f"as **Editor**, then try again."
-                            )
-
-        # Download as DOCX (opens cleanly in Word + Google Docs)
-        with save_cols[1]:
+        # Primary actions row: Download + Clear (always visible).
+        # Manual save lives below — prominent on auto-save failure,
+        # demoted into an expander on success.
+        _dl_col, _clear_col = st.columns([3, 1])
+        with _dl_col:
             fname = f"prospect-brief-{(st.session_state['last_brief_company'] or 'untitled').lower().replace(' ', '-')}-{datetime.now():%Y-%m-%d}.docx"
             st.download_button(
                 "⬇️ Download DOCX",
@@ -1458,9 +1366,7 @@ with right:
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                 use_container_width=True,
             )
-
-        # Clear
-        with save_cols[2]:
+        with _clear_col:
             if st.button("🗑 Clear", use_container_width=True, key="brief_clear_btn"):
                 for k in ("last_brief_data", "last_brief_html", "last_brief_docx",
                           "last_brief_company", "last_brief_mode",
@@ -1469,6 +1375,122 @@ with right:
                           "last_brief_trashed_count"):
                     st.session_state.pop(k, None)
                 st.rerun()
+
+        # Manual save — wrapped in expander when auto-save succeeded
+        # (rare-use, mostly for pushing renderer fixes), or rendered
+        # directly when auto-save failed (primary recovery action).
+        def _manual_save_button():
+            _doc_id = st.session_state.get("last_brief_doc_id")
+            if _autosave_ok:
+                _label = ("🔄 Re-render Doc with latest code"
+                          if _doc_id else "💾 Save to Drive again")
+            else:
+                _label = ("🔁 Re-upload to existing Doc"
+                          if _doc_id else "💾 Create new Google Doc")
+            return st.button(
+                _label,
+                type="secondary" if _autosave_ok else "primary",
+                use_container_width=True,
+                key="brief_save_btn",
+            )
+
+        def _run_manual_save():
+            """Re-render + upload to Drive. Called from both the expander
+            (re-render-after-fix workflow) and the on-failure fallback."""
+            with st.spinner("Talking to Drive…"):
+                from services.sheets_client import (
+                    create_google_doc_from_docx,
+                    update_google_doc_docx,
+                    set_drive_app_properties as _sap,
+                )
+                title = (
+                    f"Prospect Brief — {st.session_state['last_brief_company']} — "
+                    f"{datetime.now():%Y-%m-%d}"
+                )
+                share_with = [
+                    e.strip() for e in (share_with_raw or "").split(",")
+                    if e.strip() and "@" in e
+                ]
+                # Re-render from brief_data so the upload always reflects
+                # the current renderer code (avoids stale session bytes).
+                _brief_data = st.session_state.get("last_brief_data", {})
+                if _brief_data:
+                    try:
+                        from services.brief_renderer import render_brief_docx as _rrd
+                        docx_bytes = _rrd(_brief_data)
+                        st.session_state["last_brief_docx"] = docx_bytes
+                    except Exception as _rerr:
+                        st.warning(
+                            f"Re-render failed ({_rerr}) — falling back to "
+                            f"session-state bytes."
+                        )
+                        docx_bytes = st.session_state.get("last_brief_docx", b"")
+                else:
+                    docx_bytes = st.session_state.get("last_brief_docx", b"")
+                if not docx_bytes:
+                    st.error("No DOCX bytes in session — regenerate the brief.")
+                    st.stop()
+                # appProperties for the tile badge
+                _pcl_for_props = _brief_data.get("post_call_log") or []
+                _cc_for_props = (len(_pcl_for_props) if isinstance(_pcl_for_props, list) else 0)
+                _mp = {
+                    "brief_mode": (f"Post call-{_cc_for_props}" if _cc_for_props > 0
+                                   else "Pre-call draft"),
+                    "brief_call_count": _cc_for_props,
+                    "brief_company_key": _normalize_company_key(
+                        st.session_state.get("last_brief_company", "")
+                    ),
+                }
+                if st.session_state.get("last_brief_doc_id"):
+                    res = update_google_doc_docx(
+                        st.session_state["last_brief_doc_id"],
+                        docx_bytes,
+                        new_title=title,
+                    )
+                    if res["ok"]:
+                        url = f"https://docs.google.com/document/d/{st.session_state['last_brief_doc_id']}/edit"
+                        st.session_state["last_brief_doc_url"] = url
+                        _sap(st.session_state["last_brief_doc_id"], _mp)
+                        st.success(f"✅ Updated existing Doc. [Open it →]({url})")
+                    else:
+                        st.error(f"Update failed: {res['error']}")
+                else:
+                    res = create_google_doc_from_docx(
+                        docx_bytes=docx_bytes,
+                        title=title,
+                        parent_folder_id=(drive_folder or None),
+                        share_with=share_with or None,
+                    )
+                    if res["ok"]:
+                        st.session_state["last_brief_doc_url"] = res["doc_url"]
+                        if res.get("doc_id"):
+                            _sap(res["doc_id"], _mp)
+                        st.success(f"✅ Created in Drive. [Open it →]({res['doc_url']})")
+                    else:
+                        err = res.get("error") or "unknown"
+                        st.error(
+                            f"Drive create failed: {err}\n\n"
+                            f"If this is a permissions error, share the parent folder "
+                            f"(`{drive_folder}`) with the service account email "
+                            f"(`command-center@prefab-bruin-491807-n0.iam.gserviceaccount.com`) "
+                            f"as **Editor**, then try again."
+                        )
+
+        if _autosave_ok:
+            # Auto-save worked → demote manual save into an expander.
+            with st.expander("🛠 More save actions", expanded=False):
+                st.caption(
+                    "**Re-render Doc with latest code** — pushes a fresh render of "
+                    "this same brief into the existing Doc, without paying for "
+                    "another Claude call. Useful when renderer fixes have shipped "
+                    "since your last Build."
+                )
+                if _manual_save_button():
+                    _run_manual_save()
+        else:
+            # Auto-save failed (or never ran) → manual save is the primary CTA.
+            if _manual_save_button():
+                _run_manual_save()
 
         if st.session_state.get("last_brief_doc_url"):
             st.caption(f"📄 Latest Doc: {st.session_state['last_brief_doc_url']}")
