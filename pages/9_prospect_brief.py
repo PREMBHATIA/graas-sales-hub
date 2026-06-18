@@ -1496,7 +1496,7 @@ with right:
             st.caption(f"📄 Latest Doc: {st.session_state['last_brief_doc_url']}")
 
             # ── Share panel — fires a Drive notification email to recipients ──
-            with st.expander("📧 Share with the team", expanded=True):
+            with st.expander("📧 Share with the team", expanded=False):
                 st.caption(
                     "Adds the recipient as a Doc editor AND sends Google's "
                     "share-notification email so they actually see it."
