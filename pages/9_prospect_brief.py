@@ -360,6 +360,17 @@ BRIEF_JSON_SCHEMA = """{
     "market": "India / Indonesia / Vietnam / Thailand / Philippines / Malaysia / Singapore — primary",
     "status": "Pre-call draft  (post-call: 'Pre-call draft → Post call-1 — YYYY-MM-DD …')"
   },
+  "_changed_rows": {
+    "DESCRIPTION": "Post-call only — populate during update mode; leave as {} (empty object) for pre-call drafts. Maps each table-section name to the array of row indices (0-based) that were changed/added by THIS call. Used by the renderer to apply YELLOW row-highlighting so the salesperson can scan the brief and see at-a-glance what's new without diffing against a prior Doc version.",
+    "what_they_have": [0, 3],
+    "asset_graas_map": [],
+    "persona_map": [],
+    "pain_capability_cfo": [2],
+    "graas_proof_points": [],
+    "people_path_in": [1],
+    "meeting_game_plan": [],
+    "objection_handling": []
+  },
   "post_call_log": [
     {
       "call_number": "integer — 1 for the first post-call update, 2 for the second, etc. Pre-call drafts leave this entire array empty.",
@@ -670,6 +681,19 @@ def _build_update_prompt(existing_brief_text: str, call_notes: str, company: str
         f"Decide and record the **next_step** explicitly with one line on why.\n\n"
         f"Update header.status: append `→ Post call-N — {today}` where N is the next "
         f"number after the latest. Keep prior status entries intact in the string.\n\n"
+        f"**CHANGE TRACKING (critical for highlighting).** Populate the "
+        f"`_changed_rows` object with the row indices YOU updated (or added) "
+        f"in each table-shaped field as a result of THIS call. Keys: "
+        f"what_they_have, asset_graas_map, persona_map, pain_capability_cfo, "
+        f"graas_proof_points, people_path_in, meeting_game_plan, "
+        f"objection_handling. Values: 0-based arrays of row indices that "
+        f"changed. Example: if you upgraded the Scale row (index 1) in "
+        f"what_they_have and added a new persona at the end of persona_map "
+        f"(now 4 rows total, the new one at index 3), return "
+        f"{{'what_they_have': [1], 'persona_map': [3], ...}} (empty arrays "
+        f"for tables you didn't touch). The renderer paints those rows yellow "
+        f"so the salesperson sees what's new at a glance. Don't be stingy — "
+        f"if a row's content shifted in any meaningful way, flag it.\n\n"
         f"**POST-CALL LOG (critical for this update flow).** PREPEND a new entry "
         f"to the `post_call_log` array as the FIRST item (most recent on top). "
         f"PRESERVE every prior entry verbatim — never delete or rewrite old "

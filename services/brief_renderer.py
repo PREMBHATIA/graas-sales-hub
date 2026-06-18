@@ -24,6 +24,7 @@ from docx.oxml import OxmlElement
 
 GRAAS_BLUE = RGBColor(0x27, 0x42, 0xFF)
 LIGHT_BLUE = "EEF1FF"  # table header fill
+YELLOW = "FFF4B8"  # post-call highlight — rows changed by the latest call
 GREY = RGBColor(0x66, 0x66, 0x66)
 CALLOUT_FILL = "FFF4E5"
 
@@ -159,6 +160,7 @@ def _add_table(
     header_size: float = 9.5,
     cell_size: float = 9.5,
     col_styles: dict = None,
+    highlighted_rows: set = None,
 ) -> None:
     """Build a table with explicit column widths and tighter cell padding.
 
@@ -166,7 +168,11 @@ def _add_table(
     col_widths_cm: list[float] — column widths in cm, must match len(headers).
     col_styles: optional dict of {col_index: {"size": float, "italic": bool, "color": RGBColor}}
                 to override per-column font size / italic / color in DATA cells only.
+    highlighted_rows: optional set of 0-based row indices to paint with YELLOW
+                fill (post-call change-highlight — surfaces which rows the
+                latest call updated/added).
     """
+    highlighted_rows = highlighted_rows or set()
     col_styles = col_styles or {}
     table = doc.add_table(rows=1 + len(rows), cols=len(headers))
     table.autofit = False
@@ -205,9 +211,15 @@ def _add_table(
 
     # Data rows
     for r_idx, row in enumerate(rows, start=1):
+        # 0-based data-row index for highlight check (r_idx is table-row index
+        # which counts the header at 0)
+        data_idx = r_idx - 1
+        is_highlighted = data_idx in highlighted_rows
         for c_idx, val in enumerate(row):
             cell = table.rows[r_idx].cells[c_idx]
             cell.text = ""
+            if is_highlighted:
+                _set_cell_shading(cell, YELLOW)
             _set_cell_margins(cell)
             p = cell.paragraphs[0]
             p.paragraph_format.space_before = Pt(0)
@@ -268,6 +280,12 @@ def render_brief_docx(data: dict) -> bytes:
     style.paragraph_format.space_after = Pt(2)
 
     company = data.get("company") or "[Company]"
+
+    # Post-call highlight map: {table_name: set(row_indices_changed)}. Empty
+    # in pre-call drafts (no highlighting). Each table's _add_table call
+    # passes its key's set through highlighted_rows.
+    _cr = data.get("_changed_rows") or {}
+    _ch = lambda key: set(_cr.get(key, []) or [])
     header = data.get("header", {}) or {}
 
     # ── Header / status ───────────────────────────────────────────────────────
@@ -327,6 +345,7 @@ def render_brief_docx(data: dict) -> bytes:
             headers=["Asset (already live)", "What it does today", "Graas layer"],
             rows=rows,
             col_widths_cm=[5.0, 7.5, 5.5],
+            highlighted_rows=_ch("asset_graas_map"),
         )
 
     # ── Why now (macro / regulatory / segment-momentum, bulleted) ───────────
@@ -403,6 +422,7 @@ def render_brief_docx(data: dict) -> bytes:
             col_widths_cm=[3.0, 10.0, 2.3, 2.7],
             # Source column = small, italic, grey — reads as a footnote
             col_styles={3: {"size": 6.5, "italic": True, "color": GREY}},
+            highlighted_rows=_ch("what_they_have"),
         )
 
     # ── Recent news ──────────────────────────────────────────────────────────
@@ -435,6 +455,7 @@ def render_brief_docx(data: dict) -> bytes:
             headers=["Customer", "Result", "Applies here because…"],
             rows=rows,
             col_widths_cm=[4.0, 7.0, 7.0],
+            highlighted_rows=_ch("graas_proof_points"),
         )
 
     persona_map = data.get("persona_map") or []
@@ -455,6 +476,7 @@ def render_brief_docx(data: dict) -> bytes:
             headers=["Persona", "Count", "Surface today", "Current flow & leaks"],
             rows=rows,
             col_widths_cm=[3.2, 1.9, 3.7, 9.2],
+            highlighted_rows=_ch("persona_map"),
         )
         # Caption: flag flow & leaks as critical and pending verification.
         _add_sub(doc, "(critical — to be further verified)")
@@ -471,6 +493,7 @@ def render_brief_docx(data: dict) -> bytes:
             headers=["Pain (their language)", "Product capability", "CFO metric it moves"],
             rows=rows,
             col_widths_cm=[6.5, 6.5, 5.0],
+            highlighted_rows=_ch("pain_capability_cfo"),
         )
 
     if data.get("metric_that_matters"):
@@ -533,6 +556,7 @@ def render_brief_docx(data: dict) -> bytes:
             headers=["Name", "Role", "Why they matter & how to play them", "Type"],
             rows=rows,
             col_widths_cm=[3.2, 3.2, 8.4, 3.2],
+            highlighted_rows=_ch("people_path_in"),
         )
     if data.get("entry_wedge"):
         _add_kv_para(doc, "Entry wedge", data["entry_wedge"])
@@ -564,6 +588,7 @@ def render_brief_docx(data: dict) -> bytes:
             headers=["Min", "Segment", "Talking point / owner"],
             rows=rows,
             col_widths_cm=[1.8, 4.7, 11.5],
+            highlighted_rows=_ch("meeting_game_plan"),
         )
 
     # ── Opening hook ─────────────────────────────────────────────────────────
@@ -581,6 +606,7 @@ def render_brief_docx(data: dict) -> bytes:
             headers=["Likely objection", "Response"],
             rows=rows,
             col_widths_cm=[7.0, 11.0],
+            highlighted_rows=_ch("objection_handling"),
         )
 
     # ── Appendix: Conflicts & unknowns (de-emphasised, ends the doc) ─────────
@@ -613,6 +639,12 @@ def render_brief_html(data: dict) -> str:
     company = _esc(data.get("company") or "[Company]")
     header = data.get("header", {}) or {}
 
+    # Post-call highlight map → which rows in each table to mark as 'changed'.
+    # Empty for pre-call drafts; only renders the .changed class when populated.
+    _cr_html = data.get("_changed_rows") or {}
+    def _trc(key: str, idx: int) -> str:
+        return " class='changed'" if idx in (_cr_html.get(key) or []) else ""
+
     parts: list = []
     parts.append("""<!doctype html><html><head><meta charset='utf-8'><style>
 body { font-family: Calibri, Arial, sans-serif; font-size: 10pt; color: #1a1a1a; line-height: 1.25; margin: 0; padding: 0 12px; }
@@ -629,6 +661,7 @@ table { border-collapse: collapse; width: 100%; margin: 3pt 0; }
 th, td { border: 1px solid #bbb; padding: 2pt 6pt; text-align: left; vertical-align: top; font-size: 9.5pt; line-height: 1.2; }
 th { background: #eef1ff; font-weight: bold; }
 .callout td { background: #fff4e5; }
+tr.changed td { background: #fff4b8; }
 .hook { font-style: italic; }
 td.src { font-size: 7pt; font-style: italic; color: #777; }
 </style></head><body>""")
@@ -674,9 +707,9 @@ td.src { font-size: 7pt; font-style: italic; color: #777; }
     if _asset_map:
         parts.append("<h2>Their digital assets &rarr; Graas layer that fits</h2><table>")
         parts.append("<tr><th>Asset (already live)</th><th>What it does today</th><th>Graas layer</th></tr>")
-        for a in _asset_map:
+        for _idx, a in enumerate(_asset_map):
             parts.append(
-                f"<tr><td>{_esc(a.get('asset'))}</td>"
+                f"<tr{_trc('asset_graas_map', _idx)}><td>{_esc(a.get('asset'))}</td>"
                 f"<td>{_esc(a.get('what_it_does'))}</td>"
                 f"<td>{_esc(a.get('graas_layer'))}</td></tr>"
             )
@@ -732,9 +765,9 @@ td.src { font-size: 7pt; font-style: italic; color: #777; }
     if what:
         parts.append("<h2>What they have</h2><table>")
         parts.append("<tr><th>Dimension</th><th>What we know</th><th>Confidence</th><th>Source</th></tr>")
-        for r in what:
+        for _idx, r in enumerate(what):
             parts.append(
-                f"<tr><td>{_esc(r.get('dimension'))}</td>"
+                f"<tr{_trc('what_they_have', _idx)}><td>{_esc(r.get('dimension'))}</td>"
                 f"<td>{_esc(r.get('what_we_know'))}</td>"
                 f"<td>{_esc(r.get('confidence'))}</td>"
                 f"<td class='src'>{_esc(r.get('source'))}</td></tr>"
@@ -762,9 +795,9 @@ td.src { font-size: 7pt; font-style: italic; color: #777; }
     if _pp:
         parts.append("<h3>Graas proof points relevant to this account</h3><table>")
         parts.append("<tr><th>Customer</th><th>Result</th><th>Applies here because…</th></tr>")
-        for p in _pp:
+        for _idx, p in enumerate(_pp):
             parts.append(
-                f"<tr><td>{_esc(p.get('customer'))}</td>"
+                f"<tr{_trc('graas_proof_points', _idx)}><td>{_esc(p.get('customer'))}</td>"
                 f"<td>{_esc(p.get('result'))}</td>"
                 f"<td>{_esc(p.get('applies_here'))}</td></tr>"
             )
@@ -773,10 +806,10 @@ td.src { font-size: 7pt; font-style: italic; color: #777; }
     if data.get("persona_map"):
         parts.append("<h3>Persona &amp; order flow</h3><table>")
         parts.append("<tr><th>Persona</th><th>Count</th><th>Surface today</th><th>Current flow &amp; leaks</th></tr>")
-        for r in data["persona_map"]:
+        for _idx, r in enumerate(data["persona_map"]):
             flow = r.get("flow_and_leaks", r.get("flow", ""))
             parts.append(
-                f"<tr><td>{_esc(r.get('persona'))}</td>"
+                f"<tr{_trc('persona_map', _idx)}><td>{_esc(r.get('persona'))}</td>"
                 f"<td>{_esc(r.get('count'))}</td>"
                 f"<td>{_esc(r.get('surface'))}</td>"
                 f"<td>{_esc(flow)}</td></tr>"
@@ -787,9 +820,9 @@ td.src { font-size: 7pt; font-style: italic; color: #777; }
     if data.get("pain_capability_cfo"):
         parts.append("<h3>Pain → Capability → CFO metric</h3><table>")
         parts.append("<tr><th>Pain (their language)</th><th>Product capability</th><th>CFO metric it moves</th></tr>")
-        for r in data["pain_capability_cfo"]:
+        for _idx, r in enumerate(data["pain_capability_cfo"]):
             parts.append(
-                f"<tr><td>{_esc(r.get('pain'))}</td>"
+                f"<tr{_trc('pain_capability_cfo', _idx)}><td>{_esc(r.get('pain'))}</td>"
                 f"<td>{_esc(r.get('capability'))}</td>"
                 f"<td>{_esc(r.get('metric'))}</td></tr>"
             )
@@ -835,7 +868,7 @@ td.src { font-size: 7pt; font-style: italic; color: #777; }
     if _people:
         parts.append("<h3>People &amp; path in</h3><table>")
         parts.append("<tr><th>Name</th><th>Role</th><th>Why they matter &amp; how to play them</th><th>Type</th></tr>")
-        for p in _people:
+        for _idx, p in enumerate(_people):
             why_raw = p.get("why_matter", "") or ""
             li = (p.get("linkedin") or "").strip()
             lead = (p.get("lead_with") or "").strip()
@@ -845,7 +878,7 @@ td.src { font-size: 7pt; font-style: italic; color: #777; }
             if lead:
                 cell = f"{cell}<br><strong>→ Lead with:</strong> {_esc(lead)}" if cell else f"<strong>→ Lead with:</strong> {_esc(lead)}"
             parts.append(
-                f"<tr><td>{_esc(p.get('name'))}</td>"
+                f"<tr{_trc('people_path_in', _idx)}><td>{_esc(p.get('name'))}</td>"
                 f"<td>{_esc(p.get('role'))}</td>"
                 f"<td>{cell}</td>"
                 f"<td>{_esc(p.get('type'))}</td></tr>"
@@ -872,9 +905,9 @@ td.src { font-size: 7pt; font-style: italic; color: #777; }
     if _gp:
         parts.append("<h3>Meeting game plan</h3><table>")
         parts.append("<tr><th>Min</th><th>Segment</th><th>Talking point / owner</th></tr>")
-        for g in _gp:
+        for _idx, g in enumerate(_gp):
             parts.append(
-                f"<tr><td>{_esc(g.get('minute'))}</td>"
+                f"<tr{_trc('meeting_game_plan', _idx)}><td>{_esc(g.get('minute'))}</td>"
                 f"<td>{_esc(g.get('segment'))}</td>"
                 f"<td>{_esc(g.get('talking_point'))}</td></tr>"
             )
@@ -888,9 +921,9 @@ td.src { font-size: 7pt; font-style: italic; color: #777; }
     if _objs:
         parts.append("<h3>Objection handling</h3><table>")
         parts.append("<tr><th>Likely objection</th><th>Response</th></tr>")
-        for o in _objs:
+        for _idx, o in enumerate(_objs):
             parts.append(
-                f"<tr><td>{_esc(o.get('objection'))}</td>"
+                f"<tr{_trc('objection_handling', _idx)}><td>{_esc(o.get('objection'))}</td>"
                 f"<td>{_esc(o.get('response'))}</td></tr>"
             )
         parts.append("</table>")
