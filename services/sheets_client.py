@@ -689,6 +689,94 @@ def _url_quote(s: str) -> str:
     return quote(s, safe="")
 
 
+def _normalize_company_key_for_pipeline(name: str) -> str:
+    """Inline copy of pages/9_prospect_brief.py::_normalize_company_key.
+
+    Kept here so the pipeline-sheet write helper can match Lead names
+    using the same normalization the auto-save uses for Drive dedup —
+    "Kalbe Enseval" should match "kalbe enseval indonesia", etc.
+    """
+    import re as _re
+    if not name:
+        return ""
+    s = name.lower().strip()
+    s = _re.sub(r"^pt\s+", "", s)
+    s = _re.sub(r"\s+tbk\s*$", "", s)
+    s = _re.sub(r"\s+(and|&|\+|x)\s+", " ", s)
+    s = _re.sub(
+        r"\s+(india|indonesia|vietnam|thailand|philippines|malaysia|singapore|sea)\s*$",
+        "",
+        s,
+    )
+    s = _re.sub(r"\s+", " ", s).strip()
+    return s
+
+
+def upsert_brief_link_into_pipeline(
+    company_name: str,
+    doc_url: str,
+    mode: str,
+    date_str: str,
+    sheet_id: Optional[str] = None,
+    tab_name: str = "Overall Pipeline for IN and SEA",
+    column_letter: str = "S",
+) -> dict:
+    """Write a HYPERLINK formula for the brief Doc into the pipeline sheet's
+    row matching `company_name` (normalized) against column A "Lead name".
+
+    Cell content rendered in Sheets is a clickable link like:
+        🔁 Post call-2 · 2026-06-18
+        🆕 Pre-call draft · 2026-06-18
+
+    Returns {"ok": bool, "rows_updated": int, "error": str|None}. Silent
+    on no-match; caller should not block on this — pipeline write-back
+    is best-effort, not load-bearing.
+    """
+    if not sheet_id:
+        sheet_id = os.getenv("ALLE_SHEET_ID", "")
+    if not sheet_id:
+        return {"ok": False, "rows_updated": 0, "error": "ALLE_SHEET_ID not set"}
+    if not company_name or not doc_url:
+        return {"ok": False, "rows_updated": 0,
+                "error": "company_name and doc_url required"}
+
+    try:
+        client = _get_writer_client()
+        if client is None:
+            return {"ok": False, "rows_updated": 0,
+                    "error": "writer client unavailable"}
+        ws = client.open_by_key(sheet_id).worksheet(tab_name)
+        # Column A — Lead name (incl. header)
+        lead_names = ws.col_values(1)
+        target_key = _normalize_company_key_for_pipeline(company_name)
+        if not target_key:
+            return {"ok": False, "rows_updated": 0,
+                    "error": "empty normalized company key"}
+
+        # Badge + label text shown inside the hyperlink
+        badge = "🔁" if mode and mode.lower().startswith("post") else "🆕"
+        cell_text = f'{badge} {mode} · {date_str}'
+        # Escape any double-quotes in the label (paranoia — unlikely)
+        cell_text_escaped = cell_text.replace('"', '""')
+        formula = f'=HYPERLINK("{doc_url}", "{cell_text_escaped}")'
+
+        # Find matching rows (rare: more than one — write to all of them).
+        # Skip the header row at index 0.
+        rows_updated = 0
+        for row_idx, name in enumerate(lead_names[1:], start=2):
+            if _normalize_company_key_for_pipeline(name) == target_key:
+                ws.update(
+                    f"{column_letter}{row_idx}",
+                    [[formula]],
+                    value_input_option="USER_ENTERED",
+                )
+                rows_updated += 1
+        return {"ok": True, "rows_updated": rows_updated, "error": None}
+    except Exception as e:
+        return {"ok": False, "rows_updated": 0,
+                "error": f"{type(e).__name__}: {e}"}
+
+
 def set_drive_app_properties(file_id: str, properties: dict) -> dict:
     """Set custom appProperties on a Drive file (free-form key-value metadata).
 

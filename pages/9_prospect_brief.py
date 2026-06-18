@@ -1146,6 +1146,33 @@ with right:
                 st.session_state["last_brief_doc_id"] = ""
             st.session_state["last_brief_doc_url"] = ""
 
+            def _write_brief_link_to_pipeline(co_name, doc_url, mode, date_s):
+                """Best-effort write of the brief link into the pipeline
+                sheet's SalesHub Brief column. Failures are surfaced as a
+                small caption — never blocks the user flow."""
+                try:
+                    from services.sheets_client import upsert_brief_link_into_pipeline
+                    _r = upsert_brief_link_into_pipeline(
+                        company_name=co_name, doc_url=doc_url,
+                        mode=mode, date_str=date_s,
+                    )
+                    if _r.get("ok") and _r.get("rows_updated"):
+                        st.session_state["last_pipeline_writeback"] = (
+                            "ok", _r["rows_updated"],
+                        )
+                    elif _r.get("ok"):
+                        st.session_state["last_pipeline_writeback"] = (
+                            "nomatch", co_name,
+                        )
+                    else:
+                        st.session_state["last_pipeline_writeback"] = (
+                            "fail", _r.get("error", "unknown"),
+                        )
+                except Exception as _e:
+                    st.session_state["last_pipeline_writeback"] = (
+                        "fail", f"{type(_e).__name__}: {_e}",
+                    )
+
             # ── Auto-save to Drive ──────────────────────────────────────────
             # The "last generated brief for each customer" should land on the
             # Recent briefs tile (and the Doc) without a separate click. We
@@ -1266,6 +1293,10 @@ with right:
                         )
                         from services.sheets_client import set_drive_app_properties
                         set_drive_app_properties(existing_doc_id, _props)
+                        _write_brief_link_to_pipeline(
+                            company_name, _url, _brief_mode,
+                            f"{datetime.now():%Y-%m-%d}",
+                        )
                 else:
                     _res = create_google_doc_from_docx(
                         docx_bytes=brief_docx,
@@ -1283,6 +1314,10 @@ with right:
                         if _new_id:
                             from services.sheets_client import set_drive_app_properties
                             set_drive_app_properties(_new_id, _props)
+                            _write_brief_link_to_pipeline(
+                                company_name, _res.get("doc_url", ""),
+                                _brief_mode, f"{datetime.now():%Y-%m-%d}",
+                            )
                     else:
                         st.session_state["last_brief_autosave_status"] = (
                             "failed", _res.get("error") or "unknown error"
@@ -1353,6 +1388,22 @@ with right:
                     f"Use the manual save below."
                 )
 
+        # Pipeline-sheet write-back status (a small caption — best-effort,
+        # not load-bearing; salesperson can ignore if it didn't match)
+        _pw = st.session_state.get("last_pipeline_writeback")
+        if _pw:
+            _pkind, _ppayload = _pw
+            if _pkind == "ok":
+                st.caption(f"🔗 Pipeline sheet updated · {_ppayload} row(s)")
+            elif _pkind == "nomatch":
+                st.caption(
+                    f"ℹ️ No pipeline-sheet row matched **{_ppayload}** "
+                    f"— add a row in 'Overall Pipeline for IN and SEA' to "
+                    f"link this brief from the sheet."
+                )
+            elif _pkind == "fail":
+                st.caption(f"⚠️ Pipeline sheet write-back failed: {_ppayload}")
+
         # Primary actions row: Download + Clear (always visible).
         # Manual save lives below — prominent on auto-save failure,
         # demoted into an expander on success.
@@ -1372,7 +1423,8 @@ with right:
                           "last_brief_company", "last_brief_mode",
                           "last_brief_doc_url", "last_brief_doc_id",
                           "last_brief_autosave_status",
-                          "last_brief_trashed_count"):
+                          "last_brief_trashed_count",
+                          "last_pipeline_writeback"):
                     st.session_state.pop(k, None)
                 st.rerun()
 
@@ -1441,6 +1493,13 @@ with right:
                         st.session_state.get("last_brief_company", "")
                     ),
                 }
+                # Pipeline-sheet write-back parameters (best-effort; matches
+                # the auto-save behaviour so manual saves stay in sync)
+                from services.sheets_client import upsert_brief_link_into_pipeline as _ublp
+                _pl_co = st.session_state.get("last_brief_company", "")
+                _pl_mode = _mp.get("brief_mode", "Pre-call draft")
+                _pl_date = f"{datetime.now():%Y-%m-%d}"
+
                 if st.session_state.get("last_brief_doc_id"):
                     res = update_google_doc_docx(
                         st.session_state["last_brief_doc_id"],
@@ -1451,6 +1510,10 @@ with right:
                         url = f"https://docs.google.com/document/d/{st.session_state['last_brief_doc_id']}/edit"
                         st.session_state["last_brief_doc_url"] = url
                         _sap(st.session_state["last_brief_doc_id"], _mp)
+                        try:
+                            _ublp(_pl_co, url, _pl_mode, _pl_date)
+                        except Exception:
+                            pass
                         st.success(f"✅ Updated existing Doc. [Open it →]({url})")
                     else:
                         st.error(f"Update failed: {res['error']}")
@@ -1465,6 +1528,10 @@ with right:
                         st.session_state["last_brief_doc_url"] = res["doc_url"]
                         if res.get("doc_id"):
                             _sap(res["doc_id"], _mp)
+                        try:
+                            _ublp(_pl_co, res["doc_url"], _pl_mode, _pl_date)
+                        except Exception:
+                            pass
                         st.success(f"✅ Created in Drive. [Open it →]({res['doc_url']})")
                     else:
                         err = res.get("error") or "unknown"
