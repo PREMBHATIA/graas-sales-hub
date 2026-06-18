@@ -1076,17 +1076,19 @@ with right:
                             # Probe failed → fall through to safe CREATE path
                             pass
                 else:
-                    # Pre-call: search the folder for a prior brief for this
+                    # Pre-call: search the folder for prior briefs for this
                     # company. Uses _normalize_company_key so "Kalbe Enseval
                     # Indonesia" and "kalbe and enseval indonesia" both resolve
                     # to the same prior doc (and overwrite instead of dupe).
+                    # Keeps the latest match, then trashes any OLDER matches
+                    # so only ONE brief per customer survives in Drive.
                     _existing = list_drive_folder_docs(target_folder)
                     _co_key = _normalize_company_key(company_name)
-                    for _d in _existing:  # already modifiedTime-desc
+                    _matches: list = []  # all matches, modifiedTime-desc
+                    for _d in _existing:
                         _nm = _d.get("name", "")
                         if not _nm.lower().startswith("prospect brief"):
                             continue
-                        # Title pattern: "Prospect Brief — {company} — YYYY-MM-DD"
                         _m = re.match(
                             r"Prospect Brief\s*[—\-]\s*(.+?)\s*[—\-]\s*\d{4}-\d{2}-\d{2}",
                             _nm,
@@ -1094,8 +1096,19 @@ with right:
                         if not _m:
                             continue
                         if _normalize_company_key(_m.group(1)) == _co_key:
-                            existing_doc_id = _d["id"]
-                            break
+                            _matches.append(_d["id"])
+                    if _matches:
+                        existing_doc_id = _matches[0]
+                        # Trash older duplicates so the tile + Drive folder
+                        # carry only the latest brief for this company.
+                        from services.sheets_client import trash_drive_file
+                        _trashed = 0
+                        for _stale_id in _matches[1:]:
+                            _tr = trash_drive_file(_stale_id)
+                            if _tr.get("ok"):
+                                _trashed += 1
+                        if _trashed:
+                            st.session_state["last_brief_trashed_count"] = _trashed
 
                 if existing_doc_id:
                     _res = update_google_doc_docx(existing_doc_id, brief_docx)
@@ -1175,10 +1188,15 @@ with right:
         _autosave = st.session_state.get("last_brief_autosave_status")
         if _autosave:
             _kind, _payload = _autosave
+            _trashed_n = st.session_state.get("last_brief_trashed_count", 0)
+            _trashed_suffix = (
+                f" · trashed {_trashed_n} older duplicate" + ("s" if _trashed_n != 1 else "")
+                if _trashed_n else ""
+            )
             if _kind == "updated":
-                st.success(f"✅ Auto-updated existing Doc in Drive. [Open it →]({_payload})")
+                st.success(f"✅ Auto-updated existing Doc in Drive. [Open it →]({_payload}){_trashed_suffix}")
             elif _kind == "created":
-                st.success(f"✅ Auto-saved new Doc to Drive. [Open it →]({_payload})")
+                st.success(f"✅ Auto-saved new Doc to Drive. [Open it →]({_payload}){_trashed_suffix}")
             elif _kind == "failed":
                 st.warning(
                     f"⚠️ Auto-save to Drive failed: {_payload}. "
@@ -1259,7 +1277,8 @@ with right:
                 for k in ("last_brief_data", "last_brief_html", "last_brief_docx",
                           "last_brief_company", "last_brief_mode",
                           "last_brief_doc_url", "last_brief_doc_id",
-                          "last_brief_autosave_status"):
+                          "last_brief_autosave_status",
+                          "last_brief_trashed_count"):
                     st.session_state.pop(k, None)
                 st.rerun()
 

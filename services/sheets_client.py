@@ -684,6 +684,33 @@ def _url_quote(s: str) -> str:
     return quote(s, safe="")
 
 
+def trash_drive_file(file_id: str) -> dict:
+    """Soft-delete a Drive file (sends to trash; recoverable for 30 days).
+
+    Returns {"ok": bool, "error": str | None}. Used by the auto-save flow
+    to keep only ONE brief per customer in the Recent briefs tile + Drive
+    folder — after picking the most-recent match for a company, older
+    duplicates get trashed.
+    """
+    creds = _get_drive_credentials()
+    if creds is None:
+        return {"ok": False, "error": "Drive credentials unavailable"}
+    try:
+        session = greq.AuthorizedSession(creds)
+        url = (f"https://www.googleapis.com/drive/v3/files/{file_id}"
+               f"?supportsAllDrives=true")
+        resp = session.patch(
+            url,
+            json={"trashed": True},
+            timeout=30,
+        )
+        if resp.status_code not in (200, 204):
+            return {"ok": False, "error": f"Drive trash failed: HTTP {resp.status_code} — {resp.text[:200]}"}
+        return {"ok": True, "error": None}
+    except Exception as e:
+        return {"ok": False, "error": f"{type(e).__name__}: {e}"}
+
+
 def update_google_doc_docx(doc_id: str, docx_bytes: bytes) -> dict:
     """Replace the contents of an existing Google Doc by uploading new DOCX.
 
