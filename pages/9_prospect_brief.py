@@ -463,6 +463,36 @@ BRIEF_JSON_SCHEMA = """{
 REFERENCE_PROPOSALS_FOLDER_ID = "1tBMrcpiIDVhg5e0-N1ytjuzbDexQyheX"
 
 
+def _normalize_company_key(name: str) -> str:
+    """Reduce a company name to a dedup key that survives common typing
+    variations — case, joiner words (and/&/+/x), country suffix, and the
+    Indonesian PT…Tbk legal-name wrapper.
+
+    Examples:
+      "Kalbe Enseval Indonesia"       → "kalbe enseval"
+      "kalbe and enseval indonesia"   → "kalbe enseval"
+      "PT Enseval Putera Tbk"         → "enseval putera"
+      "Procter & Gamble India"        → "procter gamble"
+    """
+    if not name:
+        return ""
+    s = name.lower().strip()
+    # Drop Indonesian legal prefix/suffix
+    s = re.sub(r"^pt\s+", "", s)
+    s = re.sub(r"\s+tbk\s*$", "", s)
+    # Drop joiner words between brand tokens
+    s = re.sub(r"\s+(and|&|\+|x)\s+", " ", s)
+    # Drop trailing country/market suffix (the title's date carries timing)
+    s = re.sub(
+        r"\s+(india|indonesia|vietnam|thailand|philippines|malaysia|singapore|sea)\s*$",
+        "",
+        s,
+    )
+    # Collapse whitespace
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
+
+
 @st.cache_data(ttl=3600, show_spinner=False)
 def _fetch_proof_points_block() -> str:
     """Scan the Reference Proposals folder and build the prompt block listing
@@ -1047,12 +1077,23 @@ with right:
                             pass
                 else:
                     # Pre-call: search the folder for a prior brief for this
-                    # company. Title pattern: "Prospect Brief — {company} — YYYY-MM-DD"
+                    # company. Uses _normalize_company_key so "Kalbe Enseval
+                    # Indonesia" and "kalbe and enseval indonesia" both resolve
+                    # to the same prior doc (and overwrite instead of dupe).
                     _existing = list_drive_folder_docs(target_folder)
-                    _co_lower = company_name.lower().strip()
+                    _co_key = _normalize_company_key(company_name)
                     for _d in _existing:  # already modifiedTime-desc
-                        _nm = _d.get("name", "").lower()
-                        if _nm.startswith("prospect brief") and _co_lower in _nm:
+                        _nm = _d.get("name", "")
+                        if not _nm.lower().startswith("prospect brief"):
+                            continue
+                        # Title pattern: "Prospect Brief — {company} — YYYY-MM-DD"
+                        _m = re.match(
+                            r"Prospect Brief\s*[—\-]\s*(.+?)\s*[—\-]\s*\d{4}-\d{2}-\d{2}",
+                            _nm,
+                        )
+                        if not _m:
+                            continue
+                        if _normalize_company_key(_m.group(1)) == _co_key:
                             existing_doc_id = _d["id"]
                             break
 
@@ -1317,7 +1358,7 @@ else:
             _company = (_name.replace("Prospect Brief —", "")
                             .replace("Prospect Brief -", "").strip() or _name)
             _date_str = ""
-        _key = _company.lower().strip()
+        _key = _normalize_company_key(_company)
         if _key in _seen_companies:
             continue
         _seen_companies.add(_key)
