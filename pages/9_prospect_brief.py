@@ -595,6 +595,49 @@ def _normalize_company_key(name: str) -> str:
     return s
 
 
+def _resolve_existing_brief_for_company(
+    company_name: str, target_folder: str,
+) -> tuple:
+    """Search target_folder for prior briefs matching this company key,
+    then trash all but the latest. Returns (latest_doc_id_or_empty,
+    trashed_count). Used by BOTH auto-save AND manual save so the two
+    paths cannot create duplicate Docs for the same company.
+
+    Without this shared helper, manual save's CREATE branch was naïve —
+    if user clicked it after auto-save had already created a Doc, the
+    folder ended up with two Docs for the same company (one orphan).
+    """
+    from services.sheets_client import list_drive_folder_docs, trash_drive_file
+    if not company_name:
+        return ("", 0)
+    co_key = _normalize_company_key(company_name)
+    if not co_key:
+        return ("", 0)
+    existing = list_drive_folder_docs(target_folder) or []
+    matches = []  # modifiedTime-desc
+    for d in existing:
+        nm = d.get("name", "")
+        if not nm.lower().startswith("prospect brief"):
+            continue
+        m = re.match(
+            r"Prospect Brief\s*[—\-]\s*(.+?)\s*[—\-]\s*\d{4}-\d{2}-\d{2}",
+            nm,
+        )
+        if not m:
+            continue
+        if _normalize_company_key(m.group(1)) == co_key:
+            matches.append(d["id"])
+    if not matches:
+        return ("", 0)
+    latest_id = matches[0]
+    trashed = 0
+    for stale_id in matches[1:]:
+        tr = trash_drive_file(stale_id)
+        if tr.get("ok"):
+            trashed += 1
+    return (latest_id, trashed)
+
+
 @st.cache_data(ttl=3600, show_spinner=False)
 def _fetch_proof_points_block() -> str:
     """Scan the Reference Proposals folder and build the prompt block listing
@@ -1188,24 +1231,14 @@ with right:
                 target_folder = drive_folder or DEFAULT_DRIVE_FOLDER
                 existing_doc_id = ""
 
-                # Always scan the target folder for prior briefs matching
-                # this company key (normalized). Used both to pick the
-                # update target AND to trash duplicates after.
-                _existing = list_drive_folder_docs(target_folder)
-                _co_key = _normalize_company_key(company_name)
-                _matches: list = []  # SalesHub matches, modifiedTime-desc
-                for _d in _existing:
-                    _nm = _d.get("name", "")
-                    if not _nm.lower().startswith("prospect brief"):
-                        continue
-                    _m = re.match(
-                        r"Prospect Brief\s*[—\-]\s*(.+?)\s*[—\-]\s*\d{4}-\d{2}-\d{2}",
-                        _nm,
-                    )
-                    if not _m:
-                        continue
-                    if _normalize_company_key(_m.group(1)) == _co_key:
-                        _matches.append(_d["id"])
+                # Shared dedup-and-trash helper. Always pick the latest
+                # SalesHub match for this company; trash older duplicates
+                # so only one brief per customer survives.
+                _latest_id, _trashed_n = _resolve_existing_brief_for_company(
+                    company_name, target_folder,
+                )
+                if _trashed_n:
+                    st.session_state["last_brief_trashed_count"] = _trashed_n
 
                 if mode.startswith("🔁"):
                     # Post-call: prefer the user-pasted source — but only if
@@ -1237,25 +1270,9 @@ with right:
                             pass
 
                 # If we still don't have a target (pre-call OR post-call
-                # where source was external), take the most-recent SalesHub
-                # match for this company.
-                if not existing_doc_id and _matches:
-                    existing_doc_id = _matches[0]
-
-                # Trash any SalesHub matches other than the one we're about
-                # to write — keeps "one brief per customer" in both tiles
-                # and Drive, in both pre-call AND post-call.
-                if _matches:
-                    from services.sheets_client import trash_drive_file
-                    _trashed = 0
-                    for _stale_id in _matches:
-                        if _stale_id == existing_doc_id:
-                            continue
-                        _tr = trash_drive_file(_stale_id)
-                        if _tr.get("ok"):
-                            _trashed += 1
-                    if _trashed:
-                        st.session_state["last_brief_trashed_count"] = _trashed
+                # where source was external), take the latest SalesHub match.
+                if not existing_doc_id and _latest_id:
+                    existing_doc_id = _latest_id
 
                 # Compute the brief mode + call count for stamping into Drive
                 # appProperties — tile renderer reads these to colour pre-call
@@ -1499,6 +1516,19 @@ with right:
                 _pl_co = st.session_state.get("last_brief_company", "")
                 _pl_mode = _mp.get("brief_mode", "Pre-call draft")
                 _pl_date = f"{datetime.now():%Y-%m-%d}"
+
+                # Run the SAME dedup-and-trash as auto-save before deciding
+                # update vs create. Without this, clicking "Save to Drive
+                # again" right after auto-save created a duplicate Doc for
+                # the same company.
+                _ms_target_folder = drive_folder or DEFAULT_DRIVE_FOLDER
+                _ms_latest_id, _ms_trashed_n = _resolve_existing_brief_for_company(
+                    _pl_co, _ms_target_folder,
+                )
+                # If we already know the doc_id from session state, prefer
+                # it; otherwise fall back to the dedup-found latest.
+                if not st.session_state.get("last_brief_doc_id") and _ms_latest_id:
+                    st.session_state["last_brief_doc_id"] = _ms_latest_id
 
                 if st.session_state.get("last_brief_doc_id"):
                     res = update_google_doc_docx(
