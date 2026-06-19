@@ -437,21 +437,30 @@ def render_brief_docx(data: dict) -> bytes:
         _add_bullets(doc, why_now[:2])  # cap at 2 in render too
 
     # ── Meeting game plan (3 bullets — open / pitch / close) ────────────────
+    # Defensively accept both shapes Claude might return:
+    #   • list[str] — preferred ("3-bullet meeting plan, not a 6-row table")
+    #   • list[dict{minute,segment,talking_point}] — legacy shape from earlier prompt
     game_plan = data.get("meeting_game_plan") or []
     if game_plan:
         _add_h3(doc, "Meeting game plan")
-        # Bullets format: "{segment}: {talking_point}" — cap at 3
         bullets = []
         for g in game_plan[:3]:
-            seg = g.get("segment", "").strip()
-            tp = g.get("talking_point", "").strip()
-            if seg and tp:
-                bullets.append(f"{seg}: {tp}")
-            elif tp:
-                bullets.append(tp)
-            elif seg:
-                bullets.append(seg)
-        _add_bullets(doc, bullets)
+            if isinstance(g, str):
+                if g.strip():
+                    bullets.append(g.strip())
+            elif isinstance(g, dict):
+                seg = (g.get("segment") or "").strip()
+                tp = (g.get("talking_point") or "").strip()
+                if seg and tp:
+                    bullets.append(f"{seg}: {tp}")
+                elif tp:
+                    bullets.append(tp)
+                elif seg:
+                    bullets.append(seg)
+            else:
+                bullets.append(str(g))
+        if bullets:
+            _add_bullets(doc, bullets)
 
     # ── Pain → Capability → CFO metric (3 rows max) ─────────────────────────
     pain_map = data.get("pain_capability_cfo") or []
