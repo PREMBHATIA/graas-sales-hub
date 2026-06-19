@@ -389,46 +389,20 @@ def render_brief_docx(data: dict) -> bytes:
         _div_label.paragraph_format.space_after = Pt(8)
         _div_label.paragraph_format.alignment = 1  # CENTER
 
+    # ══════════════════════════════════════════════════════════════════════
+    # MAIN BRIEF — what the salesperson reads to run the meeting
+    # ══════════════════════════════════════════════════════════════════════
+
     # ── Strategic hook (sets the meeting frame, one line) ───────────────────
     if data.get("strategic_hook"):
         _add_para(doc, f"“{data['strategic_hook']}”", italic=True, size=10.5)
 
-    # ── Asset → Graas-layer map (the structured unpack of the hook) ─────────
-    asset_map = data.get("asset_graas_map") or []
-    if asset_map:
-        _add_h2(doc, "Their digital assets → Graas layer that fits")
-        rows = [
-            [a.get("asset", ""), a.get("what_it_does", ""), a.get("graas_layer", "")]
-            for a in asset_map
-        ]
-        _add_table(
-            doc,
-            headers=["Asset (already live)", "What it does today", "Graas layer"],
-            rows=rows,
-            col_widths_cm=[5.0, 7.5, 5.5],
-            highlighted_rows=_ch("asset_graas_map"),
-        )
-
-    # ── Why now (macro / regulatory / segment-momentum, bulleted) ───────────
-    why_now = data.get("why_now") or []
-    if why_now:
-        _add_h3(doc, "Why now")
-        _add_bullets(doc, why_now)
-
     # ── Executive Summary ────────────────────────────────────────────────────
-    # Two stacked 3-col tables that look like the stat band — Category/Type/Motion
-    # on row 1, Comps/History/Maturity on row 2. Type and Motion live INSIDE the
-    # exec summary now (used to be standalone lines below the stat band).
-    # Back-compat:
-    #   - exec_summary as dict → new boxed layout
-    #   - exec_summary as string → old paragraph rendering
-    #   - type/motion may live at top level (legacy) or inside exec_summary
     es = data.get("executive_summary")
     top_type = data.get("type") or ""
     top_motion = data.get("motion") or ""
     if isinstance(es, dict) and any(es.values()):
         _add_h2(doc, "Executive Summary")
-        # Row 1 — Category | Type | Motion
         es_type = es.get("type") or top_type
         es_motion = es.get("motion") or top_motion
         _add_table(
@@ -437,7 +411,6 @@ def render_brief_docx(data: dict) -> bytes:
             rows=[[es.get("category", ""), es_type, es_motion]],
             col_widths_cm=[6.0, 6.0, 6.0],
         )
-        # Row 2 — Comps | History | Maturity
         _add_table(
             doc,
             headers=["Comps", "History", "Maturity"],
@@ -453,15 +426,51 @@ def render_brief_docx(data: dict) -> bytes:
     if stat_band:
         headers = [s.get("label", "") for s in stat_band]
         values = [s.get("value", "") for s in stat_band]
-        # Distribute 19.5cm of usable width across cells
         n = max(1, len(headers))
         col_w = round(18.0 / n, 2)
         _add_table(doc, headers, [values], [col_w] * n, header_size=9.5, cell_size=9.5)
 
-    # Type / Motion now live INSIDE Executive Summary as boxes — no standalone
-    # paragraphs here. Legacy briefs without a structured Exec Summary still get
-    # the back-compat string paragraph above, so type/motion are surfaced there
-    # via the schema's top-level keys when needed.
+    # ── Why now (2 bullets, capped) ─────────────────────────────────────────
+    why_now = data.get("why_now") or []
+    if why_now:
+        _add_h3(doc, "Why now")
+        _add_bullets(doc, why_now[:2])  # cap at 2 in render too
+
+    # ── Meeting game plan (3 bullets — open / pitch / close) ────────────────
+    game_plan = data.get("meeting_game_plan") or []
+    if game_plan:
+        _add_h3(doc, "Meeting game plan")
+        # Bullets format: "{segment}: {talking_point}" — cap at 3
+        bullets = []
+        for g in game_plan[:3]:
+            seg = g.get("segment", "").strip()
+            tp = g.get("talking_point", "").strip()
+            if seg and tp:
+                bullets.append(f"{seg}: {tp}")
+            elif tp:
+                bullets.append(tp)
+            elif seg:
+                bullets.append(seg)
+        _add_bullets(doc, bullets)
+
+    # ── Pain → Capability → CFO metric (3 rows max) ─────────────────────────
+    pain_map = data.get("pain_capability_cfo") or []
+    if pain_map:
+        _add_h3(doc, "Pain → Capability → CFO metric")
+        rows = [
+            [r.get("pain", ""), r.get("capability", ""), r.get("metric", "")]
+            for r in pain_map[:3]  # cap at 3
+        ]
+        _add_table(
+            doc,
+            headers=["Pain (their language)", "Product capability", "CFO metric it moves"],
+            rows=rows,
+            col_widths_cm=[6.5, 6.5, 5.0],
+            highlighted_rows=_ch("pain_capability_cfo"),
+        )
+
+    if data.get("metric_that_matters"):
+        _add_kv_para(doc, "The metric that matters", data["metric_that_matters"])
 
     # ── What they have ───────────────────────────────────────────────────────
     what = data.get("what_they_have") or []
@@ -481,115 +490,12 @@ def render_brief_docx(data: dict) -> bytes:
             headers=["Dimension", "What we know", "Confidence", "Source"],
             rows=rows,
             col_widths_cm=[3.0, 10.0, 2.3, 2.7],
-            # Source column = small, italic, grey — reads as a footnote
             col_styles={3: {"size": 6.5, "italic": True, "color": GREY}},
             highlighted_rows=_ch("what_they_have"),
         )
 
-    # ── Recent news ──────────────────────────────────────────────────────────
-    recent = data.get("recent_news") or []
-    if recent:
-        _add_h2(doc, "Recent news (last 12 months)")
-        _add_bullets(doc, recent)
-
-    # ── What they're missing ─────────────────────────────────────────────────
-    missing = data.get("what_missing") or []
-    if missing:
-        _add_h2(doc, "What they're likely missing")
-        _add_bullets(doc, missing)
-
-    # ── Product fit & CFO lens ───────────────────────────────────────────────
-    _add_h2(doc, "Product fit & CFO lens")
-    if data.get("product_route"):
-        _add_h3(doc, "Product route")
-        _add_para(doc, data["product_route"])
-
-    proof_points = data.get("graas_proof_points") or []
-    if proof_points:
-        _add_h3(doc, "Graas proof points relevant to this account")
-        rows = [
-            [p.get("customer", ""), p.get("result", ""), p.get("applies_here", "")]
-            for p in proof_points
-        ]
-        _add_table(
-            doc,
-            headers=["Customer", "Result", "Applies here because…"],
-            rows=rows,
-            col_widths_cm=[4.0, 7.0, 7.0],
-            highlighted_rows=_ch("graas_proof_points"),
-        )
-
-    persona_map = data.get("persona_map") or []
-    if persona_map:
-        _add_h3(doc, "Persona & order flow")
-        # Each persona row = one sales motion: who they sell to, surface, current flow.
-        rows = [
-            [
-                r.get("persona", ""),
-                r.get("count", ""),
-                r.get("surface", ""),
-                r.get("flow_and_leaks", r.get("flow", "")),
-            ]
-            for r in persona_map
-        ]
-        _add_table(
-            doc,
-            headers=["Persona", "Count", "Surface today", "Current flow & leaks"],
-            rows=rows,
-            col_widths_cm=[3.2, 1.9, 3.7, 9.2],
-            highlighted_rows=_ch("persona_map"),
-        )
-        # Caption: flag flow & leaks as critical and pending verification.
-        _add_sub(doc, "(critical — to be further verified)")
-
-    pain_map = data.get("pain_capability_cfo") or []
-    if pain_map:
-        _add_h3(doc, "Pain → Capability → CFO metric")
-        rows = [
-            [r.get("pain", ""), r.get("capability", ""), r.get("metric", "")]
-            for r in pain_map
-        ]
-        _add_table(
-            doc,
-            headers=["Pain (their language)", "Product capability", "CFO metric it moves"],
-            rows=rows,
-            col_widths_cm=[6.5, 6.5, 5.0],
-            highlighted_rows=_ch("pain_capability_cfo"),
-        )
-
-    if data.get("metric_that_matters"):
-        _add_h3(doc, "The metric that matters")
-        _add_para(doc, data["metric_that_matters"])
-
-    # ── Discovery & next move ────────────────────────────────────────────────
-    discovery = data.get("discovery") or {}
-    if discovery:
-        _add_h2(doc, "Discovery & next move")
-        _add_h3(doc, "Double-click in discovery")
-        if discovery.get("business_model"):
-            _add_h4(doc, "Business model")
-            _add_bullets(doc, discovery["business_model"])
-        if discovery.get("data_readiness"):
-            _add_h4(doc, "Data readiness")
-            _add_bullets(doc, discovery["data_readiness"])
-        if discovery.get("tech_integration"):
-            _add_h4(doc, "Tech stack & integration")
-            _add_bullets(doc, discovery["tech_integration"])
-        if discovery.get("commercial_authority"):
-            _add_h4(doc, "Commercial authority")
-            _add_bullets(doc, discovery["commercial_authority"])
-        motion_block = discovery.get("motion_specific") or {}
-        if motion_block.get("questions"):
-            _add_h4(doc, motion_block.get("label") or "Motion-specific")
-            _add_bullets(doc, motion_block["questions"])
-
-    # ── People & path in (merges old Meeting Attendees) ──────────────────────
-    # Each row: Name | Role | Why they matter (+ optional LinkedIn line) | Type
-    # Type = Decision-maker | Champion | Finance buyer | Meeting attendee
-    # If a row has a "linkedin" field, append it as a 2nd line inside the why-matter
-    # cell so attendee context stays visible without a separate section.
+    # ── People & path in (with per-attendee lead_with) ──────────────────────
     people = list(data.get("people_path_in") or [])
-    # Back-compat: fold any legacy meeting_attendees rows in as type='Meeting attendee'
     legacy_attendees = data.get("meeting_attendees") or []
     for a in legacy_attendees:
         people.append({
@@ -599,9 +505,8 @@ def render_brief_docx(data: dict) -> bytes:
             "type": "Meeting attendee",
             "linkedin": a.get("linkedin_summary", ""),
         })
-
     if people:
-        _add_h3(doc, "People & path in")
+        _add_h2(doc, "People & path in")
         rows = []
         for p in people:
             why = p.get("why_matter", "") or ""
@@ -619,49 +524,12 @@ def render_brief_docx(data: dict) -> bytes:
             col_widths_cm=[3.2, 3.2, 8.4, 3.2],
             highlighted_rows=_ch("people_path_in"),
         )
-    if data.get("entry_wedge"):
-        _add_kv_para(doc, "Entry wedge", data["entry_wedge"])
 
-    # ── Next step ────────────────────────────────────────────────────────────
-    next_step = data.get("next_step") or {}
-    if next_step:
-        _add_h3(doc, "Next step")
-        if next_step.get("action"):
-            _add_kv_para(doc, "Recommended next move", next_step["action"])
-        if next_step.get("why"):
-            _add_kv_para(doc, "Why", next_step["why"])
-        gate = "Yes" if next_step.get("gate_met") else "No"
-        gate_line = f"{gate}"
-        if next_step.get("still_open"):
-            gate_line += f" — still open: {next_step['still_open']}"
-        _add_kv_para(doc, "Ready to solution?", gate_line)
-
-    # ── Meeting game plan (minute-by-minute run-sheet) ──────────────────────
-    game_plan = data.get("meeting_game_plan") or []
-    if game_plan:
-        _add_h3(doc, "Meeting game plan")
-        rows = [
-            [g.get("minute", ""), g.get("segment", ""), g.get("talking_point", "")]
-            for g in game_plan
-        ]
-        _add_table(
-            doc,
-            headers=["Min", "Segment", "Talking point / owner"],
-            rows=rows,
-            col_widths_cm=[1.8, 4.7, 11.5],
-            highlighted_rows=_ch("meeting_game_plan"),
-        )
-
-    # ── Opening hook ─────────────────────────────────────────────────────────
-    if data.get("opening_hook"):
-        _add_h3(doc, "Opening hook")
-        _add_para(doc, f"“{data['opening_hook']}”", italic=True)
-
-    # ── Objection handling (anticipated objections + Graas response) ────────
+    # ── Objection handling (top 3) ──────────────────────────────────────────
     objections = data.get("objection_handling") or []
     if objections:
-        _add_h3(doc, "Objection handling")
-        rows = [[o.get("objection", ""), o.get("response", "")] for o in objections]
+        _add_h2(doc, "Objection handling")
+        rows = [[o.get("objection", ""), o.get("response", "")] for o in objections[:3]]
         _add_table(
             doc,
             headers=["Likely objection", "Response"],
@@ -670,10 +538,157 @@ def render_brief_docx(data: dict) -> bytes:
             highlighted_rows=_ch("objection_handling"),
         )
 
-    # ── Appendix: Conflicts & unknowns (de-emphasised, ends the doc) ─────────
+    # ── Entry wedge + Next step + Opening hook (compact close) ──────────────
+    if data.get("entry_wedge"):
+        _add_kv_para(doc, "Entry wedge", data["entry_wedge"])
+
+    next_step = data.get("next_step") or {}
+    if next_step:
+        _add_h3(doc, "Next step")
+        if next_step.get("action"):
+            _add_kv_para(doc, "Recommended next move", next_step["action"])
+        if next_step.get("why"):
+            _add_kv_para(doc, "Why", next_step["why"])
+        gate = "Yes" if next_step.get("gate_met") else "No"
+        gate_line = gate
+        if next_step.get("still_open"):
+            gate_line += f" — still open: {next_step['still_open']}"
+        _add_kv_para(doc, "Ready to solution?", gate_line)
+
+    if data.get("opening_hook"):
+        _add_h3(doc, "Opening hook")
+        _add_para(doc, f"“{data['opening_hook']}”", italic=True)
+
+    # ══════════════════════════════════════════════════════════════════════
+    # APPENDIX — prep reference + post-call notes scratchpad
+    # ══════════════════════════════════════════════════════════════════════
+
+    # Page break + big "APPENDIX" heading so reader knows we're below the fold
+    doc.add_page_break()
+    _add_h1(doc, "Appendix")
+    _add_sub(doc, "Prep reference · scannable when drilling on a specific question")
+
+    # ── Asset → Graas-layer map ─────────────────────────────────────────────
+    asset_map = data.get("asset_graas_map") or []
+    if asset_map:
+        _add_h2(doc, "Their digital assets → Graas layer that fits")
+        rows = [
+            [a.get("asset", ""), a.get("what_it_does", ""), a.get("graas_layer", "")]
+            for a in asset_map
+        ]
+        _add_table(
+            doc,
+            headers=["Asset (already live)", "What it does today", "Graas layer"],
+            rows=rows,
+            col_widths_cm=[5.0, 7.5, 5.5],
+            highlighted_rows=_ch("asset_graas_map"),
+        )
+
+    # ── Product route (small narrative) ─────────────────────────────────────
+    if data.get("product_route"):
+        _add_h3(doc, "Product route")
+        _add_para(doc, data["product_route"])
+
+    # ── Persona & order flow (full detail with leak points) ─────────────────
+    persona_map = data.get("persona_map") or []
+    if persona_map:
+        _add_h2(doc, "Persona & order flow")
+        rows = [
+            [
+                r.get("persona", ""),
+                r.get("count", ""),
+                r.get("surface", ""),
+                r.get("flow_and_leaks", r.get("flow", "")),
+            ]
+            for r in persona_map
+        ]
+        _add_table(
+            doc,
+            headers=["Persona", "Count", "Surface today", "Current flow & leaks"],
+            rows=rows,
+            col_widths_cm=[3.2, 1.9, 3.7, 9.2],
+            highlighted_rows=_ch("persona_map"),
+        )
+        _add_sub(doc, "(critical — to be further verified)")
+
+    # ── Graas proof points (case-study credibility) ─────────────────────────
+    proof_points = data.get("graas_proof_points") or []
+    if proof_points:
+        _add_h2(doc, "Graas proof points relevant to this account")
+        rows = [
+            [p.get("customer", ""), p.get("result", ""), p.get("applies_here", "")]
+            for p in proof_points
+        ]
+        _add_table(
+            doc,
+            headers=["Customer", "Result", "Applies here because…"],
+            rows=rows,
+            col_widths_cm=[4.0, 7.0, 7.0],
+            highlighted_rows=_ch("graas_proof_points"),
+        )
+
+    # ── Discovery agenda — 5 must-haves + 5 nice-to-haves ───────────────────
+    must = data.get("discovery_must_haves") or []
+    nice = data.get("discovery_nice_to_haves") or []
+    if must or nice:
+        _add_h2(doc, "Discovery agenda")
+        _add_sub(doc, "Operational questions to confirm at the meeting. Fill the Answer column live.")
+        def _disc_rows(qs):
+            return [["🔓 Open", q, ""] for q in qs[:5]]
+        if must:
+            _add_h3(doc, "🔴 Must-haves (5)")
+            _add_table(
+                doc,
+                headers=["Status", "Question", "Answer (fill in meeting)"],
+                rows=_disc_rows(must),
+                col_widths_cm=[2.0, 9.0, 7.0],
+            )
+        if nice:
+            _add_h3(doc, "🟡 Nice-to-haves (5)")
+            _add_table(
+                doc,
+                headers=["Status", "Question", "Answer (fill in meeting)"],
+                rows=_disc_rows(nice),
+                col_widths_cm=[2.0, 9.0, 7.0],
+            )
+
+    # Back-compat: legacy `discovery` dict (5-bucket structure) — render as
+    # flat bulleted list under each bucket. Only fires when new fields absent.
+    legacy_discovery = data.get("discovery") or {}
+    if legacy_discovery and not (must or nice):
+        _add_h2(doc, "Discovery agenda (legacy format)")
+        for key, label in [
+            ("business_model", "Business model"),
+            ("data_readiness", "Data readiness"),
+            ("tech_integration", "Tech stack & integration"),
+            ("commercial_authority", "Commercial authority"),
+        ]:
+            items = legacy_discovery.get(key) or []
+            if items:
+                _add_h4(doc, label)
+                _add_bullets(doc, items)
+        ms = (legacy_discovery.get("motion_specific") or {}).get("questions") or []
+        if ms:
+            _add_h4(doc, (legacy_discovery.get("motion_specific") or {}).get("label") or "Motion-specific")
+            _add_bullets(doc, ms)
+
+    # ── Meeting Notes (blank — salesperson fills during/after the call) ─────
+    _add_h2(doc, "Meeting Notes")
+    _add_sub(doc, "Write here during or after the meeting. The next post-call update will read these notes.")
+    # Render 8 empty bullet rows as a scratchpad. Salesperson types into them.
+    for _ in range(8):
+        _add_bullets(doc, [" "])
+
+    # ── Recent news ─────────────────────────────────────────────────────────
+    recent = data.get("recent_news") or []
+    if recent:
+        _add_h2(doc, "Recent news (last 12 months)")
+        _add_bullets(doc, recent)
+
+    # ── Conflicts & unknowns (callout) ──────────────────────────────────────
     conflicts = data.get("conflicts_unknowns") or {}
     if conflicts and any(conflicts.values()):
-        _add_h3(doc, "Appendix: Conflicts & unknowns")
+        _add_h3(doc, "Conflicts & unknowns")
         _add_callout_box(doc, [
             ("Conflicting figures", conflicts.get("conflicting", "")),
             ("Unverified, load-bearing", conflicts.get("unverified", "")),

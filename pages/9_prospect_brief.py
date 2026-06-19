@@ -515,16 +515,20 @@ BRIEF_JSON_SCHEMA = """{
   "persona_map": [
     {"persona": "Dealers", "count": "~500", "surface": "WhatsApp / phone today", "flow_and_leaks": "Phone order → SFA → ERP → invoice → delivery. *Leak: ~20% orders miss SFA same day; 3-day credit-check delay*"}
   ],
-  "pain_capability_cfo": [{"pain": "pain in their language", "capability": "All-e/KG capability", "metric": "DSO / revenue per rep / cost per order / ..."}],
+  "pain_capability_cfo": [
+    {"pain": "pain in their language", "capability": "All-e/KG capability", "metric": "DSO / revenue per rep / cost per order / ..."}
+  ],
+  "_pain_capability_cfo_CAP": "HARD CAP: 3 rows MAX. Pick the three highest-value pains. More rows dilute the pitch.",
   "metric_that_matters": "The metric this moves for [CFO or decision-maker name, role] is [single literal metric].",
-  "discovery": {
-    "_TOTAL_CAP": "HARD CAP: 12 questions TOTAL across all 5 buckets combined. Quality over quantity — each question must be one a seasoned AE would actually ask. Aim for 2-3 per bucket, not 5. Cut anything generic or restate-the-obvious.",
-    "business_model": ["Walk-me-through-one-order question + 1-2 motion-specific questions. MAX 3."],
-    "data_readiness": ["SKU/catalogue cleanliness; sell-out data agent-readiness; API-build effort (who builds, how long, direct or via warehouse). MAX 3."],
-    "tech_integration": ["Existing agents? Channels live? System of record + API? WABA? MAX 3."],
-    "commercial_authority": ["Who owns the budget? Who owns the success metric? Who signs? MAX 2."],
-    "motion_specific": {"label": "If B2B / General Trade  OR  If B2C / eCommerce", "questions": ["1-2 motion-specific questions only."]}
-  },
+  "discovery_must_haves": [
+    "5 questions — operational only (flows, metrics, integrations, budgets). These run FIRST at the meeting and must not be dropped. e.g. 'Walk me through one order end-to-end', 'Who owns the budget for a digital pilot?', 'Current conversion rate + AOV on the live channel?'",
+    "...", "...", "...", "..."
+  ],
+  "discovery_nice_to_haves": [
+    "5 questions — operational, asked only if time permits. Same rules as must-haves.",
+    "...", "...", "...", "..."
+  ],
+  "_discovery_RULES": "BOTH lists are EXACTLY 5 entries each (10 total). OPERATIONAL questions only — never ask about an attendee's role/background (that's already in people_path_in as 'Unknown' which IS the ask). Each question ≤20 words. Drop anything generic or already-confirmed elsewhere in the brief.",
   "people_path_in": [
     {"name": "...", "role": "...", "why_matter": "1-line relevance", "type": "Decision-maker | Champion | Finance buyer | Meeting attendee", "linkedin": "ONE optional line (background + prior companies). Omit field if no useful info.", "lead_with": "ONE phrase, 8-20 words — for THIS person specifically, which product/section to lead with and ONE reason grounded in their LinkedIn signal. e.g. 'Lead with hoppr + cite SOC2/PDPA up front — he's a Certified Ethical Hacker.' Only populate for meeting attendees; omit field for non-attendees."}
   ],
@@ -772,15 +776,21 @@ def _build_new_brief_prompt(
         f"one honest 'Nothing material in the last 12 months from public sources'), "
         f"what_missing, product_route, persona_map (each row contains the current order "
         f"flow + leak points for THAT persona — split into per-motion rows: Dealers, "
-        f"Retailers via SFA, B2B customers, etc.), pain_capability_cfo, "
-        f"metric_that_matters, discovery (all 4 buckets + motion_specific), "
+        f"Retailers via SFA, B2B customers, etc.; appendix-section, ≤4 rows), "
+        f"pain_capability_cfo (**MAX 3 rows** — pick the three highest-value pains; "
+        f"more rows dilute the pitch), "
+        f"metric_that_matters, discovery_must_haves (**EXACTLY 5 questions** — "
+        f"operational only, no role-clarification, each ≤20 words), "
+        f"discovery_nice_to_haves (**EXACTLY 5 questions** — same rules), "
         f"people_path_in (merge meeting attendees here; use type='Meeting attendee' + "
         f"the optional linkedin field for any attendees the user provided; for each "
         f"Meeting attendee, ALSO populate lead_with — the product/section to lead "
         f"with for that person and ONE reason grounded in their LinkedIn signal), "
-        f"objection_handling (3-5 likely objections the room will raise + crisp "
-        f"Graas responses — anticipate based on their tech stack, prior digital "
-        f"investments, and audience seniority), entry_wedge, "
+        f"objection_handling (**TOP 3 ONLY** — the most likely objections the room "
+        f"will raise; responses ≤2 sentences each), entry_wedge, "
+        f"meeting_game_plan (**EXACTLY 3 rows** — Open / Pitch / Close — talking "
+        f"points ≤1 sentence each; this is a 3-bullet meeting plan, not a 6-row "
+        f"minute-by-minute), "
         f"next_step, opening_hook, conflicts_unknowns (appendix at the end — keep it "
         f"terse). If a fact is genuinely not findable, set the value to *\"Info not "
         f"publicly available\"* and confidence to *\"Unknown\"* — **never drop the "
@@ -788,7 +798,17 @@ def _build_new_brief_prompt(
         f"**REMOVED FIELDS (do not include):** order_flow (now rolled into persona_map "
         f"as a column per persona), other_signals (dropped — promote material findings to "
         f"recent_news or what_missing), meeting_attendees (merged into people_path_in "
-        f"with type='Meeting attendee').\n\n"
+        f"with type='Meeting attendee'), discovery (the old 4-bucket discovery dict "
+        f"has been REPLACED by discovery_must_haves + discovery_nice_to_haves — do "
+        f"not output the old `discovery` field).\n\n"
+        f"**APPENDIX LAYOUT NOTE.** The renderer splits the brief into a MAIN section "
+        f"(strategic_hook, exec_summary, stat_band, why_now, meeting_game_plan, "
+        f"pain_capability_cfo, what_they_have, people_path_in, objection_handling, "
+        f"next_step, opening_hook) and an APPENDIX section (asset_graas_map, "
+        f"persona_map, graas_proof_points, discovery_must_haves, "
+        f"discovery_nice_to_haves, Meeting Notes (blank for the salesperson), "
+        f"recent_news, conflicts_unknowns). You don't control the placement — just "
+        f"return the fields; the renderer handles the order.\n\n"
         f"=== INPUTS — INTERNAL RESEARCH / CONTEXT ===\n{research or '(no internal notes pasted — research the company from public sources using web_search)'}\n"
         f"{crm_block}{meeting_block}\n\n"
         f"=== JSON SCHEMA (fill exactly this shape) ===\n{BRIEF_JSON_SCHEMA}\n\n"
@@ -1151,7 +1171,8 @@ with right:
                              "executive_summary", "stat_band", "what_they_have",
                              "product_route", "graas_proof_points",
                              "pain_capability_cfo", "meeting_game_plan",
-                             "objection_handling", "opening_hook"]
+                             "objection_handling", "opening_hook",
+                             "discovery_must_haves", "discovery_nice_to_haves"]
             # Post-call updates MUST surface what the call added. Without a
             # populated post_call_log, the brief renders as a "looks like a
             # pre-call draft" which is the exact silent-failure we hit earlier.
