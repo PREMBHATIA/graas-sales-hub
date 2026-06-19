@@ -512,9 +512,7 @@ BRIEF_JSON_SCHEMA = """{
   "recent_news": ["MAX 2 bullets, the most material events in the last 12 months. With inline citation."],
   "what_missing": ["Gap phrased as a question or honest gap statement.", "..."],
   "product_route": "All-e / Knowledge Graph / Layered — 2-3 lines on why this follows from motion + signals; name wedge vs expansion.",
-  "persona_map": [
-    {"persona": "Dealers", "count": "~500", "surface": "WhatsApp / phone today", "flow_and_leaks": "Phone order → SFA → ERP → invoice → delivery. *Leak: ~20% orders miss SFA same day; 3-day credit-check delay*"}
-  ],
+  "_persona_map_REMOVED": "The persona_map field is DEPRECATED — do not output it. Its content overlapped heavily with pain_capability_cfo (the operational pains) and asset_graas_map (the digital surfaces it covered). The leak-point detail per persona now lives inline in pain_capability_cfo where it belongs.",
   "pain_capability_cfo": [
     {"pain": "pain in their language", "capability": "All-e/KG capability", "metric": "DSO / revenue per rep / cost per order / ..."}
   ],
@@ -729,6 +727,31 @@ def _build_new_brief_prompt(
         f"conflicts_unknowns). Keep solutioning sections DENSE — phrases not "
         f"paragraphs — so the sales sections carry visual weight. A meeting-"
         f"ready brief reads like a play-script, not an analyst report.\n\n"
+        f"**STRICT FACT DEDUP — each load-bearing fact appears in EXACTLY ONE "
+        f"section.** Other sections REFERENCE it shorthand without restating "
+        f"the full fact. The brief's sections are different VIEWS of the same "
+        f"underlying data, not copies of it. Examples:\n"
+        f"  ✗ BAD: '60% online; in-house OMS; 3 data engineers' appears in "
+        f"Exec Summary Maturity AND What they have Scale AND Pain table AND "
+        f"Asset map AND People row.\n"
+        f"  ✓ GOOD: full fact in ONE section (e.g. What they have Scale row); "
+        f"other sections reference shorthand ('the in-house OMS team' or 'the "
+        f"60% online split'). Each fact lands once; the reader assembles the "
+        f"picture from one place per topic.\n"
+        f"Apply this rigorously across asset_graas_map, executive_summary, "
+        f"what_they_have, pain_capability_cfo, people_path_in.lead_with, "
+        f"meeting_game_plan, and post_call_log.now_confirmed. If you find "
+        f"yourself typing the same phrase twice, the second mention should "
+        f"be a 3-4 word reference, not a restate.\n\n"
+        f"**DISCOVERY IS FORWARD-LOOKING.** discovery_must_haves and "
+        f"discovery_nice_to_haves are the agenda for the NEXT call — they "
+        f"must NOT include questions that were ALREADY answered. On a post-"
+        f"call update: walk through post_call_log[0] (the latest call's) "
+        f"now_confirmed list; for each item there, REMOVE the corresponding "
+        f"question from the discovery lists. Replace with new questions "
+        f"surfaced by this call's newly_surfaced items, or by gaps in the "
+        f"new info. Discovery shrinks (answered) AND grows (new gaps) "
+        f"between calls — it's never a static restate.\n\n"
         f"**RESEARCH DEPTH RULES — apply these before filling the brief:**\n"
         f"1. **Per-segment / per-division growth.** For any multi-segment / "
         f"multi-division company (pharma w/ Rx+OTC+Nutrition+Distribution; "
@@ -774,9 +797,7 @@ def _build_new_brief_prompt(
         f"Channel structure · Catalogue size / SKU count · Tech stack · External-facing "
         f"agents · AI maturity), recent_news (**MAX 2 bullets**, the most material; or "
         f"one honest 'Nothing material in the last 12 months from public sources'), "
-        f"what_missing, product_route, persona_map (each row contains the current order "
-        f"flow + leak points for THAT persona — split into per-motion rows: Dealers, "
-        f"Retailers via SFA, B2B customers, etc.; appendix-section, ≤4 rows), "
+        f"what_missing, product_route, "
         f"pain_capability_cfo (**MAX 3 rows** — pick the three highest-value pains; "
         f"more rows dilute the pitch), "
         f"metric_that_matters, discovery_must_haves (**EXACTLY 5 questions** — "
@@ -800,12 +821,13 @@ def _build_new_brief_prompt(
         f"recent_news or what_missing), meeting_attendees (merged into people_path_in "
         f"with type='Meeting attendee'), discovery (the old 4-bucket discovery dict "
         f"has been REPLACED by discovery_must_haves + discovery_nice_to_haves — do "
-        f"not output the old `discovery` field).\n\n"
+        f"not output the old `discovery` field), persona_map (REMOVED — its "
+        f"operational pain detail now lives in pain_capability_cfo).\n\n"
         f"**APPENDIX LAYOUT NOTE.** The renderer splits the brief into a MAIN section "
         f"(strategic_hook, exec_summary, stat_band, why_now, meeting_game_plan, "
         f"pain_capability_cfo, what_they_have, people_path_in, objection_handling, "
         f"next_step, opening_hook) and an APPENDIX section (asset_graas_map, "
-        f"persona_map, graas_proof_points, discovery_must_haves, "
+        f"graas_proof_points, discovery_must_haves, "
         f"discovery_nice_to_haves, Meeting Notes (blank for the salesperson), "
         f"recent_news, conflicts_unknowns). You don't control the placement — just "
         f"return the fields; the renderer handles the order.\n\n"

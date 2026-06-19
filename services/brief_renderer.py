@@ -598,27 +598,10 @@ def render_brief_docx(data: dict) -> bytes:
         _add_h3(doc, "Product route")
         _add_para(doc, data["product_route"])
 
-    # ── Persona & order flow (full detail with leak points) ─────────────────
-    persona_map = data.get("persona_map") or []
-    if persona_map:
-        _add_h2(doc, "Persona & order flow")
-        rows = [
-            [
-                r.get("persona", ""),
-                r.get("count", ""),
-                r.get("surface", ""),
-                r.get("flow_and_leaks", r.get("flow", "")),
-            ]
-            for r in persona_map
-        ]
-        _add_table(
-            doc,
-            headers=["Persona", "Count", "Surface today", "Current flow & leaks"],
-            rows=rows,
-            col_widths_cm=[3.2, 1.9, 3.7, 9.2],
-            highlighted_rows=_ch("persona_map"),
-        )
-        _add_sub(doc, "(critical — to be further verified)")
+    # ── Persona & order flow REMOVED — its operational pain content overlapped
+    # heavily with pain_capability_cfo + asset_graas_map + what_they_have.
+    # Field kept in schema for back-compat with existing briefs but no
+    # longer rendered.
 
     # ── Graas proof points (case-study credibility) ─────────────────────────
     proof_points = data.get("graas_proof_points") or []
