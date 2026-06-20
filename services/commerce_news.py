@@ -71,7 +71,10 @@ _PROMPT = (
 )
 
 
-@st.cache_data(ttl=86400, show_spinner=False)
+@st.cache_data(
+    ttl=86400,
+    show_spinner="🔍 Searching the last 21 days of commerce-tech news…",
+)
 def fetch_commerce_tech_stories() -> list:
     """Returns a list of 0-3 story dicts. Cached 24h."""
     if not ANTHROPIC_API_KEY:
