@@ -34,26 +34,24 @@ def load_proposals():
 
 @st.cache_data(ttl=1800)
 def load_meetings_summary():
-    """Derive meetings summary by unioning three sources:
+    """Derive meetings summary.
 
-      • Active presales (has First conv date) — current live pipeline
-      • Dropped leads  (has First conv date) — historical meetings that
-        didn't progress; STILL COUNT as "met"
-      • Overall Pipeline for IN and SEA (unified, has Latest conv date) —
-        catches new entries / All-e leads not in the old tabs
+    SOURCE OF TRUTH: the **`Overall Pipeline for IN and SEA`** tab in the
+    All-e sheet. Primary tab going forward — both meetings and pipeline
+    progression read from here.
 
-    Dedup by normalised Lead name; prefer the row that has a real
-    First conv date (correct "newly met" semantic). For rows only in the
-    unified tab we synthesise First conv date from the earliest non-null
-    date on the row.
+    SUPPLEMENT: **`Dropped leads`** tab — contributes ONLY leads that
+    aren't in the unified tab (historical meetings that died before the
+    migration and weren't carried over). On any dedup conflict the
+    unified row wins.
 
-    Pipeline progression (POC / Pilot / Production) still reads from the
-    unified tab only — those columns don't exist in the old tabs.
+    Bucketing date: `First conv date` from the unified tab when populated,
+    else `Latest conv date` as a proxy. Same fallback for Dropped-leads-
+    only rows.
 
-    CAVEAT (surfaced in caption): primarily All-e. Hoppr and MP BU may
-    not be reflected on the unified tab; old-tab leads cover the legacy
-    cross-product history but new Hoppr/MP wins won't show until they
-    land somewhere in this sheet.
+    NOTE on the legacy "Active presales" tab — it no longer exists in
+    this sheet (was renamed/removed during the migration to the unified
+    tab). Don't try to fetch it.
     """
     from services.sheets_client import fetch_sheet_tab
     sheet_id = os.getenv("ALLE_SHEET_ID", "")
@@ -66,60 +64,60 @@ def load_meetings_summary():
     MONTHS_ALL = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
                   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
-    df_active = pd.DataFrame()
-    df_dropped = pd.DataFrame()
     df_unified = pd.DataFrame()
+    df_dropped = pd.DataFrame()
     try:
-        df_active  = fetch_sheet_tab(sheet_id, "Active presales")
-        df_dropped = fetch_sheet_tab(sheet_id, "Dropped leads")
         df_unified = fetch_sheet_tab(sheet_id, "Overall Pipeline for IN and SEA")
+        df_dropped = fetch_sheet_tab(sheet_id, "Dropped leads")
     except Exception as e:
         import streamlit as _st
         _st.warning(f"Pipeline load error: {e}")
 
-    # Active presales uses 'Country', Dropped leads uses 'Region'. Standardise.
-    if not df_active.empty and "Country" in df_active.columns and "Region" not in df_active.columns:
-        df_active = df_active.rename(columns={"Country": "Region"})
-
-    # Parse date columns on every frame
+    # Parse all candidate date columns on both frames
     _date_cols = ["First conv date", "Latest conv date", "POC Delivery Date",
                   "Proposal Sent Date", "Pilot Start Date",
                   "Production Start Date"]
-    for _df in (df_active, df_dropped, df_unified):
+    for _df in (df_unified, df_dropped):
         if _df is None or _df.empty:
             continue
         for c in _date_cols:
             if c in _df.columns:
                 _df[c] = _pd.to_datetime(_df[c], format="mixed", errors="coerce")
 
-    # Concat old tabs (both carry First conv date)
-    if not df_active.empty or not df_dropped.empty:
-        df_old = _pd.concat([df_active, df_dropped], ignore_index=True, sort=False)
-    else:
-        df_old = pd.DataFrame()
+    def _ensure_first_conv(df):
+        """Fill First conv date from Latest conv date (or other date cols)
+        when First conv date is missing/blank on a row."""
+        if df.empty:
+            return df
+        if "First conv date" not in df.columns:
+            df["First conv date"] = _pd.NaT
+        proxy_cols = [c for c in ["Latest conv date", "POC Delivery Date",
+                                  "Proposal Sent Date", "Pilot Start Date",
+                                  "Production Start Date"]
+                      if c in df.columns]
+        if proxy_cols:
+            proxy = df[proxy_cols].min(axis=1)
+            df["First conv date"] = df["First conv date"].fillna(proxy)
+        return df
 
-    # ── Union: old tabs ∪ unified (unified-only rows synthesise First conv date)
+    df_unified = _ensure_first_conv(df_unified)
+    df_dropped = _ensure_first_conv(df_dropped)
+
+    # ── Unified is primary; Dropped leads only contributes leads NOT
+    # already in the unified tab. Dedup by normalised Lead name.
     if not df_unified.empty and "Lead name" in df_unified.columns:
-        _norm = lambda s: str(s or "").strip().lower()
-        _seen = set(df_old["Lead name"].astype(str).map(_norm)) if not df_old.empty else set()
-        _unified_only = df_unified[
-            ~df_unified["Lead name"].astype(str).map(_norm).isin(_seen)
-            & (df_unified["Lead name"].astype(str).str.strip() != "")
-        ].copy()
-        if not _unified_only.empty:
-            _proxy_cols = [c for c in ["Latest conv date", "POC Delivery Date",
-                                       "Proposal Sent Date", "Pilot Start Date",
-                                       "Production Start Date"]
-                           if c in _unified_only.columns]
-            if _proxy_cols:
-                # Earliest non-null date on the row stands in for "first met"
-                _unified_only["First conv date"] = _unified_only[_proxy_cols].min(axis=1)
-            df_mtg = _pd.concat([df_old, _unified_only], ignore_index=True, sort=False) \
-                if not df_old.empty else _unified_only
-        else:
-            df_mtg = df_old
+        df_mtg = df_unified.copy()
+        if not df_dropped.empty and "Lead name" in df_dropped.columns:
+            _norm = lambda s: str(s or "").strip().lower()
+            _seen = set(df_unified["Lead name"].astype(str).map(_norm))
+            _dropped_only = df_dropped[
+                ~df_dropped["Lead name"].astype(str).map(_norm).isin(_seen)
+                & (df_dropped["Lead name"].astype(str).str.strip() != "")
+            ]
+            if not _dropped_only.empty:
+                df_mtg = _pd.concat([df_mtg, _dropped_only], ignore_index=True, sort=False)
     else:
-        df_mtg = df_old
+        df_mtg = df_dropped
 
     if df_mtg.empty or "Lead name" not in df_mtg.columns:
         return {}
@@ -257,20 +255,18 @@ from services.sheets_client import fetch_sheet_tab as _fetch_tab
 _alle_id = os.getenv("ALLE_SHEET_ID", "")
 if _alle_id:
     # Cache hits — essentially free.
-    _validate_schema(_fetch_tab(_alle_id, "Active presales"),
-                     "Active presales", context="Pipeline Meetings YTD")
-    _validate_schema(_fetch_tab(_alle_id, "Dropped leads"),
-                     "Dropped leads", context="Pipeline Meetings YTD")
     _validate_schema(_fetch_tab(_alle_id, "Overall Pipeline for IN and SEA"),
                      "Overall Pipeline for IN and SEA",
-                     context="Pipeline progression (POC / Pilot / Production)")
+                     context="Pipeline meetings + progression")
+    _validate_schema(_fetch_tab(_alle_id, "Dropped leads"),
+                     "Dropped leads", context="Historical meetings supplement")
 
 st.markdown(f"### 🤝 Meetings — YTD 2026 (through {_YTD_MONTHS[-1]})")
 st.caption(
-    "Source: union of **Active presales + Dropped leads + Overall Pipeline "
-    "for IN and SEA** tabs (deduped by Lead name). Bucketed by "
-    "**First conv date**; for leads only on the unified tab (no First conv "
-    "date) we use the earliest available date on the row as a proxy. "
+    "Source: **'Overall Pipeline for IN and SEA'** tab (authoritative), "
+    "supplemented by **'Dropped leads'** for historical leads not in the "
+    "unified tab. Bucketed by **First conv date**, falling back to "
+    "Latest conv date when First is blank. "
     "⚠️ Coverage is **primarily All-e** — Hoppr and MP BU may not be "
     "reflected unless those leads are also tracked in this sheet."
 )
