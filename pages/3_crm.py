@@ -756,6 +756,40 @@ with tab_contacts:
                 with st.expander("📝 Latest Conversation"):
                     st.markdown(first['conv_details'][:1000])
 
+            # 📋 Prospect Brief link — surface the latest brief Doc for this
+            # company if one exists in the SalesHub Drive folder. Lets
+            # Dhanashree open verified research without leaving the page.
+            from services.sheets_client import find_briefs_for_company as _find_briefs
+            _saleshub_folder = os.getenv(
+                "PROSPECT_BRIEF_DRIVE_FOLDER",
+                "0ABwowt8s9tmzUk9PVA",  # SalesHub Shared Drive
+            )
+
+            @st.cache_data(ttl=300, show_spinner=False)
+            def _briefs_for(co_name: str, folder: str):
+                return _find_briefs(co_name, folder)
+
+            _briefs = _briefs_for(first['company'], _saleshub_folder)
+            if _briefs:
+                _latest = _briefs[0]
+                _older_suffix = ""
+                if len(_briefs) > 1:
+                    _older_suffix = (
+                        f" &nbsp;<span style='color:#6B7280;font-size:0.8rem;'>"
+                        f"(+{len(_briefs) - 1} older)</span>"
+                    )
+                st.markdown(
+                    f"<div style='margin-top:10px;padding:8px 12px;"
+                    f"background:#EEF6EE;border-left:3px solid #2E7D32;"
+                    f"border-radius:4px;font-size:0.9rem;'>"
+                    f"📋 <b>Prospect brief on file</b> &nbsp;·&nbsp; "
+                    f"<a href='{_latest['url']}' target='_blank' "
+                    f"style='color:#1B5E20;font-weight:600;'>"
+                    f"Open in Drive →</a>{_older_suffix}"
+                    f"</div>",
+                    unsafe_allow_html=True,
+                )
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 2: SEGMENTS

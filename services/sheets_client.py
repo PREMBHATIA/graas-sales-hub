@@ -430,6 +430,56 @@ def list_drive_folder_docs(folder_id: str) -> list:
     return []
 
 
+def find_briefs_for_company(company_name: str, folder_id: str) -> list:
+    """Return matching Prospect Brief Docs for `company_name` in `folder_id`.
+
+    Matches the same naming convention as
+    `_resolve_existing_brief_for_company` in pages/9_prospect_brief.py
+    ('Prospect Brief — <company> — YYYY-MM-DD'), normalised so PT/Tbk/
+    country suffixes don't break the match.
+
+    Returns a list of {id, name, url, modified_time} sorted newest-first.
+    Empty list if nothing matches. Non-mutating (does NOT trash dupes).
+    """
+    import re as _re
+
+    def _norm(s: str) -> str:
+        if not s:
+            return ""
+        s = str(s).strip().lower()
+        s = _re.sub(r"^pt\s+|^tbk\s+", "", s)
+        s = _re.sub(r"\s+(india|sea|asia|indonesia|thailand|vietnam|philippines|malaysia|singapore|inc|llc|ltd|pvt|private limited)$", "", s)
+        s = _re.sub(r"[^\w\s]", " ", s)
+        s = _re.sub(r"\s+", " ", s).strip()
+        return s
+
+    if not company_name or not folder_id:
+        return []
+    co_key = _norm(company_name)
+    if not co_key:
+        return []
+    docs = list_drive_folder_docs(folder_id) or []
+    out = []
+    for d in docs:
+        nm = d.get("name", "")
+        if not nm.lower().startswith("prospect brief"):
+            continue
+        m = _re.match(
+            r"Prospect Brief\s*[—\-]\s*(.+?)\s*[—\-]\s*\d{4}-\d{2}-\d{2}",
+            nm,
+        )
+        if not m:
+            continue
+        if _norm(m.group(1)) == co_key:
+            out.append({
+                "id": d["id"],
+                "name": nm,
+                "url": f"https://docs.google.com/document/d/{d['id']}/edit",
+                "modified_time": d.get("modified_time", ""),
+            })
+    return out
+
+
 def fetch_crm_notes_link(url_or_text: str) -> tuple:
     """Fetch the content behind a CRM 'Link for full notes' (col K) value.
 
