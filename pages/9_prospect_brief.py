@@ -497,26 +497,28 @@ BRIEF_JSON_SCHEMA = """{
     {"label": "Geography", "value": "3-8 words. e.g. 'Indonesia + 71 branches + SEA export'"}
   ],
   "_type_motion_note": "type and motion now live INSIDE executive_summary (above) — they render as boxes in the Exec Summary section. Top-level keys are kept here only for back-compat with existing briefs in session state; do not populate them in new output.",
+  "situation_and_opportunity": [
+    {
+      "operational_area": "ONE label, 1-4 words. The operational area this row covers. e.g. 'Marketplace ops', 'Data / Eng', 'Telemedicine', 'Offline retail', 'Field force', 'AR / Collections'.",
+      "what_they_have_today": "PHRASE, ≤15 words. What's there today in this area — channels/scale/staff/tech. e.g. '60% revenue · Tokopedia/Shopee/Lazada' or 'In-house OMS/WMS · 3 engineers'.",
+      "pain_or_gap": "PHRASE, ≤10 words. The operational pain or capability gap. e.g. 'Performance opaque' or 'Siloed manual extract'. Pre-call: best inference; post-call: confirmed by customer where possible.",
+      "graas_fit": "≤5 WORDS. Product name + 1-3 word descriptor. e.g. 'hoppr', 'MCP/Extract', 'hoppr Rx intel', 'Future: All-e'. NO product descriptions — the product is named elsewhere.",
+      "cfo_metric": "≤5 WORDS. The metric this Graas fit moves. e.g. 'Conversion · GMV/SKU', 'Eng hours saved', 'Cart accuracy', 'Write-offs ↓'."
+    }
+  ],
+  "_situation_and_opportunity_CAP": "4-6 ROWS MAX. One row per operational area where Graas slots in. SKIP areas with no Graas fit (those go to the trimmed what_they_have background ledger). This table REPLACES the old separate pain_capability_cfo table — do not also output pain_capability_cfo unless you can't fit a pain into this merged shape.",
   "what_they_have": [
-    {"dimension": "Business model", "what_we_know": "PHRASE 5-15 words", "confidence": "Confirmed|Public estimate|Inferred|Unknown", "source": "short source"},
-    {"dimension": "Scale", "what_we_know": "...", "confidence": "...", "source": "..."},
-    {"dimension": "Funding status", "what_we_know": "Listed / PE-backed / VC-funded (round, year, lead) / bootstrapped; profitable or loss-making", "confidence": "...", "source": "..."},
+    {"dimension": "Funding status", "what_we_know": "Listed / PE-backed / VC-funded (round, year, lead) / bootstrapped; profitable or loss-making", "confidence": "Confirmed|Public estimate|Inferred|Unknown", "source": "short source"},
     {"dimension": "Top brands", "what_we_know": "3-5 recognisable brands", "confidence": "...", "source": "..."},
     {"dimension": "Top competitors", "what_we_know": "2-3 competitors", "confidence": "...", "source": "..."},
-    {"dimension": "Channel structure", "what_we_know": "HQ → distributors → retailers; counts", "confidence": "...", "source": "..."},
-    {"dimension": "Catalogue size / SKU count", "what_we_know": "...", "confidence": "...", "source": "..."},
-    {"dimension": "Tech stack", "what_we_know": "ERP / CRM / DMS / SFA / channels — name vendors", "confidence": "...", "source": "..."},
-    {"dimension": "External-facing agents", "what_we_know": "agents/chatbots deployed? — the All-e vs KG signal", "confidence": "...", "source": "..."},
-    {"dimension": "AI maturity", "what_we_know": "...", "confidence": "...", "source": "..."}
+    {"dimension": "Founded / IPO", "what_we_know": "founding year + key inflection (IPO, major acquisition, rebrand)", "confidence": "...", "source": "..."}
   ],
+  "_what_they_have_NOTE": "TRIMMED to 4-6 NON-OPERATIONAL background rows ONLY: Funding status, Top brands, Top competitors, Founded/IPO, Business model (if not captured in Exec Summary). Operational dimensions (Scale, Channel structure, Tech stack, External-facing agents, AI maturity) have MOVED into situation_and_opportunity rows. Renders as a small 'Background' callout in the appendix, not the main brief.",
   "recent_news": ["MAX 2 bullets, the most material events in the last 12 months. With inline citation."],
   "what_missing": ["Gap phrased as a question or honest gap statement.", "..."],
   "product_route": "All-e / Knowledge Graph / Layered — 2-3 lines on why this follows from motion + signals; name wedge vs expansion.",
-  "_persona_map_REMOVED": "The persona_map field is DEPRECATED — do not output it. Its content overlapped heavily with pain_capability_cfo (the operational pains) and asset_graas_map (the digital surfaces it covered). The leak-point detail per persona now lives inline in pain_capability_cfo where it belongs.",
-  "pain_capability_cfo": [
-    {"pain": "pain in their language", "capability": "All-e/KG capability", "metric": "DSO / revenue per rep / cost per order / ..."}
-  ],
-  "_pain_capability_cfo_CAP": "HARD CAP: 3 rows MAX. Pick the three highest-value pains. More rows dilute the pitch.",
+  "_persona_map_REMOVED": "The persona_map field is DEPRECATED — do not output it.",
+  "_pain_capability_cfo_REMOVED": "DEPRECATED — merged into situation_and_opportunity. Do not output pain_capability_cfo unless an operational pain genuinely doesn't fit the merged shape (rare).",
   "metric_that_matters": "The metric this moves for [CFO or decision-maker name, role] is [single literal metric].",
   "discovery_must_haves": [
     "5 questions — operational only (flows, metrics, integrations, budgets). These run FIRST at the meeting and must not be dropped. e.g. 'Walk me through one order end-to-end', 'Who owns the budget for a digital pilot?', 'Current conversion rate + AOV on the live channel?'",
@@ -792,14 +794,18 @@ def _build_new_brief_prompt(
         f"sales weight), "
         f"executive_summary (6 fields rendered as two stacked box rows: "
         f"category/type/motion on row 1, comps/history/maturity on row 2 — NOT a "
-        f"paragraph, NOT labelled lines), stat_band (all 5), what_they_have (all 10 dimensions: "
-        f"Business model · Scale · Funding status · Top brands · Top competitors · "
-        f"Channel structure · Catalogue size / SKU count · Tech stack · External-facing "
-        f"agents · AI maturity), recent_news (**MAX 2 bullets**, the most material; or "
+        f"paragraph, NOT labelled lines), stat_band (all 5), "
+        f"situation_and_opportunity (**4-6 rows**, the merged main-brief table — "
+        f"one row per operational area where Graas slots in; columns "
+        f"operational_area / what_they_have_today / pain_or_gap / graas_fit "
+        f"(≤5 words, product + 1-3 word descriptor) / cfo_metric (≤5 words). "
+        f"This REPLACES the old separate pain_capability_cfo table.), "
+        f"what_they_have (**TRIMMED to 4-6 non-operational background rows**: "
+        f"Funding status · Top brands · Top competitors · Founded/IPO · Business "
+        f"model. Operational dimensions moved to situation_and_opportunity.), "
+        f"recent_news (**MAX 2 bullets**, the most material; or "
         f"one honest 'Nothing material in the last 12 months from public sources'), "
         f"what_missing, product_route, "
-        f"pain_capability_cfo (**MAX 3 rows** — pick the three highest-value pains; "
-        f"more rows dilute the pitch), "
         f"metric_that_matters, discovery_must_haves (**EXACTLY 5 questions** — "
         f"operational only, no role-clarification, each ≤20 words), "
         f"discovery_nice_to_haves (**EXACTLY 5 questions** — same rules), "
@@ -821,16 +827,18 @@ def _build_new_brief_prompt(
         f"recent_news or what_missing), meeting_attendees (merged into people_path_in "
         f"with type='Meeting attendee'), discovery (the old 4-bucket discovery dict "
         f"has been REPLACED by discovery_must_haves + discovery_nice_to_haves — do "
-        f"not output the old `discovery` field), persona_map (REMOVED — its "
-        f"operational pain detail now lives in pain_capability_cfo).\n\n"
+        f"not output the old `discovery` field), persona_map (REMOVED — operational "
+        f"detail now lives in situation_and_opportunity), pain_capability_cfo "
+        f"(REMOVED — merged into situation_and_opportunity).\n\n"
         f"**APPENDIX LAYOUT NOTE.** The renderer splits the brief into a MAIN section "
         f"(strategic_hook, exec_summary, stat_band, why_now, meeting_game_plan, "
-        f"pain_capability_cfo, what_they_have, people_path_in, objection_handling, "
+        f"situation_and_opportunity, people_path_in, objection_handling, "
         f"next_step, opening_hook) and an APPENDIX section (asset_graas_map, "
-        f"graas_proof_points, discovery_must_haves, "
+        f"product_route, graas_proof_points, discovery_must_haves, "
         f"discovery_nice_to_haves, Meeting Notes (blank for the salesperson), "
-        f"recent_news, conflicts_unknowns). You don't control the placement — just "
-        f"return the fields; the renderer handles the order.\n\n"
+        f"what_they_have (background facts), recent_news, conflicts_unknowns). "
+        f"You don't control the placement — just return the fields; the renderer "
+        f"handles the order.\n\n"
         f"=== INPUTS — INTERNAL RESEARCH / CONTEXT ===\n{research or '(no internal notes pasted — research the company from public sources using web_search)'}\n"
         f"{crm_block}{meeting_block}\n\n"
         f"=== JSON SCHEMA (fill exactly this shape) ===\n{BRIEF_JSON_SCHEMA}\n\n"
@@ -1190,9 +1198,10 @@ with right:
 
             # Sanity-check mandatory fields are populated
             required_keys = ["strategic_hook", "asset_graas_map", "why_now",
-                             "executive_summary", "stat_band", "what_they_have",
-                             "product_route", "graas_proof_points",
-                             "pain_capability_cfo", "meeting_game_plan",
+                             "executive_summary", "stat_band",
+                             "situation_and_opportunity",
+                             "what_they_have", "product_route",
+                             "graas_proof_points", "meeting_game_plan",
                              "objection_handling", "opening_hook",
                              "discovery_must_haves", "discovery_nice_to_haves"]
             # Post-call updates MUST surface what the call added. Without a

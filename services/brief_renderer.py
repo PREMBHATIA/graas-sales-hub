@@ -462,46 +462,54 @@ def render_brief_docx(data: dict) -> bytes:
         if bullets:
             _add_bullets(doc, bullets)
 
-    # ── Pain → Capability → CFO metric (3 rows max) ─────────────────────────
-    pain_map = data.get("pain_capability_cfo") or []
-    if pain_map:
-        _add_h3(doc, "Pain → Capability → CFO metric")
+    # ── Situation → Graas opportunity (merged main table) ───────────────────
+    # Single 5-col table that replaces both the old pain_capability_cfo
+    # AND most of what_they_have. Each row covers one operational area
+    # with what they have today + the gap + the Graas fit + CFO metric.
+    so = data.get("situation_and_opportunity") or []
+    if so:
+        _add_h2(doc, "Situation → Graas opportunity")
         rows = [
-            [r.get("pain", ""), r.get("capability", ""), r.get("metric", "")]
-            for r in pain_map[:3]  # cap at 3
+            [
+                r.get("operational_area", ""),
+                r.get("what_they_have_today", ""),
+                r.get("pain_or_gap", ""),
+                r.get("graas_fit", ""),
+                r.get("cfo_metric", ""),
+            ]
+            for r in so[:6]  # cap at 6
         ]
         _add_table(
             doc,
-            headers=["Pain (their language)", "Product capability", "CFO metric it moves"],
+            headers=["Area", "What's there today", "Pain / gap", "Graas fit", "CFO metric"],
             rows=rows,
-            col_widths_cm=[6.5, 6.5, 5.0],
-            highlighted_rows=_ch("pain_capability_cfo"),
+            col_widths_cm=[2.8, 5.5, 3.8, 2.9, 3.0],
+            highlighted_rows=_ch("situation_and_opportunity"),
         )
+    else:
+        # Back-compat: legacy pain_capability_cfo render path
+        pain_map = data.get("pain_capability_cfo") or []
+        if pain_map:
+            _add_h2(doc, "Pain → Capability → CFO metric")
+            rows = [
+                [r.get("pain", ""), r.get("capability", ""), r.get("metric", "")]
+                for r in pain_map[:3]
+            ]
+            _add_table(
+                doc,
+                headers=["Pain (their language)", "Product capability", "CFO metric it moves"],
+                rows=rows,
+                col_widths_cm=[6.5, 6.5, 5.0],
+                highlighted_rows=_ch("pain_capability_cfo"),
+            )
 
     if data.get("metric_that_matters"):
         _add_kv_para(doc, "The metric that matters", data["metric_that_matters"])
 
-    # ── What they have ───────────────────────────────────────────────────────
-    what = data.get("what_they_have") or []
-    if what:
-        _add_h2(doc, "What they have")
-        rows = [
-            [
-                r.get("dimension", ""),
-                r.get("what_we_know", ""),
-                r.get("confidence", ""),
-                r.get("source", ""),
-            ]
-            for r in what
-        ]
-        _add_table(
-            doc,
-            headers=["Dimension", "What we know", "Confidence", "Source"],
-            rows=rows,
-            col_widths_cm=[3.0, 10.0, 2.3, 2.7],
-            col_styles={3: {"size": 6.5, "italic": True, "color": GREY}},
-            highlighted_rows=_ch("what_they_have"),
-        )
+    # ── What they have MOVED to appendix — see below ───────────────────────
+    # The full 10-row research ledger now lives as a small 'Background'
+    # callout in the appendix. Operational rows (Scale, Channel structure,
+    # Tech stack, etc.) have migrated into situation_and_opportunity.
 
     # ── People & path in (with per-attendee lead_with) ──────────────────────
     people = list(data.get("people_path_in") or [])
@@ -598,10 +606,33 @@ def render_brief_docx(data: dict) -> bytes:
         _add_h3(doc, "Product route")
         _add_para(doc, data["product_route"])
 
-    # ── Persona & order flow REMOVED — its operational pain content overlapped
-    # heavily with pain_capability_cfo + asset_graas_map + what_they_have.
-    # Field kept in schema for back-compat with existing briefs but no
-    # longer rendered.
+    # ── Background facts (trimmed what_they_have ledger — 4-6 rows) ─────────
+    # What's left of the original 10-row research ledger after operational
+    # rows migrated to situation_and_opportunity. Non-operational only:
+    # Funding · Top brands · Top competitors · Founded · Business model.
+    bg = data.get("what_they_have") or []
+    if bg:
+        _add_h2(doc, "Background")
+        rows = [
+            [
+                r.get("dimension", ""),
+                r.get("what_we_know", ""),
+                r.get("confidence", ""),
+                r.get("source", ""),
+            ]
+            for r in bg
+        ]
+        _add_table(
+            doc,
+            headers=["Dimension", "What we know", "Confidence", "Source"],
+            rows=rows,
+            col_widths_cm=[3.0, 10.0, 2.3, 2.7],
+            col_styles={3: {"size": 6.5, "italic": True, "color": GREY}},
+            highlighted_rows=_ch("what_they_have"),
+        )
+
+    # ── Persona & order flow REMOVED — content migrated to
+    # situation_and_opportunity.
 
     # ── Graas proof points (case-study credibility) ─────────────────────────
     proof_points = data.get("graas_proof_points") or []
