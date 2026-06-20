@@ -763,39 +763,40 @@ def _resolve_existing_brief_for_company(
     return (latest_id, trashed)
 
 
-@st.cache_data(ttl=3600, show_spinner=False)
-def _fetch_commerce_tech_story() -> dict:
-    """Use Claude + web_search to fetch ONE substantive commerce-tech news
-    story from the last 7 days, with a verified source URL. Returns
-    {tag, title, body, why, source_label, source_url} or None on any
-    failure / unverifiable result.
+@st.cache_data(ttl=86400, show_spinner=False)
+def _fetch_commerce_tech_stories() -> list:
+    """Use Claude + web_search to fetch UP TO 3 distinct commerce-tech news
+    stories from the last 14 days, each with a verified source URL.
+    Returns a list of {tag, title, body, why, source_label, source_url}
+    dicts (0-3 entries). Cached 24h — one fetch per day per instance.
 
     HARD RULE — NO HALLUCINATION: every claim in body must trace to the
-    actual article. If a stat isn't in the source, it's left out. If no
-    real URL can be extracted, returns None (caller shows fallback msg).
-
-    Cached 1h so we hit Claude/web_search once per hour per Streamlit
-    Cloud instance — trivial cost, fresh content for everyone.
+    actual article. Stories without a verifiable URL are dropped.
     """
     if not ANTHROPIC_API_KEY:
-        return None
+        return []
     try:
         import anthropic
         import json as _j
         import re as _re
         client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
         prompt = (
-            "Use web_search to find ONE substantive commerce-tech news "
-            "story from the LAST 14 DAYS. Topics: agentic AI for retail/"
-            "ecom, quick commerce in India/SEA, marketplace AI features, "
-            "retail-tech M&A/funding, Shopify/Amazon/TikTok-Shop product "
-            "announcements, Anthropic/OpenAI vertical retail moves.\n\n"
-            "From the search results, pick ONE story that:\n"
-            "  • Has a real source you can identify (publication + URL)\n"
-            "  • Is substantive (not a rumor or speculation piece)\n"
-            "  • Would matter to a salesperson at Graas (Graas builds "
-            "agentic AI for commerce — All-e, hoppr, MCP/Extract)\n\n"
-            "Return ONLY a JSON object with these EXACT keys:\n"
+            "Use web_search to find UP TO 3 distinct substantive "
+            "commerce-tech news stories from the LAST 14 DAYS. Topics: "
+            "agentic AI for retail/ecom, quick commerce in India/SEA, "
+            "marketplace AI features, retail-tech M&A/funding, Shopify/"
+            "Amazon/TikTok-Shop product announcements, Anthropic/OpenAI "
+            "vertical retail moves.\n\n"
+            "Each story MUST:\n"
+            "  • Have a real source you can identify (publication + URL)\n"
+            "  • Be substantive (not a rumor or speculation piece)\n"
+            "  • Cover a DIFFERENT angle/topic from the others (don't "
+            "return 3 TikTok stories — diversify)\n"
+            "  • Matter to a salesperson at Graas (Graas builds agentic "
+            "AI for commerce — All-e, hoppr, MCP/Extract)\n\n"
+            "Return ONLY a JSON object with key 'stories' whose value is "
+            "an array of 1-3 story objects. Each story object has these "
+            "EXACT keys:\n"
             "  • tag: country flag + short topic, e.g. '🇺🇸 US · agentic "
             "commerce', '🇮🇳 India · quick commerce', '🇮🇩 SEA · live "
             "commerce', '🌏 Global · AI for retail'\n"
@@ -811,21 +812,20 @@ def _fetch_commerce_tech_story() -> dict:
             "  • source_url: the ACTUAL article URL from web_search "
             "results — MUST start with http and must be the real link.\n\n"
             "HARD RULES:\n"
-            "  1. Every claim in body MUST be in the source you cite. If "
-            "you can't see it in the search results, don't write it.\n"
-            "  2. If the searches return nothing solid with a real URL, "
-            "return {} (empty JSON) — do NOT invent content.\n"
-            "  3. Don't combine multiple stories — pick ONE.\n\n"
+            "  1. Every claim in body MUST be in the source you cite.\n"
+            "  2. If a story has no verifiable URL, OMIT it from the "
+            "array — do NOT invent content.\n"
+            "  3. If nothing solid surfaces, return {\"stories\": []}.\n\n"
             "Return ONLY the JSON. No prose, no code fences."
         )
         resp = client.messages.create(
             model="claude-sonnet-4-6",
-            max_tokens=2000,
+            max_tokens=4000,
             messages=[{"role": "user", "content": prompt}],
             tools=[{
                 "type": "web_search_20250305",
                 "name": "web_search",
-                "max_uses": 5,
+                "max_uses": 8,
             }],
         )
         text_parts = []
@@ -834,33 +834,49 @@ def _fetch_commerce_tech_story() -> dict:
                 text_parts.append(block.text)
         raw = "\n".join(text_parts).strip()
         if not raw:
-            return None
-        # Extract first JSON object
+            return []
         m = _re.search(r"\{.*\}", raw, _re.DOTALL)
         if not m:
-            return None
+            return []
         try:
-            story = _j.loads(m.group(0))
+            parsed = _j.loads(m.group(0))
         except Exception:
-            return None
-        # Strict validation — must have real URL + key fields
-        if not isinstance(story, dict):
-            return None
-        url = (story.get("source_url") or "").strip()
-        if not url.startswith("http"):
-            return None
-        if not story.get("title") or not story.get("body") or not story.get("why"):
-            return None
-        return {
-            "tag": story.get("tag", "📰 News"),
-            "title": story.get("title"),
-            "body": story.get("body"),
-            "why": story.get("why"),
-            "source_label": story.get("source_label", "Read more"),
-            "source_url": url,
-        }
+            return []
+        stories_raw = parsed.get("stories", []) if isinstance(parsed, dict) else []
+        out = []
+        for st_obj in stories_raw[:3]:
+            if not isinstance(st_obj, dict):
+                continue
+            url = (st_obj.get("source_url") or "").strip()
+            if not url.startswith("http"):
+                continue
+            if not st_obj.get("title") or not st_obj.get("body") or not st_obj.get("why"):
+                continue
+            out.append({
+                "tag": st_obj.get("tag", "📰 News"),
+                "title": st_obj.get("title"),
+                "body": st_obj.get("body"),
+                "why": st_obj.get("why"),
+                "source_label": st_obj.get("source_label", "Read more"),
+                "source_url": url,
+            })
+        return out
     except Exception:
+        return []
+
+
+def _fetch_commerce_tech_story() -> dict:
+    """Pick ONE story for this session from the daily 3-story pool. The
+    pick is stable within a session (so it doesn't flicker on rerun) and
+    randomised across sessions (so users see variety across the day)."""
+    stories = _fetch_commerce_tech_stories() or []
+    if not stories:
         return None
+    if "_news_session_idx" not in st.session_state:
+        import random as _r
+        st.session_state["_news_session_idx"] = _r.randint(0, 9999)
+    idx = st.session_state["_news_session_idx"] % len(stories)
+    return stories[idx]
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
