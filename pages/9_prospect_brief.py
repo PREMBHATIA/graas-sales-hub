@@ -569,11 +569,13 @@ BRIEF_JSON_SCHEMA = """{
 REFERENCE_PROPOSALS_FOLDER_ID = "1tBMrcpiIDVhg5e0-N1ytjuzbDexQyheX"
 
 
-# Curated commerce-tech stories shown in the "While you wait" card on the
-# preview pane. Mix of US / India / SEA. Each ~120 words: title + body +
-# why-it-matters angle for a Graas salesperson. Rotated random-per-session.
-# Refresh quarterly (or move to a web_search-backed daily pull later).
-_COMMERCE_TECH_STORIES = [
+# DEPRECATED static list — kept only as a SHAPE REFERENCE for what
+# _fetch_commerce_tech_story() returns. The page no longer reads from
+# this list (it would be fabricated content). The live fetch returns the
+# same dict shape: {tag, title, body, why, source_label, source_url}.
+# REMOVE this entire constant in a follow-up cleanup once the live
+# fetch has been in production for a few weeks.
+_COMMERCE_TECH_STORIES_DEPRECATED = [
     {
         "tag": "🇺🇸 US · agentic commerce",
         "title": "Amazon Rufus — shopping becomes a conversation",
@@ -758,6 +760,106 @@ def _resolve_existing_brief_for_company(
         if tr.get("ok"):
             trashed += 1
     return (latest_id, trashed)
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def _fetch_commerce_tech_story() -> dict:
+    """Use Claude + web_search to fetch ONE substantive commerce-tech news
+    story from the last 7 days, with a verified source URL. Returns
+    {tag, title, body, why, source_label, source_url} or None on any
+    failure / unverifiable result.
+
+    HARD RULE — NO HALLUCINATION: every claim in body must trace to the
+    actual article. If a stat isn't in the source, it's left out. If no
+    real URL can be extracted, returns None (caller shows fallback msg).
+
+    Cached 1h so we hit Claude/web_search once per hour per Streamlit
+    Cloud instance — trivial cost, fresh content for everyone.
+    """
+    if not ANTHROPIC_API_KEY:
+        return None
+    try:
+        import anthropic
+        import json as _j
+        import re as _re
+        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+        prompt = (
+            "Use web_search to find ONE substantive commerce-tech news "
+            "story from the LAST 14 DAYS. Topics: agentic AI for retail/"
+            "ecom, quick commerce in India/SEA, marketplace AI features, "
+            "retail-tech M&A/funding, Shopify/Amazon/TikTok-Shop product "
+            "announcements, Anthropic/OpenAI vertical retail moves.\n\n"
+            "From the search results, pick ONE story that:\n"
+            "  • Has a real source you can identify (publication + URL)\n"
+            "  • Is substantive (not a rumor or speculation piece)\n"
+            "  • Would matter to a salesperson at Graas (Graas builds "
+            "agentic AI for commerce — All-e, hoppr, MCP/Extract)\n\n"
+            "Return ONLY a JSON object with these EXACT keys:\n"
+            "  • tag: country flag + short topic, e.g. '🇺🇸 US · agentic "
+            "commerce', '🇮🇳 India · quick commerce', '🇮🇩 SEA · live "
+            "commerce', '🌏 Global · AI for retail'\n"
+            "  • title: the actual headline (verbatim or close paraphrase)\n"
+            "  • body: 2-3 sentences using ONLY facts that appear in the "
+            "search result snippet or page content. NO STATS YOU CAN'T "
+            "POINT TO IN THE SOURCE. If unsure, leave the stat out.\n"
+            "  • why: 2 sentences on why this matters for a Graas "
+            "salesperson — tie it to commerce-AI, retail agents, or "
+            "vertical AI competitive dynamics.\n"
+            "  • source_label: publication name (e.g. 'Bloomberg', "
+            "'TechCrunch', 'Reuters', 'Economic Times')\n"
+            "  • source_url: the ACTUAL article URL from web_search "
+            "results — MUST start with http and must be the real link.\n\n"
+            "HARD RULES:\n"
+            "  1. Every claim in body MUST be in the source you cite. If "
+            "you can't see it in the search results, don't write it.\n"
+            "  2. If the searches return nothing solid with a real URL, "
+            "return {} (empty JSON) — do NOT invent content.\n"
+            "  3. Don't combine multiple stories — pick ONE.\n\n"
+            "Return ONLY the JSON. No prose, no code fences."
+        )
+        resp = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=2000,
+            messages=[{"role": "user", "content": prompt}],
+            tools=[{
+                "type": "web_search_20250305",
+                "name": "web_search",
+                "max_uses": 5,
+            }],
+        )
+        text_parts = []
+        for block in resp.content:
+            if getattr(block, "type", None) == "text":
+                text_parts.append(block.text)
+        raw = "\n".join(text_parts).strip()
+        if not raw:
+            return None
+        # Extract first JSON object
+        m = _re.search(r"\{.*\}", raw, _re.DOTALL)
+        if not m:
+            return None
+        try:
+            story = _j.loads(m.group(0))
+        except Exception:
+            return None
+        # Strict validation — must have real URL + key fields
+        if not isinstance(story, dict):
+            return None
+        url = (story.get("source_url") or "").strip()
+        if not url.startswith("http"):
+            return None
+        if not story.get("title") or not story.get("body") or not story.get("why"):
+            return None
+        return {
+            "tag": story.get("tag", "📰 News"),
+            "title": story.get("title"),
+            "body": story.get("body"),
+            "why": story.get("why"),
+            "source_label": story.get("source_label", "Read more"),
+            "source_url": url,
+        }
+    except Exception:
+        return None
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -1132,24 +1234,29 @@ with right:
     placeholder = st.empty()
 
     def _news_card_html() -> str:
-        """Build the 'While you wait' commerce-tech story card. Picks one
-        story per session (stable across reruns until session reset)."""
-        import random as _r
-        # Pin the story to the session so it doesn't flicker between reruns
-        if "_news_card_story_idx" not in st.session_state:
-            st.session_state["_news_card_story_idx"] = _r.randint(
-                0, len(_COMMERCE_TECH_STORIES) - 1
-            )
-        s = _COMMERCE_TECH_STORIES[st.session_state["_news_card_story_idx"]]
-        _src_link = ""
-        if s.get("source_url"):
-            _src_link = (
-                f"<div style='margin-top:12px;font-size:9pt;'>"
-                f"🔗 <a href='{s['source_url']}' target='_blank' "
-                f"style='color:#2a522a;text-decoration:none;border-bottom:"
-                f"1px dotted #5a8c5a;'>Source: {s.get('source_label', 'read more')} →</a>"
-                f"</div>"
-            )
+        """Build the 'While you wait' commerce-tech story card. Pulls
+        a fresh story via Claude + web_search (cached 1h). Honest
+        fallback when fetch fails — never fabricates content."""
+        s = _fetch_commerce_tech_story()
+        if not s:
+            # Honest fallback — no fake content
+            return """
+            <div style='background:#f5f5f5;border:1px solid #ddd;
+            border-radius:12px;padding:18px 22px;margin-top:36px;
+            font-size:10pt;line-height:1.5;color:#666;font-style:italic;'>
+              📰 Couldn't fetch today's commerce-tech news right now.
+              It'll be back next time you load the page. Either web_search
+              is rate-limited or the day's headlines aren't surfacing
+              anything substantive yet.
+            </div>
+            """
+        _src_link = (
+            f"<div style='margin-top:12px;font-size:9pt;'>"
+            f"🔗 <a href='{s['source_url']}' target='_blank' "
+            f"style='color:#2a522a;text-decoration:none;border-bottom:"
+            f"1px dotted #5a8c5a;'>Source: {s['source_label']} →</a>"
+            f"</div>"
+        )
         return f"""
         <div style='background:#eef6ee;border:1px solid #c8e0c8;
         border-radius:12px;padding:18px 22px;margin-top:36px;
