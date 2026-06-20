@@ -1033,20 +1033,19 @@ with right:
                 border-radius:12px;padding:18px 22px;margin-top:18px;
                 font-size:10.5pt;line-height:1.55;color:#1a1a1a;'>
                   <div style='font-size:12pt;font-weight:600;color:#7a5c00;
-                  margin-bottom:8px;'>🤖 A note from me while I'm working…</div>
-                  Once this brief lands in Drive, please
-                  <strong>feel free to edit or delete</strong>
-                  anything I got wrong, repeated, or framed badly.
-                  I read your edits the next time you regenerate — and use
-                  them as the new baseline so I match your style instead of
-                  overwriting it.
+                  margin-bottom:8px;'>🤖 Yo — while I cook this up…</div>
+                  When the brief lands in Drive, <strong>hammer it</strong>
+                  — edit, delete, rewrite anything I got wrong, padded out,
+                  or repeated. I read your edits next time you regen and
+                  use them as my new baseline. The more you trim my fluff,
+                  the sharper I get.
                   <br><br>
-                  <em>I'm still learning. Thanks for teaching me 🙏</em>
+                  <em>🤝 Don't hold back. I'm here to learn from you, not
+                  the other way round.</em>
                   <div style='font-size:9pt;color:#666;margin-top:14px;
                   font-style:italic;'>
-                    💡 Tip — tighter is better. If I gave you a paragraph
-                    and you'd prefer a phrase, just rewrite. I pick up the
-                    pattern.
+                    💡 Paragraph too long? Chop it to a phrase. I'll pick
+                    up the pattern.
                   </div>
                 </div>
                 """,
