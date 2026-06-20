@@ -10,12 +10,12 @@ Why this exists:
 How to use:
     from services.schema import validate_schema
 
-    df = fetch_sheet_tab(sheet_id, "Active presales")
+    df = fetch_sheet_tab(sheet_id, "Overall Pipeline for IN and SEA")
     validate_schema(
         df,
-        tab_name="Active presales",
+        tab_name="Overall Pipeline for IN and SEA",
         context="Pipeline Meetings YTD",
-        required=["Lead name", "First conv date", "Source of lead"],  # optional override
+        required=["Lead name", "Region", "Source of lead"],  # optional override
     )
 
     # If columns are missing, an st.error banner renders inline and the call
@@ -49,36 +49,25 @@ EXPECTED_SCHEMAS: dict = {
             "Active / Dropped", "Lead status",
         ],
         "expected_optional": [
-            "First conv date",   # CRITICAL for Meetings YTD attribution — see note
+            "First conv date",
             "Latest conv date",
             "POC Delivery Date", "Pilot Start Date", "Production Start Date",
             "Vertical", "Email of Key Personnel ",
         ],
-        "note": ("Unified pipeline tab replacing 'Active presales' + 'Dropped leads'. "
-                 "If 'First conv date' is missing, Pipeline meetings YTD will fall "
-                 "back to the old tabs while they exist, then degrade further."),
-    },
-    "Active presales": {
-        "required": ["Lead name", "First conv date", "Source of lead"],
-        "expected_optional": [
-            "Vertical", "Country", "Lead status", "Latest conv date",
-            "Email of Key Personnel ",
-        ],
-        # NOTE: this tab uses "Country" while the unified tab + Dropped leads
-        # use "Region" — pages that read it normalize via rename. Don't add
-        # "Region" to the optional list here or the sentry will spuriously
-        # flag it as missing every render.
-        "note": ("Source of truth for Meetings YTD attribution until "
-                 "'First conv date' is restored on the unified tab. "
-                 "Uses 'Country' column (legacy); pages normalize to 'Region'."),
+        "note": ("Authoritative pipeline tab — single source of truth for "
+                 "meetings + progression. Meetings YTD buckets by 'First "
+                 "conv date', falling back to 'Latest conv date' when blank."),
     },
     "Dropped leads": {
-        "required": ["Lead name", "First conv date", "Source of lead"],
+        "required": ["Lead name", "Source of lead"],
         "expected_optional": [
-            "Vertical", "Region", "Lead status", "Latest conv date",
+            "First conv date", "Latest conv date",
+            "Vertical", "Region", "Lead status",
             "Email of Key Personnel ",
         ],
-        "note": "Same role as 'Active presales' for the dropped-leads side.",
+        "note": ("Supplementary tab — historical leads not in the unified "
+                 "tab. Pipeline page contributes only Lead names that "
+                 "aren't already on the unified tab."),
     },
     "Hoppr__Anaysis": {
         "required": ["user_key"],
@@ -185,8 +174,8 @@ def validate_many(checks: list) -> bool:
 
     Example:
         ok = validate_many([
-            (df_active,  "Active presales", "Pipeline Meetings YTD"),
-            (df_dropped, "Dropped leads",   "Pipeline Meetings YTD"),
+            (df_unified, "Overall Pipeline for IN and SEA", "Pipeline Meetings YTD"),
+            (df_dropped, "Dropped leads",                    "Historical supplement"),
         ])
         if not ok:
             st.stop()
