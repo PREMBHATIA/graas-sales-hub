@@ -1014,10 +1014,43 @@ with right:
     placeholder = st.empty()
 
     def _render_brief(html: str, company: str, mode_label: str):
+        # When no brief has been generated yet (or after Clear), show a warm
+        # explainer in the preview column that doubles as the "fill in the
+        # form" guidance + sets the mental model that edits in Drive ARE
+        # picked up on the next regen. Disappears once html is set.
         if not html:
-            placeholder.info(
-                "Fill in the form on the left and click **Build brief** "
-                "(or **Update from call notes**). The generated brief renders here."
+            placeholder.markdown(
+                """
+                <div style='background:#eaf2ff;border:1px solid #c8d4ff;
+                border-radius:10px;padding:14px 18px;margin-top:4px;
+                font-size:10pt;line-height:1.5;color:#1a1a1a;'>
+                  <div style='font-size:10.5pt;font-weight:600;color:#2742FF;
+                  margin-bottom:6px;'>Fill in the form on the left → click
+                  Build brief (or Update from call notes).</div>
+                  The generated brief will render here.
+                </div>
+                <div style='background:#f9f7ee;border:1px solid #e9dfb8;
+                border-radius:12px;padding:18px 22px;margin-top:18px;
+                font-size:10.5pt;line-height:1.55;color:#1a1a1a;'>
+                  <div style='font-size:12pt;font-weight:600;color:#7a5c00;
+                  margin-bottom:8px;'>🤖 A note from me while I'm working…</div>
+                  Once this brief lands in Drive, please
+                  <strong>feel free to edit or delete</strong>
+                  anything I got wrong, repeated, or framed badly.
+                  I read your edits the next time you regenerate — and use
+                  them as the new baseline so I match your style instead of
+                  overwriting it.
+                  <br><br>
+                  <em>I'm still learning. Thanks for teaching me 🙏</em>
+                  <div style='font-size:9pt;color:#666;margin-top:14px;
+                  font-style:italic;'>
+                    💡 Tip — tighter is better. If I gave you a paragraph
+                    and you'd prefer a phrase, just rewrite. I pick up the
+                    pattern.
+                  </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
             )
             return
         placeholder.markdown(
