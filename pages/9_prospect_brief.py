@@ -336,13 +336,13 @@ with left:
             with st.container(border=True, height=_CARD_H):
                 _b = "✅" if _card2_valid else "2."
                 st.markdown(f"**{_b} Call notes**")
-                st.caption("Granola / Zoom export, or paste your own")
+                st.caption("Granola / Zoom · email thread · WhatsApp · or paste your own")
                 st.text_area(
                     "Notes",
                     key="brief_call_notes",
                     label_visibility="collapsed",
                     height=200,
-                    placeholder="Paste raw notes — don't pre-summarise",
+                    placeholder="Paste raw notes, email trail, or WhatsApp chat — don't pre-summarise",
                 )
                 _msg = (f"✅ {len(_pc_notes.strip())} chars" if _card2_valid
                         else f"⏳ {len(_pc_notes.strip())} chars (need ≥30)")
