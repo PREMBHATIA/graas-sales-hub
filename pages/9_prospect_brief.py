@@ -569,6 +569,112 @@ BRIEF_JSON_SCHEMA = """{
 REFERENCE_PROPOSALS_FOLDER_ID = "1tBMrcpiIDVhg5e0-N1ytjuzbDexQyheX"
 
 
+# Curated commerce-tech stories shown in the "While you wait" card on the
+# preview pane. Mix of US / India / SEA. Each ~120 words: title + body +
+# why-it-matters angle for a Graas salesperson. Rotated random-per-session.
+# Refresh quarterly (or move to a web_search-backed daily pull later).
+_COMMERCE_TECH_STORIES = [
+    {
+        "tag": "🇺🇸 US · agentic commerce",
+        "title": "Amazon Rufus — shopping becomes a conversation",
+        "body": (
+            "Amazon's Rufus AI assistant is now embedded inside the Amazon "
+            "app, answering product questions, comparing SKUs and "
+            "personalising recommendations live. Early reports show "
+            "Rufus users have higher session times and AOV than search-only."
+        ),
+        "why": (
+            "The default eCom UX is shifting from search-and-filter to "
+            "ask-and-receive. Every retailer with a marketplace presence "
+            "(or their own storefront) now has to answer: do we build "
+            "our own agentic layer, or watch Amazon set the bar?"
+        ),
+    },
+    {
+        "tag": "🇮🇳 India · quick commerce",
+        "title": "Zepto, Blinkit, Instamart — 10-min war goes nuclear",
+        "body": (
+            "Quick commerce in India crossed $5B GMV run-rate, with Zepto "
+            "raising at $5B valuation and Blinkit profitable in 8 cities. "
+            "Dark-store density is the moat, but AI-driven SKU optimisation "
+            "per dark store is where the margin lives."
+        ),
+        "why": (
+            "Distribution + AI + dark-store ops = the new D2C playbook in "
+            "SEA-style markets. Every kirana-distribution prospect is "
+            "watching this. Q-commerce is also redefining 'what fast "
+            "fulfilment looks like' for FMCG brands sitting upstream."
+        ),
+    },
+    {
+        "tag": "🇺🇸 US · merchant tooling",
+        "title": "Shopify Magic + Sidekick — AI co-pilot for every merchant",
+        "body": (
+            "Shopify shipped Magic (AI copy, product images, FAQs) and "
+            "Sidekick (conversational store manager) to all merchants — no "
+            "extra fee. SMBs now have a built-in AI co-pilot for marketing, "
+            "support and inventory questions."
+        ),
+        "why": (
+            "Verticalised AI inside a platform crushes standalone tools. "
+            "If you're selling a third-party AI capability into a Shopify "
+            "merchant, you have ~12 months before Shopify ships their own "
+            "version. Move fast or pick a non-overlapping wedge."
+        ),
+    },
+    {
+        "tag": "🇮🇩 SEA · live commerce",
+        "title": "TikTok Shop Indonesia — #2 platform in 18 months",
+        "body": (
+            "TikTok Shop is now the #2 ecom platform in Indonesia after "
+            "Tokopedia, with creator-led live shopping driving the lift. "
+            "Local sellers report 30-50% of GMV via live sessions; "
+            "the algorithm rewards conversational, not catalogue, UX."
+        ),
+        "why": (
+            "Live commerce + creator discovery is the SEA default — not "
+            "an experiment. Indonesian retail prospects (pharmacy, FMCG, "
+            "fashion) need agentic product search + cart flows that work "
+            "inside chat / live, not just web storefronts."
+        ),
+    },
+    {
+        "tag": "🇺🇸 US · capital signal",
+        "title": "SpaceX $350B secondary — what late-stage tech capital says",
+        "body": (
+            "SpaceX closed a secondary at $350B valuation, making it the "
+            "most valuable private company globally. Even with rate-cycle "
+            "headwinds, investors are writing massive cheques for "
+            "infrastructure + defensible moats."
+        ),
+        "why": (
+            "Late-stage capital still flowing — but to category-defining "
+            "infra plays. For Graas customers in capital-restructuring "
+            "years (Pyfa, Kalbe-style), this signals where the "
+            "competitive AI investment is going and what the bar is for "
+            "'tech budget' framing."
+        ),
+    },
+    {
+        "tag": "🌏 Global · AI for retail",
+        "title": "Anthropic + OpenAI verticalise into retail/commerce",
+        "body": (
+            "Both Anthropic (Claude for Enterprise) and OpenAI (Operator + "
+            "Custom GPTs for retail) are shipping verticalised agentic "
+            "features for ecom. Retailer-specific evals, prebuilt connectors "
+            "to Shopify/SAP/Salesforce, and managed agentic workflows."
+        ),
+        "why": (
+            "The general-purpose AI window is closing for retailers. "
+            "Vertical AI = Graas's lane. If a prospect is evaluating "
+            "OpenAI's retail features, the question becomes 'commerce-"
+            "native vs general-purpose with retail skin' — anchor on "
+            "Graas's commerce-only DNA."
+        ),
+    },
+]
+
+
 def _normalize_company_key(name: str) -> str:
     """Reduce a company name to a dedup key that survives common typing
     variations — case, joiner words (and/&/+/x), country suffix, and the
@@ -1013,6 +1119,34 @@ with right:
 
     placeholder = st.empty()
 
+    def _news_card_html() -> str:
+        """Build the 'While you wait' commerce-tech story card. Picks one
+        story per session (stable across reruns until session reset)."""
+        import random as _r
+        # Pin the story to the session so it doesn't flicker between reruns
+        if "_news_card_story_idx" not in st.session_state:
+            st.session_state["_news_card_story_idx"] = _r.randint(
+                0, len(_COMMERCE_TECH_STORIES) - 1
+            )
+        s = _COMMERCE_TECH_STORIES[st.session_state["_news_card_story_idx"]]
+        return f"""
+        <div style='background:#eef6ee;border:1px solid #c8e0c8;
+        border-radius:12px;padding:18px 22px;margin-top:18px;
+        font-size:10.5pt;line-height:1.55;color:#1a1a1a;'>
+          <div style='font-size:8.5pt;color:#3a6a3a;font-weight:600;
+          letter-spacing:0.5px;margin-bottom:2px;'>
+            📰 WHILE YOU WAIT — TODAY IN COMMERCE-TECH · {s['tag']}
+          </div>
+          <div style='font-size:12pt;font-weight:600;color:#2a522a;
+          margin-bottom:8px;'>{s['title']}</div>
+          {s['body']}
+          <div style='background:#dcefdc;border-left:3px solid #5a8c5a;
+          padding:8px 12px;margin-top:12px;font-size:9.5pt;line-height:1.5;'>
+            <strong>Why this matters for Graas:</strong> {s['why']}
+          </div>
+        </div>
+        """
+
     def _render_brief(html: str, company: str, mode_label: str):
         # When no brief has been generated yet (or after Clear), show a warm
         # explainer in the preview column that doubles as the "fill in the
@@ -1048,6 +1182,7 @@ with right:
                     up the pattern.
                   </div>
                 </div>
+                """ + _news_card_html() + """
                 """,
                 unsafe_allow_html=True,
             )
