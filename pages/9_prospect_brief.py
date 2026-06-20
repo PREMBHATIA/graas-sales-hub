@@ -39,81 +39,68 @@ st.caption("Pre-call research → 2-3 page account brief, then a living doc upda
            "every call until it's ready for solutioning. Output is a native Google Doc.")
 
 with st.expander("ℹ️ How to use this — read once, then collapse", expanded=False):
-    st.markdown("#### What this does")
+    st.markdown("#### The 30-second version")
     st.markdown(
-        "Type a company name → Claude **web-researches the company** (website, "
-        "LinkedIn, news, filings, funding databases) → produces a **2-3 page "
-        "Prospect Brief Google Doc** you can share with the team. The brief tells you:"
-    )
-    st.markdown(
-        "- **What they have** — business model, tech stack, channels, AI maturity (confidence tagged)\n"
-        "- **What they're missing** — gap analysis vs. what good looks like for their motion\n"
-        "- **Where to probe in discovery** — prioritized question list, not a generic checklist\n"
-        "- **Which product to pursue** — All-e, Knowledge Graph, or layered — tied to a CFO metric\n"
-        "- **People & path in** — who to engage, the champion, the budget owner"
+        "Type a company name → Claude web-researches it → produces a tight "
+        "**2-3 page Prospect Brief** (Google Doc, auto-saved to Drive, "
+        "auto-linked into the pipeline sheet column S).\n\n"
+        "After every call: switch to **🔁 Update existing**, paste the brief's "
+        "Doc URL + your call notes → the same Doc gets updated in place with "
+        "a Post-call analysis section + yellow highlights on rows that changed."
     )
 
     st.markdown("#### Two modes")
     m1, m2 = st.columns(2)
     with m1:
         st.markdown("##### 🆕 New brief (pre-call)")
-        st.caption("Before the first conversation")
         st.markdown(
-            "Paste research notes — website, LinkedIn, news, prior emails, "
-            "industry profile. If the company is in the CRM, pick it from "
-            "the dropdown and the form pre-fills with what we already know.\n\n"
-            "**Output:** auto-saved to Drive on generation — the live Doc link "
-            "appears under the preview and on the Recent briefs tile below. "
-            "Download as .docx is optional, for a local copy."
+            "Pick the company from CRM (or type) + paste any research notes "
+            "you have. Auto-saves to Drive when done."
         )
     with m2:
         st.markdown("##### 🔁 Update existing (post-call)")
-        st.caption("After every call · 4-card wizard guides you through it")
         st.markdown(
-            "The wizard takes a prior brief Doc URL + your call notes and "
-            "amends the brief in place. Each card validates before the next "
-            "one unlocks — no upfront instructions needed."
+            "4-card wizard: paste prior brief URL → paste call notes → "
+            "click Update. Updates the same Doc in place; tile flips to "
+            "Post call-N."
         )
-
-    st.markdown("#### The living-document workflow")
-    st.info(
-        "**Pre-call draft → Post call-1 → Post call-2 → … → Ready for solutioning**\n\n"
-        "Don't treat this as one-shot. Build it before call 1, then re-open this page "
-        "after every call and run the update. The status line at the top of the brief "
-        "tracks the version. **You don't need to download/upload between calls — the "
-        "Doc updates in place at the same URL.** When the qualification gate is met "
-        "(decision-maker known, budget identified, data readiness understood, CFO "
-        "metric confirmed by the customer), hand it to the **Create Proposal** page."
-    )
-
-    st.markdown("#### What happens after a post-call update")
-    st.markdown(
-        "- **Same Doc URL** gets updated (Drive keeps the prior version).\n"
-        "- A **Post-call analysis** section appears at the top showing what "
-        "THIS call added (newest first).\n"
-        "- **Rows that changed are highlighted yellow** so you can scan the "
-        "brief and see what's new without diffing.\n"
-        "- The Recent briefs tile keeps pointing to the same Doc — shared "
-        "links don't break."
-    )
 
     st.markdown("#### Tips that change output quality")
     st.markdown(
-        "- **Quote your sources** in the research notes "
-        "(*\"$290M revenue per Euromonitor; $50-100M per LeadIQ — conflicting\"*). "
-        "The brief flags the conflict instead of silently picking one.\n"
-        "- **Note what you don't know** (*\"not yet clear if they have a DMS\"*). "
-        "The brief turns it into a discovery question.\n"
-        "- **Paste call notes verbatim**. Don't pre-summarize — the diff against the "
-        "discovery agenda works better with raw notes."
+        "- **Quote your sources** in research notes (*\"$290M per Euromonitor; "
+        "$50-100M per LeadIQ — conflicting\"*). The brief flags conflicts "
+        "instead of silently picking one.\n"
+        "- **Note what you don't know** (*\"not yet clear if they have a DMS\"*) "
+        "→ becomes a discovery question.\n"
+        "- **Paste call notes verbatim**. Don't pre-summarise — the diff against "
+        "the discovery agenda works better with raw notes.\n"
+        "- **Edit the Doc freely**. Your edits are preserved on the next regen — "
+        "the bot reads them and uses them as the new baseline. Don't redo work."
     )
 
-    st.markdown("#### Where the Doc lives")
+    st.markdown("#### ✨ What's new")
     st.markdown(
-        "**Auto-saved** to the **\"Prospect Brief (via SalesHub)\"** Shared Drive on "
-        "every generation — pre-call AND post-call. Override the folder ID in step 4 "
-        "for a different destination. The Doc is auto-shared with the emails you list, "
-        "so it shows up in their *Shared with me*."
+        "- **Auto-save + auto-dedup** — Drive always has one Doc per customer "
+        "(older versions get trashed). Pipeline sheet column S auto-populated "
+        "with the link + mode badge.\n"
+        "- **Tile badges** — Recent briefs tile shows 🆕 Pre-call vs 🔁 "
+        "Post call-N at a glance.\n"
+        "- **Restructured layout** — Main brief (1.5 pages) + Appendix (page 3). "
+        "Discovery split into 🔴 5 must-haves + 🟡 5 nice-to-haves with fill-in "
+        "answer cells. New **Meeting Notes** scratchpad in the appendix to write "
+        "into during the call.\n"
+        "- **Yellow row highlighting** — every row a post-call update touched "
+        "renders yellow. Legend at the top of post-call docs.\n"
+        "- **Timeline anchor** — small line under status weaves CRM first/last "
+        "conv dates + post-call entries (with 'days ago' tags). Tells you deal "
+        "pace at a glance.\n"
+        "- **Preserve user edits** — the bot now treats your Doc edits as "
+        "authoritative on regen, never overwrites your specific framings.\n"
+        "- **Past-meeting auto-detect** — if your research notes mention a "
+        "meeting that already happened, the bot promotes the brief to Post "
+        "call-1 automatically (you don't have to flip the radio).\n"
+        "- **Live commerce-tech news card** in the preview pane while you wait — "
+        "real story, real source, fetched fresh via web_search."
     )
     st.markdown("---")
 
