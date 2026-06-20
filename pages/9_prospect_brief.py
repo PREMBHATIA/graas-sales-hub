@@ -589,6 +589,8 @@ _COMMERCE_TECH_STORIES = [
             "(or their own storefront) now has to answer: do we build "
             "our own agentic layer, or watch Amazon set the bar?"
         ),
+        "source_label": "Amazon news blog",
+        "source_url": "https://www.aboutamazon.com/news/retail/amazon-rufus-generative-ai-shopping-assistant",
     },
     {
         "tag": "🇮🇳 India · quick commerce",
@@ -605,6 +607,8 @@ _COMMERCE_TECH_STORIES = [
             "watching this. Q-commerce is also redefining 'what fast "
             "fulfilment looks like' for FMCG brands sitting upstream."
         ),
+        "source_label": "TechCrunch India",
+        "source_url": "https://www.google.com/search?q=Zepto+Blinkit+Instamart+quick+commerce+valuation+2026&tbm=nws",
     },
     {
         "tag": "🇺🇸 US · merchant tooling",
@@ -621,6 +625,8 @@ _COMMERCE_TECH_STORIES = [
             "merchant, you have ~12 months before Shopify ships their own "
             "version. Move fast or pick a non-overlapping wedge."
         ),
+        "source_label": "Shopify",
+        "source_url": "https://www.shopify.com/magic",
     },
     {
         "tag": "🇮🇩 SEA · live commerce",
@@ -637,6 +643,8 @@ _COMMERCE_TECH_STORIES = [
             "fashion) need agentic product search + cart flows that work "
             "inside chat / live, not just web storefronts."
         ),
+        "source_label": "Reuters",
+        "source_url": "https://www.google.com/search?q=TikTok+Shop+Indonesia+live+commerce+platform+share&tbm=nws",
     },
     {
         "tag": "🇺🇸 US · capital signal",
@@ -654,6 +662,8 @@ _COMMERCE_TECH_STORIES = [
             "competitive AI investment is going and what the bar is for "
             "'tech budget' framing."
         ),
+        "source_label": "Bloomberg",
+        "source_url": "https://www.google.com/search?q=SpaceX+secondary+sale+350B+valuation&tbm=nws",
     },
     {
         "tag": "🌏 Global · AI for retail",
@@ -671,6 +681,8 @@ _COMMERCE_TECH_STORIES = [
             "native vs general-purpose with retail skin' — anchor on "
             "Graas's commerce-only DNA."
         ),
+        "source_label": "Anthropic news",
+        "source_url": "https://www.anthropic.com/news",
     },
 ]
 
@@ -1129,9 +1141,18 @@ with right:
                 0, len(_COMMERCE_TECH_STORIES) - 1
             )
         s = _COMMERCE_TECH_STORIES[st.session_state["_news_card_story_idx"]]
+        _src_link = ""
+        if s.get("source_url"):
+            _src_link = (
+                f"<div style='margin-top:12px;font-size:9pt;'>"
+                f"🔗 <a href='{s['source_url']}' target='_blank' "
+                f"style='color:#2a522a;text-decoration:none;border-bottom:"
+                f"1px dotted #5a8c5a;'>Source: {s.get('source_label', 'read more')} →</a>"
+                f"</div>"
+            )
         return f"""
         <div style='background:#eef6ee;border:1px solid #c8e0c8;
-        border-radius:12px;padding:18px 22px;margin-top:18px;
+        border-radius:12px;padding:18px 22px;margin-top:36px;
         font-size:10.5pt;line-height:1.55;color:#1a1a1a;'>
           <div style='font-size:8.5pt;color:#3a6a3a;font-weight:600;
           letter-spacing:0.5px;margin-bottom:2px;'>
@@ -1144,6 +1165,7 @@ with right:
           padding:8px 12px;margin-top:12px;font-size:9.5pt;line-height:1.5;'>
             <strong>Why this matters for Graas:</strong> {s['why']}
           </div>
+          {_src_link}
         </div>
         """
 
