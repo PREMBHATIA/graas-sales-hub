@@ -282,7 +282,6 @@ if meetings_data:
 
     # ── Companies Met — by source × month ─────────────────────────────────────
     sources = meetings_data.get("sources", {})
-    st.markdown("#### 🏢 Companies Met")
 
     _INDIA_COLOR = "#3B82F6"   # blue for all India rows
     _SEA_COLOR = "#A855F7"     # purple for all SEA rows
