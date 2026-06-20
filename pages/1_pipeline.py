@@ -34,25 +34,18 @@ def load_proposals():
 
 @st.cache_data(ttl=1800)
 def load_meetings_summary():
-    """Derive meetings summary.
+    """Derive meetings summary from the unified 'Overall Pipeline for IN
+    and SEA' tab.
 
-    SOURCE OF TRUTH per metric:
-      • Meetings count (Companies Met) → OLD tabs 'Active presales' + 'Dropped
-        leads' — these still have a populated 'First conv date' column, which
-        is the correct semantic for "when did we first meet this company".
-      • POCs / Pilots / Production → NEW 'Overall Pipeline for IN and SEA' tab
-        which carries the pipeline-progression date columns.
+    Meetings count + pipeline progression both come from this tab going
+    forward. Meetings are bucketed by **Latest conv date** (First conv
+    date was dropped during the migration to the unified tab).
 
-    Why split: the team is migrating to the unified tab but dropped
-    'First conv date' along the way, and many rows have no 'Latest conv date'
-    either. Reading meetings from the new tab under-counts (only 26 of 79
-    rows have any date) and using Latest conv date is semantically wrong
-    (over-counts late months for leads we met months ago).
-
-    TODO when 'Active presales' + 'Dropped leads' tabs are archived:
-      - Either ask Dhanashree to restore 'First conv date' on the unified
-        tab, or move this calc to use the unified tab's Latest conv date
-        and accept the over-counting tradeoff.
+    Trade-offs the caller surfaces in the caption:
+      • Latest conv date over-weights recent months (a lead first met in
+        Jan but touched in Jun lands in Jun).
+      • Coverage is primarily All-e — Hoppr and MP BU pipelines may not
+        be reflected here.
     """
     from services.sheets_client import fetch_sheet_tab
     sheet_id = os.getenv("ALLE_SHEET_ID", "")
@@ -65,52 +58,24 @@ def load_meetings_summary():
     MONTHS_ALL = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
                   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
-    # ── Load: old tabs (for meetings) + unified tab (for pipeline progression) ──
-    # Schema sentry runs at the page level (outside this cache) because
-    # @st.cache_data only replays UI side-effects on cache miss — we want
-    # the missing-column banner to render on every page load until fixed.
-    df_active = pd.DataFrame()
-    df_dropped = pd.DataFrame()
     df_unified = pd.DataFrame()
     try:
-        df_active  = fetch_sheet_tab(sheet_id, "Active presales")
-        df_dropped = fetch_sheet_tab(sheet_id, "Dropped leads")
         df_unified = fetch_sheet_tab(sheet_id, "Overall Pipeline for IN and SEA")
     except Exception as e:
         import streamlit as _st
         _st.warning(f"Pipeline load error: {e}")
 
-    # Normalize the region column name — Active presales uses 'Country',
-    # Dropped leads uses 'Region'. Standardize to 'Region' for both.
-    if not df_active.empty and "Country" in df_active.columns and "Region" not in df_active.columns:
-        df_active = df_active.rename(columns={"Country": "Region"})
-
-    # Concat old tabs into a single meetings dataframe
-    if not df_active.empty or not df_dropped.empty:
-        df_mtg = _pd.concat([df_active, df_dropped], ignore_index=True, sort=False)
-    else:
-        # Fallback if old tabs are gone (archived) — use unified tab with whatever
-        # date column it has
-        df_mtg = df_unified.copy()
-
-    if df_mtg.empty or "Lead name" not in df_mtg.columns:
+    if df_unified.empty or "Lead name" not in df_unified.columns:
         return {}
 
-    # Parse all date columns we might use
-    for _df in (df_mtg, df_unified):
-        if _df.empty:
-            continue
-        for c in ["First conv date", "Latest conv date", "POC Delivery Date",
-                  "Proposal Sent Date", "Pilot Start Date",
-                  "Production Start Date"]:
-            if c in _df.columns:
-                _df[c] = _pd.to_datetime(_df[c], format="mixed", errors="coerce")
+    for c in ["Latest conv date", "POC Delivery Date",
+              "Proposal Sent Date", "Pilot Start Date",
+              "Production Start Date"]:
+        if c in df_unified.columns:
+            df_unified[c] = _pd.to_datetime(df_unified[c], format="mixed", errors="coerce")
 
-    df_mtg = df_mtg[df_mtg["Lead name"].astype(str).str.strip() != ""].copy()
-
-    # If the old tabs disappear, we have to live with Latest conv date
-    _MTG_COL = "First conv date" if "First conv date" in df_mtg.columns else "Latest conv date"
-    _using_fallback = (_MTG_COL == "Latest conv date")
+    df_mtg = df_unified[df_unified["Lead name"].astype(str).str.strip() != ""].copy()
+    _MTG_COL = "Latest conv date"
 
     def _bucket(src: str) -> str:
         s = str(src).strip().lower()
@@ -206,7 +171,6 @@ def load_meetings_summary():
 
     return {
         "_mtg_col_used":   _MTG_COL,
-        "_using_fallback": _using_fallback,
         "sources": {
             "Partner India":       _build_source("india", "partner"),
             "Partner SEA":         _build_source("sea",   "partner"),
@@ -242,24 +206,19 @@ from services.schema import validate_schema as _validate_schema
 from services.sheets_client import fetch_sheet_tab as _fetch_tab
 _alle_id = os.getenv("ALLE_SHEET_ID", "")
 if _alle_id:
-    # These fetches are cache hits (the data was loaded above) — essentially free.
-    _validate_schema(_fetch_tab(_alle_id, "Active presales"),
-                     "Active presales", context="Pipeline Meetings YTD")
-    _validate_schema(_fetch_tab(_alle_id, "Dropped leads"),
-                     "Dropped leads", context="Pipeline Meetings YTD")
+    # Cache hit — essentially free.
     _validate_schema(_fetch_tab(_alle_id, "Overall Pipeline for IN and SEA"),
                      "Overall Pipeline for IN and SEA",
-                     context="Pipeline progression (POC / Pilot / Production)")
+                     context="Pipeline meetings + progression")
 
 st.markdown(f"### 🤝 Meetings — YTD 2026 (through {_YTD_MONTHS[-1]})")
-_mtg_col_used = (meetings_data or {}).get("_mtg_col_used", "First conv date")
-_using_fallback = (meetings_data or {}).get("_using_fallback", False)
 st.caption(
-    f"All products — meetings from **Active presales + Dropped leads** tabs "
-    f"(derived from **{_mtg_col_used}**); pipeline progression (POC / Pilot / "
-    f"Production) from the unified 'Overall Pipeline for IN and SEA' tab."
-    + (" ⚠️ Old tabs unavailable — falling back to unified tab's Latest conv date "
-       "(over-counts late months)." if _using_fallback else "")
+    "Source: unified **'Overall Pipeline for IN and SEA'** tab, bucketed by "
+    "**Latest conv date**. "
+    "⚠️ This tab is **primarily All-e** — Hoppr and MP BU pipelines may not "
+    "be reflected, so totals can under-count for those products. "
+    "Counting by Latest conv date also slightly over-weights recent months "
+    "(a lead first met in Jan but touched in Jun lands in Jun)."
 )
 
 if meetings_data:
