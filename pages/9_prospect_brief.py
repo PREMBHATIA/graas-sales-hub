@@ -377,6 +377,19 @@ with left:
                 else:
                     st.caption("🔒 Fill cards 1 + 2")
 
+                # Working state + last-attempt outcome. Streamlit shows its own
+                # top-of-page "RUNNING" indicator during the rerun, but users
+                # don't always notice it — surface the same signal in-card.
+                if build_clicked:
+                    st.caption("⏳ Working… activity panel below shows live progress.")
+                else:
+                    _last_pc = st.session_state.get("last_pc_attempt_outcome")
+                    if _last_pc and _last_pc.get("status") == "error":
+                        _msg = str(_last_pc.get("message", ""))[:140]
+                        st.error(
+                            f"❌ Last attempt failed — click **Update brief** again.\n\n`{_msg}`"
+                        )
+
         # Mirror wizard state into the var names the downstream generation
         # code expects (existing_brief_id, call_notes, build_clicked).
         existing_brief_id = _pc_url
@@ -1778,6 +1791,7 @@ with right:
                     "failed", str(_save_err)
                 )
 
+            st.session_state["last_pc_attempt_outcome"] = {"status": "ok"}
             _should_rerun = True
         except Exception as e:
             # Streamlit's flow-control exceptions (RerunException, StopException) must
@@ -1789,6 +1803,9 @@ with right:
             except Exception:
                 pass
             st.error(f"Brief generation failed: {e}")
+            st.session_state["last_pc_attempt_outcome"] = {
+                "status": "error", "message": str(e),
+            }
             _should_rerun = False
 
         if locals().get("_should_rerun"):
