@@ -304,7 +304,10 @@ with left:
         _card2_valid = len(_pc_notes.strip()) >= 30
         _ready = _card1_valid and _card2_valid
 
-        c1, c2, c3, c4 = st.columns(4)
+        # 2×2 layout (was 1×4 — too squished at common widths)
+        _row1 = st.columns(2)
+        _row2 = st.columns(2)
+        c1, c2, c3, c4 = _row1[0], _row1[1], _row2[0], _row2[1]
         with c1:
             with st.container(border=True):
                 _b = "✅" if _card1_valid else ("❌" if _pc_url.strip() else "1.")
@@ -382,26 +385,27 @@ with left:
         existing_brief_id = _pc_url
         call_notes = _pc_notes
 
-    st.markdown("### 4. Save destination")
-    drive_folder = st.text_input(
-        "Drive folder ID (defaults to Graas Pre-Sales)",
-        value=DEFAULT_DRIVE_FOLDER,
-        key="brief_drive_folder",
-        help="Paste the ID from a Drive folder URL: docs.google.com/drive/folders/THIS_PART",
-    )
-
-    share_with_raw = st.text_input(
-        "Share the new Doc with (comma-separated emails — optional)",
-        value="prem@graas.ai, amruta@graas.ai",
-        key="brief_share_with",
-        help="If omitted, only the service account + folder-share inheritance apply.",
-    )
+    # Save destination + share — tucked away in an expander; defaults
+    # are right 99% of the time, so most users never touch this.
+    with st.expander("⚙️ Advanced — Drive folder + share list", expanded=False):
+        drive_folder = st.text_input(
+            "Drive folder ID (defaults to Graas Pre-Sales)",
+            value=DEFAULT_DRIVE_FOLDER,
+            key="brief_drive_folder",
+            help="Paste the ID from a Drive folder URL: docs.google.com/drive/folders/THIS_PART",
+        )
+        share_with_raw = st.text_input(
+            "Share the new Doc with (comma-separated emails — optional)",
+            value="prem@graas.ai, amruta@graas.ai",
+            key="brief_share_with",
+            help="If omitted, only the service account + folder-share inheritance apply.",
+        )
 
     # Pre-call uses a single standalone Build button. Post-call has its own
     # button inside card 3 of the wizard (assigned to `build_clicked` above)
     # and does NOT need a second one here.
     if mode.startswith("🆕"):
-        st.markdown("### 5. Action")
+        st.markdown("### 4. Build")
         build_clicked = st.button(
             "📝 Build brief",
             type="primary",
