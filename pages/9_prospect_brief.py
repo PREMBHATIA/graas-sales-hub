@@ -44,9 +44,10 @@ with st.expander("ℹ️ How to use this — read once, then collapse", expanded
         "**Type in a company name.** I'll research it, figure out gaps "
         "Graas can fill, and suggest a script + discovery questions for "
         "the call.\n\n"
-        "**Post your call**, add your notes into the Google Doc brief OR "
-        "paste them into the post-call section — and I learn from your "
-        "notes for the next regen."
+        "**Post your call**, drop your notes — paste the Granola summary "
+        "or Zoom transcript straight into the post-call section, OR just "
+        "edit the Google Doc brief directly. Either way, I read your "
+        "changes on the next regen and use them as the new baseline."
     )
 
     st.markdown("#### Two modes")
