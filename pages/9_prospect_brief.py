@@ -304,13 +304,12 @@ with left:
         _card2_valid = len(_pc_notes.strip()) >= 30
         _ready = _card1_valid and _card2_valid
 
-        # 2×2 layout (was 1×4 — too squished at common widths)
-        # Fixed-height containers so all 4 cards line up evenly (card 2's
-        # textarea would otherwise stretch the right column).
+        # 1×3 single-row layout. Card 4 (Done) removed — its content
+        # duplicates the right-pane success banner + Save section, so it
+        # was visual noise. Fixed-height containers so all 3 cards line
+        # up evenly (card 2's textarea would otherwise stretch its row).
         _CARD_H = 400
-        _row1 = st.columns(2)
-        _row2 = st.columns(2)
-        c1, c2, c3, c4 = _row1[0], _row1[1], _row2[0], _row2[1]
+        c1, c2, c3 = st.columns(3)
         with c1:
             with st.container(border=True, height=_CARD_H):
                 _b = "✅" if _card1_valid else ("❌" if _pc_url.strip() else "1.")
@@ -323,6 +322,16 @@ with left:
                     placeholder="docs.google.com/document/d/…",
                 )
                 st.caption(f"{_pc_url_status[0]} {_pc_url_status[1]}")
+                # Convenience link → SalesHub Shared Drive root so user can
+                # browse to a prior brief without leaving the page.
+                _sh_drive_url = "https://drive.google.com/drive/folders/0ABwowt8s9tmzUk9PVA"
+                st.markdown(
+                    f"<div style='margin-top:10px;font-size:9pt;'>"
+                    f"📁 <a href='{_sh_drive_url}' target='_blank' "
+                    f"style='color:#2742FF;text-decoration:none;'>"
+                    f"Browse SalesHub Drive folder →</a></div>",
+                    unsafe_allow_html=True,
+                )
         with c2:
             with st.container(border=True, height=_CARD_H):
                 _b = "✅" if _card2_valid else "2."
@@ -367,21 +376,6 @@ with left:
                     st.caption("🔒 Need a valid Doc URL (card 1)")
                 else:
                     st.caption("🔒 Fill cards 1 + 2")
-        with c4:
-            with st.container(border=True, height=_CARD_H):
-                _autosave = st.session_state.get("last_brief_autosave_status")
-                _done = bool(_autosave and _autosave[0] in ("updated", "created"))
-                _b = "✅" if _done else "📥"
-                st.markdown(f"**{_b} Done**")
-                st.caption("Open + share")
-                if _done:
-                    _, _url = _autosave
-                    st.markdown(f"[Open updated Doc →]({_url})")
-                    _trashed_n = st.session_state.get("last_brief_trashed_count", 0)
-                    if _trashed_n:
-                        st.caption(f"🧹 Trashed {_trashed_n} older")
-                else:
-                    st.caption("⏳ Run step 3 to populate")
 
         # Mirror wizard state into the var names the downstream generation
         # code expects (existing_brief_id, call_notes, build_clicked).
