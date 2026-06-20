@@ -41,12 +41,12 @@ st.caption("Pre-call research → 2-3 page account brief, then a living doc upda
 with st.expander("ℹ️ How to use this — read once, then collapse", expanded=False):
     st.markdown("#### The 30-second version")
     st.markdown(
-        "Type a company name → Claude web-researches it → produces a tight "
-        "**2-3 page Prospect Brief** (Google Doc, auto-saved to Drive, "
-        "auto-linked into the pipeline sheet column S).\n\n"
-        "After every call: switch to **🔁 Update existing**, paste the brief's "
-        "Doc URL + your call notes → the same Doc gets updated in place with "
-        "a Post-call analysis section + yellow highlights on rows that changed."
+        "**Type in a company name.** I'll research it, figure out gaps "
+        "Graas can fill, and suggest a script + discovery questions for "
+        "the call.\n\n"
+        "**Post your call**, add your notes into the Google Doc brief OR "
+        "paste them into the post-call section — and I learn from your "
+        "notes for the next regen."
     )
 
     st.markdown("#### Two modes")
@@ -80,27 +80,16 @@ with st.expander("ℹ️ How to use this — read once, then collapse", expanded
 
     st.markdown("#### ✨ What's new")
     st.markdown(
-        "- **Auto-save + auto-dedup** — Drive always has one Doc per customer "
-        "(older versions get trashed). Pipeline sheet column S auto-populated "
-        "with the link + mode badge.\n"
-        "- **Tile badges** — Recent briefs tile shows 🆕 Pre-call vs 🔁 "
-        "Post call-N at a glance.\n"
-        "- **Restructured layout** — Main brief (1.5 pages) + Appendix (page 3). "
-        "Discovery split into 🔴 5 must-haves + 🟡 5 nice-to-haves with fill-in "
-        "answer cells. New **Meeting Notes** scratchpad in the appendix to write "
+        "- **One Doc per customer, auto-saved** — also auto-linked into "
+        "pipeline sheet column S.\n"
+        "- **Post-call wizard** + **Meeting Notes scratchpad** to write "
         "into during the call.\n"
-        "- **Yellow row highlighting** — every row a post-call update touched "
-        "renders yellow. Legend at the top of post-call docs.\n"
-        "- **Timeline anchor** — small line under status weaves CRM first/last "
-        "conv dates + post-call entries (with 'days ago' tags). Tells you deal "
-        "pace at a glance.\n"
-        "- **Preserve user edits** — the bot now treats your Doc edits as "
-        "authoritative on regen, never overwrites your specific framings.\n"
-        "- **Past-meeting auto-detect** — if your research notes mention a "
-        "meeting that already happened, the bot promotes the brief to Post "
-        "call-1 automatically (you don't have to flip the radio).\n"
-        "- **Live commerce-tech news card** in the preview pane while you wait — "
-        "real story, real source, fetched fresh via web_search."
+        "- **Yellow row highlights** show what changed each call · "
+        "**Timeline** tells you deal pace.\n"
+        "- **I preserve your edits** on the next regen — your framings are "
+        "the new baseline.\n"
+        "- **Past-meeting auto-detect** in your research notes → brief "
+        "promoted to Post call-1 automatically."
     )
     st.markdown("---")
 
