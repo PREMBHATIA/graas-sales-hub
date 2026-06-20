@@ -1807,37 +1807,48 @@ with tab_news:
         st.caption(f"{len(_stories)} stor{'y' if len(_stories) == 1 else 'ies'} loaded · "
                    f"hit your browser's reload after 24h for fresh ones.")
 
-        for i, s in enumerate(_stories, start=1):
-            with st.container(border=True):
-                _t, _l = st.columns([5, 1])
-                with _t:
+        # Three vertical cards side-by-side. Headline + source are the
+        # decision-drivers, so they're at the top of each card; body +
+        # email angle sit below for the deeper read.
+        _cols = st.columns(len(_stories))
+        for col, (i, s) in zip(_cols, enumerate(_stories, start=1)):
+            with col:
+                with st.container(border=True):
+                    # Headline — the hero element
                     st.markdown(
-                        f"**{i}. {s['title']}** &nbsp; "
-                        f"<span style='font-size:0.75rem;color:#6B7280;'>{s['tag']}</span>",
+                        f"<div style='font-size:1.0rem;font-weight:700;"
+                        f"line-height:1.35;color:#111827;margin-bottom:8px;'>"
+                        f"{i}. {s['title']}</div>",
                         unsafe_allow_html=True,
                     )
-                with _l:
-                    st.link_button(
-                        f"🔗 {s['source_label']}",
-                        s["source_url"],
-                        use_container_width=True,
+                    # Source + region tag — the credibility row
+                    st.markdown(
+                        f"<div style='font-size:0.78rem;color:#6B7280;"
+                        f"margin-bottom:10px;'>"
+                        f"<a href='{s['source_url']}' target='_blank' "
+                        f"style='color:#2563EB;text-decoration:none;"
+                        f"border-bottom:1px dotted #2563EB;font-weight:600;'>"
+                        f"🔗 {s['source_label']}</a> &nbsp;·&nbsp; {s['tag']}"
+                        f"</div>",
+                        unsafe_allow_html=True,
                     )
-                st.markdown(s["body"])
-                st.markdown(
-                    f"<div style='background:#F3F4F6;border-left:3px solid #6B7280;"
-                    f"padding:8px 12px;margin-top:6px;font-size:0.9rem;'>"
-                    f"<b>Email angle:</b> {s['why']}</div>",
-                    unsafe_allow_html=True,
-                )
-
-                # Copy-friendly snippet (Markdown link + 1-line summary).
-                # Dhanashree can paste this directly into an email draft.
-                _snippet = (
-                    f"Saw this and thought of you — [{s['title']}]({s['source_url']}) "
-                    f"({s['source_label']}). {s['body'].split('. ')[0]}."
-                )
-                with st.expander("✂️ Copy-ready email snippet"):
-                    st.code(_snippet, language="markdown")
+                    # Body — secondary detail
+                    st.markdown(
+                        f"<div style='font-size:0.88rem;line-height:1.45;"
+                        f"color:#374151;margin-bottom:10px;'>{s['body']}</div>",
+                        unsafe_allow_html=True,
+                    )
+                    # Email angle — collapsible to keep the card compact
+                    with st.expander("📧 Email angle + snippet"):
+                        st.markdown(f"**Why it lands:** {s['why']}")
+                        st.markdown("**Copy-ready opener:**")
+                        _snippet = (
+                            f"Saw this and thought of you — "
+                            f"[{s['title']}]({s['source_url']}) "
+                            f"({s['source_label']}). "
+                            f"{s['body'].split('. ')[0]}."
+                        )
+                        st.code(_snippet, language="markdown")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
