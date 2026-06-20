@@ -763,140 +763,16 @@ def _resolve_existing_brief_for_company(
     return (latest_id, trashed)
 
 
-@st.cache_data(ttl=86400, show_spinner=False)
-def _fetch_commerce_tech_stories() -> list:
-    """Use Claude + web_search to fetch UP TO 3 distinct commerce-tech news
-    stories from the last 14 days, each with a verified source URL.
-    Returns a list of {tag, title, body, why, source_label, source_url}
-    dicts (0-3 entries). Cached 24h — one fetch per day per instance.
-
-    HARD RULE — NO HALLUCINATION: every claim in body must trace to the
-    actual article. Stories without a verifiable URL are dropped.
-    """
-    if not ANTHROPIC_API_KEY:
-        return []
-    try:
-        import anthropic
-        import json as _j
-        import re as _re
-        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-        prompt = (
-            "Use web_search to find UP TO 3 distinct substantive "
-            "commerce-tech news stories from the LAST 14 DAYS. "
-            "PRIORITY TOPIC = AGENTIC AI in retail/commerce (autonomous "
-            "shopping agents, agentic checkout, AI sales reps, agentic "
-            "search/discovery, retailer rollouts of agent platforms like "
-            "IKEA's agentic AI journey, Walmart Sparky, Amazon Rufus, "
-            "Shopify Sidekick, etc). Secondary topics: quick commerce in "
-            "India/SEA, marketplace AI features, retail-tech M&A/funding, "
-            "Shopify/Amazon/TikTok-Shop product announcements, Anthropic/"
-            "OpenAI vertical retail moves.\n\n"
-            "PREFERRED SOURCES (search these first; aim for ≥1 story from "
-            "this list — but never fabricate to fit, fall back to other "
-            "credible outlets if these don't have a fit):\n"
-            "  • McKinsey, Bain, BCG newsletters / insights — esp. retail "
-            "+ agentic AI pieces (e.g. mckinsey.com/industries/retail/"
-            "our-insights, bain.com/insights, bcg.com/publications)\n"
-            "  • Watson Weekly (watsonweekly.com) — AI + commerce digest\n"
-            "  • GeekWire (geekwire.com) — Amazon / Pacific NW tech\n"
-            "  • TechCrunch (techcrunch.com) — global tech / funding\n"
-            "  • Daman Soni's Substack (damansoni.substack.com) — India "
-            "ecommerce / D2C deep dives\n"
-            "  • e27 (e27.co) — Southeast Asia tech & commerce\n"
-            "  • The Ken, Entrackr, Inc42 — India ecom\n"
-            "  • Tech in Asia, DealStreetAsia — SEA\n"
-            "  • Modern Retail, Retail Dive, Bloomberg/Reuters retail "
-            "desk — global\n\n"
-            "Each story MUST:\n"
-            "  • Have a real source you can identify (publication + URL)\n"
-            "  • Be substantive (not a rumor or speculation piece)\n"
-            "  • Cover a DIFFERENT angle/topic from the others (don't "
-            "return 3 TikTok stories — diversify)\n"
-            "  • Matter to a salesperson at Graas (Graas builds agentic "
-            "AI for commerce — All-e, hoppr, MCP/Extract)\n\n"
-            "Return ONLY a JSON object with key 'stories' whose value is "
-            "an array of 1-3 story objects. Each story object has these "
-            "EXACT keys:\n"
-            "  • tag: country flag + short topic, e.g. '🇺🇸 US · agentic "
-            "commerce', '🇮🇳 India · quick commerce', '🇮🇩 SEA · live "
-            "commerce', '🌏 Global · AI for retail'\n"
-            "  • title: the actual headline (verbatim or close paraphrase)\n"
-            "  • body: 2-3 sentences using ONLY facts that appear in the "
-            "search result snippet or page content. NO STATS YOU CAN'T "
-            "POINT TO IN THE SOURCE. If unsure, leave the stat out.\n"
-            "  • why: 2 sentences on why this matters for a Graas "
-            "salesperson — tie it to commerce-AI, retail agents, or "
-            "vertical AI competitive dynamics.\n"
-            "  • source_label: publication name (e.g. 'Bloomberg', "
-            "'TechCrunch', 'Reuters', 'Economic Times')\n"
-            "  • source_url: the ACTUAL article URL from web_search "
-            "results — MUST start with http and must be the real link.\n\n"
-            "HARD RULES:\n"
-            "  1. Every claim in body MUST be in the source you cite.\n"
-            "  2. If a story has no verifiable URL, OMIT it from the "
-            "array — do NOT invent content.\n"
-            "  3. If nothing solid surfaces, return {\"stories\": []}.\n\n"
-            "Return ONLY the JSON. No prose, no code fences."
-        )
-        resp = client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=4000,
-            messages=[{"role": "user", "content": prompt}],
-            tools=[{
-                "type": "web_search_20250305",
-                "name": "web_search",
-                "max_uses": 8,
-            }],
-        )
-        text_parts = []
-        for block in resp.content:
-            if getattr(block, "type", None) == "text":
-                text_parts.append(block.text)
-        raw = "\n".join(text_parts).strip()
-        if not raw:
-            return []
-        m = _re.search(r"\{.*\}", raw, _re.DOTALL)
-        if not m:
-            return []
-        try:
-            parsed = _j.loads(m.group(0))
-        except Exception:
-            return []
-        stories_raw = parsed.get("stories", []) if isinstance(parsed, dict) else []
-        out = []
-        for st_obj in stories_raw[:3]:
-            if not isinstance(st_obj, dict):
-                continue
-            url = (st_obj.get("source_url") or "").strip()
-            if not url.startswith("http"):
-                continue
-            if not st_obj.get("title") or not st_obj.get("body") or not st_obj.get("why"):
-                continue
-            out.append({
-                "tag": st_obj.get("tag", "📰 News"),
-                "title": st_obj.get("title"),
-                "body": st_obj.get("body"),
-                "why": st_obj.get("why"),
-                "source_label": st_obj.get("source_label", "Read more"),
-                "source_url": url,
-            })
-        return out
-    except Exception:
-        return []
+from services.commerce_news import (
+    fetch_commerce_tech_stories as _fetch_commerce_tech_stories,
+    pick_story_for_session as _pick_story_for_session,
+)
 
 
 def _fetch_commerce_tech_story() -> dict:
-    """Pick ONE story for this session from the daily 3-story pool. The
-    pick is stable within a session (so it doesn't flicker on rerun) and
-    randomised across sessions (so users see variety across the day)."""
-    stories = _fetch_commerce_tech_stories() or []
-    if not stories:
-        return None
-    if "_news_session_idx" not in st.session_state:
-        import random as _r
-        st.session_state["_news_session_idx"] = _r.randint(0, 9999)
-    idx = st.session_state["_news_session_idx"] % len(stories)
-    return stories[idx]
+    """Pick ONE story for this session from the daily 3-story pool."""
+    return _pick_story_for_session(_fetch_commerce_tech_stories())
+
 
 
 @st.cache_data(ttl=3600, show_spinner=False)

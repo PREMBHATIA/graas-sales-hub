@@ -527,10 +527,11 @@ contacts['recency_key'] = contacts['days_silent'].apply(_recency_key)
 
 # ══════════════════════════════════════════════════════════════════════════════
 
-tab_contacts, tab_segments, tab_compose, tab_analytics = st.tabs([
+tab_contacts, tab_segments, tab_compose, tab_news, tab_analytics = st.tabs([
     "👥 Contacts",
     "🎯 Segments",
     "✉️ Email Composer",
+    "📰 Newsworthy",
     "📊 Analytics",
 ])
 
@@ -1777,7 +1778,70 @@ with tab_compose:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# TAB 4: ANALYTICS
+# TAB 4: NEWSWORTHY
+#   Top 3 commerce-tech stories from the last 21 days — high-impact
+#   talking points Dhanashree can drop into outreach emails. Shares the
+#   same 24h-cached pool that the Prospect Brief 'While you wait' card
+#   pulls from (services/commerce_news.py), so one web_search per day
+#   per instance serves both surfaces.
+# ══════════════════════════════════════════════════════════════════════════════
+
+with tab_news:
+    st.markdown("### 📰 Newsworthy")
+    st.caption(
+        "Top 3 high-impact commerce-tech stories from the last 21 days. "
+        "Use these as 'have you seen this?' openers in cold outreach. "
+        "Refreshes daily."
+    )
+
+    from services.commerce_news import fetch_commerce_tech_stories as _fetch_news
+
+    _stories = _fetch_news() or []
+    if not _stories:
+        st.info(
+            "Couldn't fetch news right now. Either web_search is rate-limited "
+            "or the day's headlines haven't surfaced anything substantive yet. "
+            "Try again in a few minutes."
+        )
+    else:
+        st.caption(f"{len(_stories)} stor{'y' if len(_stories) == 1 else 'ies'} loaded · "
+                   f"hit your browser's reload after 24h for fresh ones.")
+
+        for i, s in enumerate(_stories, start=1):
+            with st.container(border=True):
+                _t, _l = st.columns([5, 1])
+                with _t:
+                    st.markdown(
+                        f"**{i}. {s['title']}** &nbsp; "
+                        f"<span style='font-size:0.75rem;color:#6B7280;'>{s['tag']}</span>",
+                        unsafe_allow_html=True,
+                    )
+                with _l:
+                    st.link_button(
+                        f"🔗 {s['source_label']}",
+                        s["source_url"],
+                        use_container_width=True,
+                    )
+                st.markdown(s["body"])
+                st.markdown(
+                    f"<div style='background:#F3F4F6;border-left:3px solid #6B7280;"
+                    f"padding:8px 12px;margin-top:6px;font-size:0.9rem;'>"
+                    f"<b>Email angle:</b> {s['why']}</div>",
+                    unsafe_allow_html=True,
+                )
+
+                # Copy-friendly snippet (Markdown link + 1-line summary).
+                # Dhanashree can paste this directly into an email draft.
+                _snippet = (
+                    f"Saw this and thought of you — [{s['title']}]({s['source_url']}) "
+                    f"({s['source_label']}). {s['body'].split('. ')[0]}."
+                )
+                with st.expander("✂️ Copy-ready email snippet"):
+                    st.code(_snippet, language="markdown")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 5: ANALYTICS
 # ══════════════════════════════════════════════════════════════════════════════
 
 with tab_analytics:
