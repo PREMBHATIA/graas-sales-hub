@@ -170,6 +170,7 @@ def load_crm_companies() -> list:
                 "conv_details": str(r.get("Latest Conv details", "")).strip(),
                 "comments": str(r.get("Comments", "")).strip(),
                 "contacts": str(r.get("Email of Key Personnel ", "")).strip(),
+                "notes_link": str(r.get("Link for full notes", "")).strip(),
             }))
         return out
     except Exception:
@@ -331,6 +332,15 @@ with left:
                 _msg = (f"✅ {len(_pc_notes.strip())} chars" if _card2_valid
                         else f"⏳ {len(_pc_notes.strip())} chars (need ≥30)")
                 st.caption(_msg)
+                # If the selected company has a notes link in CRM col K,
+                # surface it — that content auto-pulls + merges with what
+                # the user types below at Build time.
+                _crm_link = (crm_data or {}).get("notes_link", "")
+                if _crm_link:
+                    _short = _crm_link if len(_crm_link) <= 60 else _crm_link[:57] + "…"
+                    st.caption(
+                        f"📎 Will also auto-pull from CRM col K: `{_short}`"
+                    )
         with c3:
             with st.container(border=True):
                 _b = "▶️" if _ready else "🔒"
@@ -1333,12 +1343,35 @@ with right:
             if not call_notes.strip():
                 st.error("Paste the new call notes.")
                 st.stop()
-            from services.sheets_client import fetch_drive_doc_text
+            from services.sheets_client import fetch_drive_doc_text, fetch_crm_notes_link
             existing_text = fetch_drive_doc_text(doc_id)
             if not existing_text:
                 st.error(f"Could not fetch the existing brief at `{doc_id}`. "
                          f"Check the URL/ID and that the service account has access.")
                 st.stop()
+            # Auto-pull CRM col K (Granola / Google Doc / other notes link)
+            # so the salesperson doesn't have to copy-paste. The fetched
+            # content is APPENDED to whatever they typed in the call notes
+            # textarea — both sources merge into the input to Claude.
+            _crm_notes_link = (crm_data or {}).get("notes_link", "")
+            _src_type, _fetched_text = (None, "")
+            if _crm_notes_link:
+                _src_type, _fetched_text = fetch_crm_notes_link(_crm_notes_link)
+            if _fetched_text:
+                call_notes = (
+                    f"=== CALL NOTES FROM CRM (col K, auto-pulled from "
+                    f"{_src_type or 'link'}: {_crm_notes_link}) ===\n"
+                    f"{_fetched_text}\n\n"
+                    f"=== ADDITIONAL NOTES (pasted by user) ===\n"
+                    f"{call_notes}"
+                )
+                st.session_state["last_crm_notes_pull"] = (
+                    "ok", _src_type or "link", len(_fetched_text)
+                )
+            elif _crm_notes_link:
+                st.session_state["last_crm_notes_pull"] = (
+                    "fail", _src_type or "link", 0
+                )
             user_prompt = _build_update_prompt(existing_text, call_notes, company_name or "<this prospect>")
 
         # Call Claude with streaming so we can surface every web search + draft step
@@ -1812,6 +1845,23 @@ with right:
             elif _pkind == "fail":
                 st.caption(f"⚠️ Pipeline sheet write-back failed: {_ppayload}")
 
+        # Surface CRM col-K notes auto-pull status (Granola / Google Doc /
+        # other link auto-fetched before generation). Best-effort — only
+        # shown when something was attempted.
+        _np = st.session_state.get("last_crm_notes_pull")
+        if _np:
+            _nkind, _ntype, _nchars = _np
+            if _nkind == "ok":
+                st.caption(
+                    f"📎 Pulled notes from CRM col K ({_ntype}, "
+                    f"{_nchars:,} chars) — merged with your call-notes input."
+                )
+            elif _nkind == "fail":
+                st.caption(
+                    f"📎 CRM col K had a {_ntype} link but I couldn't fetch "
+                    f"it — used only your pasted call notes."
+                )
+
         # Primary actions row: Download + Clear (always visible).
         # Manual save lives below — prominent on auto-save failure,
         # demoted into an expander on success.
@@ -1832,7 +1882,8 @@ with right:
                           "last_brief_doc_url", "last_brief_doc_id",
                           "last_brief_autosave_status",
                           "last_brief_trashed_count",
-                          "last_pipeline_writeback"):
+                          "last_pipeline_writeback",
+                          "last_crm_notes_pull"):
                     st.session_state.pop(k, None)
                 st.rerun()
 

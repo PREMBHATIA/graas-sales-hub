@@ -430,6 +430,65 @@ def list_drive_folder_docs(folder_id: str) -> list:
     return []
 
 
+def fetch_crm_notes_link(url_or_text: str) -> tuple:
+    """Fetch the content behind a CRM 'Link for full notes' (col K) value.
+
+    Col K cells contain either: a Google Doc URL, a Granola public URL
+    (notes.granola.ai/t/...), free text (not a URL), or a mix. This
+    helper extracts the first URL, routes to the right fetcher, and
+    returns (source_type, text). Returns (None, '') on any failure or
+    no fetchable URL — caller should skip the merge in that case.
+
+    source_type in: 'google_doc', 'granola', 'http', None.
+    """
+    import re as _re
+    s = (url_or_text or "").strip()
+    if not s:
+        return (None, "")
+    # Pull the first URL out of the cell
+    m = _re.search(r"https?://[^\s\)]+", s)
+    if not m:
+        return (None, "")
+    url = m.group(0).rstrip(".,;")
+
+    # Google Doc — reuse existing helper (handles native Docs + .docx)
+    if "docs.google.com/document" in url or "drive.google.com" in url:
+        m2 = _re.search(r"/d(?:ocument)?/d?/?([A-Za-z0-9_-]{20,})", url)
+        if m2:
+            try:
+                txt = fetch_drive_doc_text(m2.group(1))
+                if txt:
+                    return ("google_doc", txt)
+            except Exception:
+                pass
+        return ("google_doc", "")
+
+    # Granola public share URL — plain HTTP GET, return raw HTML.
+    # Claude can extract the note content from the response body in the
+    # prompt itself — we don't try to parse it server-side because
+    # Granola's HTML structure may change.
+    if "notes.granola.ai" in url:
+        try:
+            import urllib.request as _ur
+            req = _ur.Request(url, headers={
+                "User-Agent": "Mozilla/5.0 (SalesHub notes fetcher)",
+            })
+            with _ur.urlopen(req, timeout=15) as r:
+                body = r.read().decode("utf-8", errors="replace")
+            return ("granola", body[:30000])  # cap to keep prompt sane
+        except Exception:
+            return ("granola", "")
+
+    # Generic HTTP fallback
+    try:
+        import urllib.request as _ur
+        req = _ur.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with _ur.urlopen(req, timeout=15) as r:
+            return ("http", r.read().decode("utf-8", errors="replace")[:30000])
+    except Exception:
+        return ("http", "")
+
+
 def fetch_drive_doc_text(doc_id: str) -> str:
     """Fetch the plain-text contents of a Drive file, regardless of type.
 
