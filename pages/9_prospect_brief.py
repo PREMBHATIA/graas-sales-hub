@@ -1217,6 +1217,18 @@ with right:
                     "consider regenerating with more research notes."
                 )
 
+            # Inject timeline metadata from the CRM into brief_data so the
+            # renderer can show a Timeline section. Combines first-conv +
+            # last-conv from the pipeline sheet with post_call_log dates +
+            # today — gives the salesperson temporal anchoring (how long
+            # this deal has been running, days-since-last-touch, etc.)
+            # without any LLM involvement (all dates are known facts).
+            brief_data["_timeline_meta"] = {
+                "first_conv": (crm_data or {}).get("first_conv", ""),
+                "latest_conv": (crm_data or {}).get("latest_conv", ""),
+                "today": f"{datetime.now():%Y-%m-%d}",
+            }
+
             from services.brief_renderer import render_brief_html, render_brief_docx
             try:
                 brief_html = render_brief_html(brief_data)

@@ -327,6 +327,51 @@ def render_brief_docx(data: dict) -> bytes:
     if header.get("status"):
         _add_status(doc, f"Status: {header['status']}")
 
+    # ── Timeline (deal-pace anchor) ─────────────────────────────────────────
+    # Weaves CRM dates (first_conv + last_conv from the pipeline sheet) with
+    # post_call_log dates and today. Gives the salesperson temporal context:
+    # how long the deal's been running, days-since-last-touch, the cadence
+    # of the discovery cycle. All dates are known facts — no LLM involvement.
+    _tl = data.get("_timeline_meta") or {}
+    _first = (_tl.get("first_conv") or "").strip()
+    _last = (_tl.get("latest_conv") or "").strip()
+    _today = (_tl.get("today") or "").strip()
+    _pcl_for_tl = data.get("post_call_log") or []
+    if _first or _last or _pcl_for_tl:
+        from datetime import date as _date
+        def _days_since(d_str):
+            try:
+                y, m, d = d_str.split("-")
+                return (_date.today() - _date(int(y), int(m), int(d))).days
+            except Exception:
+                return None
+        _parts = []
+        if _first:
+            _ds = _days_since(_first)
+            _parts.append(f"First conv {_first}" + (f" ({_ds}d ago)" if _ds is not None else ""))
+        if _last and _last != _first:
+            _ds = _days_since(_last)
+            _parts.append(f"Last conv {_last}" + (f" ({_ds}d ago)" if _ds is not None else ""))
+        # Add post-call entries — earliest first for chronological flow
+        for entry in reversed(_pcl_for_tl):
+            cn = entry.get("call_number") or "?"
+            dt = entry.get("date") or ""
+            if dt:
+                _ds = _days_since(dt)
+                tag = " (today)" if _ds == 0 else (f" ({_ds}d ago)" if _ds is not None else "")
+                _parts.append(f"Call {cn} {dt}{tag}")
+        if _parts:
+            _tl_p = doc.add_paragraph()
+            _tl_run_label = _tl_p.add_run("Timeline: ")
+            _tl_run_label.font.size = Pt(8.5)
+            _tl_run_label.font.bold = True
+            _tl_run_label.font.color.rgb = GREY
+            _tl_run_body = _tl_p.add_run(" · ".join(_parts))
+            _tl_run_body.font.size = Pt(8.5)
+            _tl_run_body.font.color.rgb = GREY
+            _tl_p.paragraph_format.space_before = Pt(0)
+            _tl_p.paragraph_format.space_after = Pt(4)
+
     # ── Post-call analysis (only present after first post-call update) ──────
     # Most recent entry first. Each entry summarises what THAT call added.
     # Salesperson re-opening the brief reads this section first to see what
