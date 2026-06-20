@@ -305,11 +305,14 @@ with left:
         _ready = _card1_valid and _card2_valid
 
         # 2×2 layout (was 1×4 — too squished at common widths)
+        # Fixed-height containers so all 4 cards line up evenly (card 2's
+        # textarea would otherwise stretch the right column).
+        _CARD_H = 400
         _row1 = st.columns(2)
         _row2 = st.columns(2)
         c1, c2, c3, c4 = _row1[0], _row1[1], _row2[0], _row2[1]
         with c1:
-            with st.container(border=True):
+            with st.container(border=True, height=_CARD_H):
                 _b = "✅" if _card1_valid else ("❌" if _pc_url.strip() else "1.")
                 st.markdown(f"**{_b} Prior brief**")
                 st.caption("Paste the URL of the previous version")
@@ -321,7 +324,7 @@ with left:
                 )
                 st.caption(f"{_pc_url_status[0]} {_pc_url_status[1]}")
         with c2:
-            with st.container(border=True):
+            with st.container(border=True, height=_CARD_H):
                 _b = "✅" if _card2_valid else "2."
                 st.markdown(f"**{_b} Call notes**")
                 st.caption("Granola / Zoom export, or paste your own")
@@ -345,7 +348,7 @@ with left:
                         f"📎 Will also auto-pull from CRM col K: `{_short}`"
                     )
         with c3:
-            with st.container(border=True):
+            with st.container(border=True, height=_CARD_H):
                 _b = "▶️" if _ready else "🔒"
                 st.markdown(f"**{_b} Update brief**")
                 st.caption("Folds the notes into the existing brief")
@@ -365,7 +368,7 @@ with left:
                 else:
                     st.caption("🔒 Fill cards 1 + 2")
         with c4:
-            with st.container(border=True):
+            with st.container(border=True, height=_CARD_H):
                 _autosave = st.session_state.get("last_brief_autosave_status")
                 _done = bool(_autosave and _autosave[0] in ("updated", "created"))
                 _b = "✅" if _done else "📥"
