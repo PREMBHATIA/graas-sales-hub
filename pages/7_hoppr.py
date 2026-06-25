@@ -9,7 +9,7 @@ from collections import Counter
 import sys
 import re
 import os
-from datetime import datetime as _dt
+from datetime import datetime as _dt, timedelta
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from dotenv import load_dotenv
@@ -643,83 +643,111 @@ if not eval_processed.empty and "_answer" in eval_processed.columns:
 # PARSE SELLERS FROM USER_STATE
 # ══════════════════════════════════════════════════════════════════════════════
 
+# ── Sellers list — built from eval (always fresh), enriched by User_State ────
+#
+# Source-of-truth choice:
+#   Quantitative facts (last active, days silent, query counts, trend) →
+#     derived from the raw Q&A log (IMP - Evaluation_sheet). Always fresh.
+#   Qualitative judgements (classification bucket, running summary, sales
+#     recommended action, reason/tags) → LEFT JOIN from User_State, which
+#     is Hoppr's LLM-generated pipeline output. Marked "Unclassified" when
+#     a seller appears in eval but User_State hasn't caught up yet.
+#
+# Earlier version drove sellers off User_State and overlaid eval dates. That
+# meant sellers who'd queried in the last few days but hadn't been picked up
+# by User_State's aggregator were invisible to the Accounts tab.
 sellers = []
 seller_users_map = {}
+_today_d = _dt.now().date()
 
+
+def _classify_bucket(raw_bucket: str) -> str:
+    bl = (raw_bucket or "").lower()
+    if "sales" in bl or "ready" in bl: return "Sales-Ready"
+    if "power" in bl:                  return "Power User"
+    if "explor" in bl:                 return "Explorer"
+    if "block" in bl:                  return "Blocked"
+    if raw_bucket:                     return "Low Usage"
+    return "Unclassified"
+
+
+def _trend_from_silent(days_silent: int) -> str:
+    if days_silent <= 1:  return "Highly Active"
+    if days_silent <= 7:  return "Active"
+    if days_silent <= 30: return "Going Quiet"
+    return "Churned"
+
+
+# Build a lookup from User_State for the qualitative fields. Keyed by seller_id.
+_us = {}
 if not raw_user_state.empty:
-    _today = _dt.now().date()
     for idx in range(len(raw_user_state)):
-        row  = raw_user_state.iloc[idx]
+        row = raw_user_state.iloc[idx]
         vals = [str(v).strip() if pd.notna(v) else "" for v in row.values]
-        sid  = vals[0]
-        if not sid or sid in ("user_key", "") or not re.match(r'^[A-Z0-9]{2,10}$', sid):
+        sid = vals[0]
+        if not sid or sid in ("user_key", "") or not re.match(r"^[A-Z0-9]{2,10}$", sid):
             continue
-        email     = vals[2] if len(vals) > 2 else ""
-        last_seen = vals[3] if len(vals) > 3 else ""
-        try:    q_total = int(float(vals[4])) if len(vals) > 4 and vals[4] else 0
-        except: q_total = 0
-        try:    q_7d = int(float(vals[5])) if len(vals) > 5 and vals[5] else 0
-        except: q_7d = 0
-        days_silent = 999
-        if last_seen:
-            try:    days_silent = (_today - _dt.strptime(last_seen, "%Y-%m-%d").date()).days
-            except: pass
-        bucket = vals[7] if len(vals) > 7 else ""
-        bl = bucket.lower()
-        if "sales" in bl or "ready" in bl: cls = "Sales-Ready"
-        elif "power" in bl:                cls = "Power User"
-        elif "explor" in bl:               cls = "Explorer"
-        elif "block" in bl:                cls = "Blocked"
-        else:                              cls = "Low Usage"
-        if days_silent <= 1:    trend = "Highly Active"
-        elif days_silent <= 7:  trend = "Active"
-        elif days_silent <= 30: trend = "Going Quiet"
-        else:                   trend = "Churned"
+        _us[sid] = {
+            "email_fallback": vals[2] if len(vals) > 2 else "",
+            "bucket":         vals[7] if len(vals) > 7 else "",
+            "q_summary":      vals[6] if len(vals) > 6 else "",
+            "action":         vals[8] if len(vals) > 8 else "",
+            "a_summary":      vals[9] if len(vals) > 9 else "",
+        }
+
+# Build sellers from eval rows — every distinct seller_id that has logged a query.
+if not eval_processed.empty and "_seller" in eval_processed.columns:
+    _ev = eval_processed[["_seller", "_email", "_date"]].copy()
+    _ev = _ev[_ev["_seller"].notna() & (_ev["_seller"].astype(str) != "")
+              & (_ev["_seller"].astype(str) != "nan")]
+
+    _seven_days_ago = pd.Timestamp(_today_d - timedelta(days=7))
+
+    for sid, grp in _ev.groupby("_seller", sort=False):
+        # Strict seller-id sanity (matches old User_State validation)
+        if not re.match(r"^[A-Z0-9]{2,10}$", str(sid)):
+            continue
+
+        dates = grp["_date"].dropna()
+        last_dt = dates.max() if not dates.empty else None
+        last_active = last_dt.strftime("%Y-%m-%d") if last_dt is not None else ""
+        days_silent = (_today_d - last_dt.date()).days if last_dt is not None else 999
+
+        q_total = len(grp)
+        q_recent = int((dates >= _seven_days_ago).sum()) if not dates.empty else 0
+
+        # Email: pick the most-recently-active one for this seller; fall
+        # back to User_State email if eval has no usable email.
+        email = ""
+        non_empty = grp[grp["_email"].astype(str).str.contains("@", na=False)]
+        if not non_empty.empty:
+            email = str(non_empty.sort_values("_date").iloc[-1]["_email"])
+        elif sid in _us:
+            email = _us[sid]["email_fallback"]
+
+        us_row = _us.get(sid, {})
         sellers.append({
-            "seller_id": sid, "email": email,
-            "q_recent": q_7d, "q_total": q_total,
-            "last_active": last_seen, "days_silent": days_silent,
-            "trend": trend, "classification": cls,
-            "q_summary": vals[6] if len(vals) > 6 else "",
-            "a_summary": vals[9] if len(vals) > 9 else "",
-            "action":    vals[8] if len(vals) > 8 else "",
+            "seller_id":      sid,
+            "email":          email,
+            "q_recent":       q_recent,
+            "q_total":        q_total,
+            "last_active":    last_active,
+            "days_silent":    days_silent,
+            "trend":          _trend_from_silent(days_silent),
+            "classification": _classify_bucket(us_row.get("bucket", "")),
+            "q_summary":      us_row.get("q_summary", ""),
+            "a_summary":      us_row.get("a_summary", ""),
+            "action":         us_row.get("action", ""),
         })
 
-if not eval_processed.empty and sellers and "_email" in eval_processed.columns:
-    _ev = eval_processed[["_seller", "_email", "_date"]].copy()
-    _ev = _ev[_ev["_seller"].notna() & _ev["_email"].notna()]
-    _ev = _ev[(_ev["_seller"] != "nan") & (_ev["_email"] != "nan") & (_ev["_email"] != "")]
-    for sid, grp in _ev.groupby("_seller", sort=False):
+        # Per-seller email map (for the Accounts → Account Detail user list)
         seller_users_map[sid] = {}
         for em, eg in grp.groupby("_email", sort=False):
-            dates = eg["_date"].dropna().dt.strftime("%Y-%m-%d").tolist()
-            seller_users_map[sid][em] = {"count": len(eg), "dates": dates}
-
-    # Overlay: User_State's last_active lags the raw Q&A log by days. Pick
-    # the more-recent of (User_State last_active, max(Evaluation_sheet date)).
-    # Without this the Accounts tab shows stale "Last Active" while the Home
-    # tab chart (which reads the raw log) shows queries on later dates.
-    _max_per_seller = (_ev.dropna(subset=["_date"])
-                          .groupby("_seller")["_date"].max().to_dict())
-    _today_d = _dt.now().date()
-    for s in sellers:
-        eval_max = _max_per_seller.get(s["seller_id"])
-        if eval_max is None:
-            continue
-        eval_max_str = eval_max.strftime("%Y-%m-%d")
-        # Compare as strings (ISO format sorts correctly) — pick the later one
-        if not s["last_active"] or eval_max_str > s["last_active"]:
-            s["last_active"] = eval_max_str
-            try:
-                s["days_silent"] = (_today_d - eval_max.date()).days
-            except Exception:
-                pass
-            # Re-derive trend from the fresher days_silent
-            ds = s["days_silent"]
-            if ds <= 1:    s["trend"] = "Highly Active"
-            elif ds <= 7:  s["trend"] = "Active"
-            elif ds <= 30: s["trend"] = "Going Quiet"
-            else:          s["trend"] = "Churned"
+            em_str = str(em)
+            if em_str in ("", "nan") or "@" not in em_str:
+                continue
+            em_dates = eg["_date"].dropna().dt.strftime("%Y-%m-%d").tolist()
+            seller_users_map[sid][em_str] = {"count": len(eg), "dates": em_dates}
 
     # Per-seller avg prompt quality (excluding Empty rows)
     _scored_only = eval_processed[eval_processed["_prompt_tier"] != "Empty"]
