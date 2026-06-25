@@ -181,34 +181,49 @@ raw_eval,       _err_eval       = load_evaluation_sheet()
 raw_user_state, _err_user_state = load_user_state()
 raw_funnel,     _err_funnel     = load_funnel()
 
-# Schema sentry — surface missing-column issues as visible banners. Runs on
-# every render (outside @st.cache_data) so warnings persist until fixed.
-from services.schema import validate_schema as _validate_schema
-_validate_schema(raw_daily, "Hoppr__Anaysis", context="Hoppr seller table + Account Detail")
-
-# ── Data status ───────────────────────────────────────────────────────────────
-with st.expander("🔍 Data Status (click to hide)", expanded=True):
-    def _status(label, df, err, extra=""):
-        if err:
-            st.error(f"❌ **{label}**: {err}")
-        elif df.empty:
-            st.warning(f"⚠️ **{label}**: loaded but empty")
-        else:
-            st.success(f"✅ **{label}**: {len(df)} rows, {len(df.columns)} cols{extra}")
-    _status("Hoppr__Anaysis (daily)",  raw_daily,      _err_daily)
-    _status("Evaluation_sheet (Q&A)",  raw_eval,       _err_eval,
-            f" | cols: {list(raw_eval.columns[:10])}" if not raw_eval.empty else "")
-    _status("User_State (accounts)",   raw_user_state, _err_user_state)
-    _status("Final Funnel",            raw_funnel,     _err_funnel)
-    st.caption(f"Sheet ID: `{HOPPR_SHEET_ID}`")
-    if "_loading_rows_filtered" in st.session_state:
-        n_load = st.session_state["_loading_rows_filtered"]
-        if n_load > 0:
-            st.caption(f"🚫 Filtered out **{n_load}** 'Loading…' rows "
-                       f"(Hoppr logged before response completed — noise, "
-                       f"excluded from analytics & charts)")
-    if "eval_col_debug" in st.session_state:
-        st.code(st.session_state["eval_col_debug"], language=None)
+# ── Data health: one banner at the top, impact-first ─────────────────────────
+# Silent on the happy path. When something breaks (tab renamed, column gone,
+# empty result) the banner names the source AND every page section it affects.
+# Replaces the old column-by-column schema sentry buried below the fold.
+from services.data_health import render_banner as _data_health_banner
+_data_health_banner([
+    {
+        "name": "Hoppr Q&A log (IMP - Evaluation_sheet)",
+        "df": raw_eval,
+        "powers": [
+            "Home tab KPIs + 7d chart",
+            "Account Detail timeline + per-seller usage",
+            "Ask Hoppr context",
+        ],
+        "required_cols": ["Seller ID", "Email ID", "Date", "Question", "Answer"],
+        "tab_hint": "IMP - Evaluation_sheet",
+    },
+    {
+        "name": "Hoppr daily aggregate (Hoppr__Anaysis)",
+        "df": raw_daily,
+        "powers": [
+            "Fallback Home KPIs when Q&A log unavailable",
+            "Country breakdown chart",
+        ],
+        "tab_hint": "Hoppr__Anaysis",
+    },
+    {
+        "name": "Hoppr User_State (account classification)",
+        "df": raw_user_state,
+        "powers": ["Accounts tab classification + segments + recommended actions"],
+        "tab_hint": "User_State",
+    },
+    {
+        "name": "Hoppr Final Funnel",
+        "df": raw_funnel,
+        "powers": ["Acquisition Funnel chart on Home tab"],
+        "tab_hint": "Final Funnel",
+    },
+])
+if "_loading_rows_filtered" in st.session_state:
+    n_load = st.session_state["_loading_rows_filtered"]
+    if n_load > 0:
+        st.caption(f"🚫 Filtered out **{n_load}** 'Loading…' rows from analytics.")
 
 col_r, _ = st.columns([1, 9])
 with col_r:
