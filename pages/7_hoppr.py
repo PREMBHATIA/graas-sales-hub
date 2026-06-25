@@ -1330,62 +1330,72 @@ with tab_accounts:
                            "comparison (vs/growth). Pure follow-ups and very short prompts are capped.")
 
             st.markdown("#### 📋 Query Timeline")
-            timeline_all = acct_f.sort_values("_date", ascending=False)
-
-            # Split rows into 3 buckets:
-            #   answered      — both Q and A captured (the useful ones)
-            #   no_answer     — Q captured but Hoppr never logged an answer
-            #   no_question   — Q itself was Loading... (shouldn't happen post-filter, but safe)
-            _q = timeline_all["_question"].astype(str).str.strip().str.lower()
-            _a = timeline_all["_answer"].astype(str).str.strip().str.lower()
-            _empty = ["loading...", "loading", "", "nan"]
-            no_question_mask = _q.isin(_empty)
-            no_answer_mask   = (~no_question_mask) & _a.isin(_empty)
-            answered_mask    = (~no_question_mask) & (~no_answer_mask)
-
-            no_answer_rows = timeline_all[no_answer_mask]
-            timeline       = timeline_all[answered_mask].head(100)
-
-            # Single clean banner instead of per-row warnings
-            if len(no_answer_rows) > 0:
-                pct = len(no_answer_rows) / max(1, len(timeline_all)) * 100
-                st.warning(
-                    f"⚠️ **Hoppr logging issue:** {len(no_answer_rows)} of "
-                    f"{len(timeline_all)} queries ({pct:.0f}%) have a question "
-                    f"but no captured answer. The questions show in analytics; "
-                    f"the answers are missing from the sheet (Hoppr team to fix)."
+            # Guard: when the selected seller has no eval rows (or the period
+            # filter wiped them all) acct_f is empty and lacks `_date`. Skip
+            # the whole timeline block rather than crashing on sort_values.
+            if acct_f.empty or "_date" not in acct_f.columns:
+                st.caption(
+                    "No Q&A logs with timestamps for this seller in the "
+                    "selected period. Widen the period above (3M / All) if "
+                    "you expected to see rows."
                 )
-                with st.expander(f"Show the {len(no_answer_rows)} questions with no captured answer"):
-                    for _, qrow in no_answer_rows.head(50).iterrows():
-                        dt = str(qrow["_date"])[:10]
-                        em = str(qrow["_email"]).split("@")[0]
-                        st.caption(f"• {dt} — {em} — {str(qrow['_question'])[:200]}")
+            else:
+                timeline_all = acct_f.sort_values("_date", ascending=False)
 
-            for _, qrow in timeline.iterrows():
-                dt       = str(qrow["_date"])[:10]
-                em       = str(qrow["_email"])
-                question = str(qrow["_question"])
-                answer   = str(qrow["_answer"])
-                has_data = any(c in answer for c in ["📊", "|", "%", "table", "##"])
-                failed   = any(w in answer.lower() for w in
-                               ["unable", "don't have", "not available", "cannot provide", "no data"])
-                acc_flag = "🔴 " if is_accuracy(question) else ""
-                if failed:    status = "⚠️"
-                elif has_data: status = "✅"
-                else:          status = "➡️"
-                em_short = em.split("@")[0] if "@" in em else em
-                q_short = question[:120] + ("…" if len(question) > 120 else "")
-                with st.expander(f"{acc_flag}{status} {dt} — **{em_short}** — {q_short}"):
-                    st.markdown(f"**Q:** {question}")
-                    st.markdown("**A:**")
-                    if len(answer) > 800:
-                        st.markdown(answer[:800] + "…")
-                        with st.expander("Show full answer"):
+                # Split rows into 3 buckets:
+                #   answered      — both Q and A captured (the useful ones)
+                #   no_answer     — Q captured but Hoppr never logged an answer
+                #   no_question   — Q itself was Loading... (shouldn't happen post-filter, but safe)
+                _q = timeline_all["_question"].astype(str).str.strip().str.lower()
+                _a = timeline_all["_answer"].astype(str).str.strip().str.lower()
+                _empty = ["loading...", "loading", "", "nan"]
+                no_question_mask = _q.isin(_empty)
+                no_answer_mask   = (~no_question_mask) & _a.isin(_empty)
+                answered_mask    = (~no_question_mask) & (~no_answer_mask)
+
+                no_answer_rows = timeline_all[no_answer_mask]
+                timeline       = timeline_all[answered_mask].head(100)
+
+                # Single clean banner instead of per-row warnings
+                if len(no_answer_rows) > 0:
+                    pct = len(no_answer_rows) / max(1, len(timeline_all)) * 100
+                    st.warning(
+                        f"⚠️ **Hoppr logging issue:** {len(no_answer_rows)} of "
+                        f"{len(timeline_all)} queries ({pct:.0f}%) have a question "
+                        f"but no captured answer. The questions show in analytics; "
+                        f"the answers are missing from the sheet (Hoppr team to fix)."
+                    )
+                    with st.expander(f"Show the {len(no_answer_rows)} questions with no captured answer"):
+                        for _, qrow in no_answer_rows.head(50).iterrows():
+                            dt = str(qrow["_date"])[:10]
+                            em = str(qrow["_email"]).split("@")[0]
+                            st.caption(f"• {dt} — {em} — {str(qrow['_question'])[:200]}")
+
+                for _, qrow in timeline.iterrows():
+                    dt       = str(qrow["_date"])[:10]
+                    em       = str(qrow["_email"])
+                    question = str(qrow["_question"])
+                    answer   = str(qrow["_answer"])
+                    has_data = any(c in answer for c in ["📊", "|", "%", "table", "##"])
+                    failed   = any(w in answer.lower() for w in
+                                   ["unable", "don't have", "not available", "cannot provide", "no data"])
+                    acc_flag = "🔴 " if is_accuracy(question) else ""
+                    if failed:    status = "⚠️"
+                    elif has_data: status = "✅"
+                    else:          status = "➡️"
+                    em_short = em.split("@")[0] if "@" in em else em
+                    q_short = question[:120] + ("…" if len(question) > 120 else "")
+                    with st.expander(f"{acc_flag}{status} {dt} — **{em_short}** — {q_short}"):
+                        st.markdown(f"**Q:** {question}")
+                        st.markdown("**A:**")
+                        if len(answer) > 800:
+                            st.markdown(answer[:800] + "…")
+                            with st.expander("Show full answer"):
+                                st.markdown(answer)
+                        else:
                             st.markdown(answer)
-                    else:
-                        st.markdown(answer)
-            if len(timeline) == 100 and answered_mask.sum() > 100:
-                st.caption(f"Showing most recent 100 of {int(answered_mask.sum())} answered queries.")
+                if len(timeline) == 100 and answered_mask.sum() > 100:
+                    st.caption(f"Showing most recent 100 of {int(answered_mask.sum())} answered queries.")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
