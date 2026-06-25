@@ -695,6 +695,32 @@ if not eval_processed.empty and sellers and "_email" in eval_processed.columns:
             dates = eg["_date"].dropna().dt.strftime("%Y-%m-%d").tolist()
             seller_users_map[sid][em] = {"count": len(eg), "dates": dates}
 
+    # Overlay: User_State's last_active lags the raw Q&A log by days. Pick
+    # the more-recent of (User_State last_active, max(Evaluation_sheet date)).
+    # Without this the Accounts tab shows stale "Last Active" while the Home
+    # tab chart (which reads the raw log) shows queries on later dates.
+    _max_per_seller = (_ev.dropna(subset=["_date"])
+                          .groupby("_seller")["_date"].max().to_dict())
+    _today_d = _dt.now().date()
+    for s in sellers:
+        eval_max = _max_per_seller.get(s["seller_id"])
+        if eval_max is None:
+            continue
+        eval_max_str = eval_max.strftime("%Y-%m-%d")
+        # Compare as strings (ISO format sorts correctly) — pick the later one
+        if not s["last_active"] or eval_max_str > s["last_active"]:
+            s["last_active"] = eval_max_str
+            try:
+                s["days_silent"] = (_today_d - eval_max.date()).days
+            except Exception:
+                pass
+            # Re-derive trend from the fresher days_silent
+            ds = s["days_silent"]
+            if ds <= 1:    s["trend"] = "Highly Active"
+            elif ds <= 7:  s["trend"] = "Active"
+            elif ds <= 30: s["trend"] = "Going Quiet"
+            else:          s["trend"] = "Churned"
+
     # Per-seller avg prompt quality (excluding Empty rows)
     _scored_only = eval_processed[eval_processed["_prompt_tier"] != "Empty"]
     _seller_avg = (_scored_only.groupby("_seller")["_prompt_score"]
