@@ -143,12 +143,18 @@ def load_hoppr_daily():
 
 @st.cache_data(ttl=1800)
 def load_evaluation_sheet():
+    """Read the Q&A log. The Hoppr team renamed the tab to
+    'IMP - Evaluation_sheet'; we try the new name first and fall back to
+    the old one so neither rename direction can break the page again."""
     from services.sheets_client import fetch_sheet_tab
-    try:
-        df = fetch_sheet_tab(HOPPR_SHEET_ID, "Evaluation_sheet")
-        return df if not df.empty else pd.DataFrame(), None
-    except Exception as e:
-        return pd.DataFrame(), str(e)
+    for tab_name in ("IMP - Evaluation_sheet", "Evaluation_sheet"):
+        try:
+            df = fetch_sheet_tab(HOPPR_SHEET_ID, tab_name)
+            if not df.empty:
+                return df, None
+        except Exception as e:
+            return pd.DataFrame(), str(e)
+    return pd.DataFrame(), None
 
 @st.cache_data(ttl=1800)
 def load_user_state():
