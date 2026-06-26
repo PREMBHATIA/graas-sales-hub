@@ -955,10 +955,10 @@ with tab_home:
 
         fig = go.Figure()
         fig.add_trace(go.Scatter(x=daily_f["date"], y=daily_f["total_queries"],
-                                 mode="lines+markers", name="Queries",
+                                 mode="lines+markers", name="Queries (ext)",
                                  line=dict(color="#4F46E5", width=2)))
         fig.add_trace(go.Bar(x=daily_f["date"], y=daily_f["unique_sellers"],
-                             name="Unique Sellers", marker_color="#7C3AED", opacity=0.5))
+                             name="Unique Sellers (ext)", marker_color="#7C3AED", opacity=0.5))
         fig.add_trace(go.Scatter(x=daily_f["date"], y=daily_f["new_signups"],
                                  mode="lines+markers", name="New Signups",
                                  line=dict(color="#10B981", dash="dot")))
@@ -969,7 +969,7 @@ with tab_home:
             if not i_f.empty:
                 fig.add_trace(go.Scatter(
                     x=i_f["date"], y=i_f["total_queries"],
-                    mode="lines", name="Internal Queries",
+                    mode="lines", name="Queries (int)",
                     line=dict(color="#9CA3AF", dash="dash", width=1.5),
                 ))
         fig.update_layout(height=340, template="plotly_dark", margin=dict(l=20, r=20, t=20, b=20))
