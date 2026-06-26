@@ -855,51 +855,50 @@ with tab_home:
     if not daily.empty:
         today_ts  = daily["date"].max()
         this_week = daily[daily["date"] >= today_ts - pd.Timedelta(days=7)]
-        last_week = daily[(daily["date"] >= today_ts - pd.Timedelta(days=14)) &
-                          (daily["date"] <  today_ts - pd.Timedelta(days=7))]
 
-        def safe_delta(a, b):
-            return f"{((a - b) / b * 100):+.0f}%" if b else None
+        # ── 2-row × 4-metric KPI grid ────────────────────────────────────
+        # Headers appear once at the top. Each row is just the row label +
+        # the four numbers. No delta pills, no repeated headers.
+        _HDR_STYLE = (
+            "font-size:0.82rem;color:#9CA3AF;font-weight:600;"
+            "letter-spacing:0.02em;text-transform:none;padding-bottom:4px;"
+        )
+        _LBL_STYLE = (
+            "padding-top:6px;font-weight:600;color:#9CA3AF;font-size:0.9rem;"
+        )
+        _VAL_STYLE = (
+            "font-size:2rem;font-weight:600;color:#E5E7EB;line-height:1.1;"
+        )
 
-        # ── Two-row KPI grid: label column + 4 metric columns ────────────
-        # Row 1: External (real customer Hoppr usage, from eval log)
-        # Row 2: Internal Hoppr Usage (Graas employees, from Internal Users-1)
-        def _kpi_row(label, this_week_df, last_week_df, include_signups=True):
+        # Header row
+        h = st.columns([1, 2, 2, 2, 2])
+        with h[0]: st.markdown("", unsafe_allow_html=True)
+        with h[1]: st.markdown(f"<div style='{_HDR_STYLE}'>Queries (7d)</div>", unsafe_allow_html=True)
+        with h[2]: st.markdown(f"<div style='{_HDR_STYLE}'>Unique Users (7d)</div>", unsafe_allow_html=True)
+        with h[3]: st.markdown(f"<div style='{_HDR_STYLE}'>Unique Sellers (7d)</div>", unsafe_allow_html=True)
+        with h[4]: st.markdown(f"<div style='{_HDR_STYLE}'>New Signups (7d)</div>", unsafe_allow_html=True)
+
+        def _kpi_row(label, week_df, include_signups=True):
             cols = st.columns([1, 2, 2, 2, 2])
             with cols[0]:
-                st.markdown(
-                    f"<div style='padding-top:18px;font-weight:600;color:#9CA3AF;"
-                    f"font-size:0.85rem;'>{label}</div>",
-                    unsafe_allow_html=True,
-                )
-            with cols[1]:
-                tw = int(this_week_df["total_queries"].sum())
-                lw = int(last_week_df["total_queries"].sum())
-                st.metric("Queries (7d)", f"{tw:,}", safe_delta(tw, lw))
-            with cols[2]:
-                tw = int(this_week_df["unique_users"].sum())
-                lw = int(last_week_df["unique_users"].sum())
-                st.metric("Unique Users (7d)", f"{tw:,}", safe_delta(tw, lw))
-            with cols[3]:
-                tw = int(this_week_df["unique_sellers"].sum())
-                lw = int(last_week_df["unique_sellers"].sum())
-                st.metric("Unique Sellers (7d)", f"{tw:,}", safe_delta(tw, lw))
+                st.markdown(f"<div style='{_LBL_STYLE}'>{label}</div>", unsafe_allow_html=True)
+
+            def _v(col):
+                return f"{int(week_df[col].sum()):,}"
+
+            with cols[1]: st.markdown(f"<div style='{_VAL_STYLE}'>{_v('total_queries')}</div>", unsafe_allow_html=True)
+            with cols[2]: st.markdown(f"<div style='{_VAL_STYLE}'>{_v('unique_users')}</div>", unsafe_allow_html=True)
+            with cols[3]: st.markdown(f"<div style='{_VAL_STYLE}'>{_v('unique_sellers')}</div>", unsafe_allow_html=True)
             with cols[4]:
-                if include_signups and "new_signups" in this_week_df.columns:
-                    tw = int(this_week_df["new_signups"].sum())
-                    lw = int(last_week_df["new_signups"].sum())
-                    st.metric("New Signups (7d)", f"{tw:,}", safe_delta(tw, lw))
-                else:
-                    st.metric("New Signups (7d)", "—")
+                val = _v("new_signups") if include_signups and "new_signups" in week_df.columns else "—"
+                st.markdown(f"<div style='{_VAL_STYLE}'>{val}</div>", unsafe_allow_html=True)
 
-        _kpi_row("External", this_week, last_week, include_signups=True)
+        _kpi_row("External", this_week, include_signups=True)
 
-        # Internal slice — same 7d / prior 7d window as customer KPIs.
+        # Internal Hoppr usage — Graas employees dogfooding Hoppr.
         if not internal_daily.empty:
             i_this = internal_daily[internal_daily["date"] >= today_ts - pd.Timedelta(days=7)]
-            i_last = internal_daily[(internal_daily["date"] >= today_ts - pd.Timedelta(days=14)) &
-                                    (internal_daily["date"] <  today_ts - pd.Timedelta(days=7))]
-            _kpi_row("Internal", i_this, i_last, include_signups=False)
+            _kpi_row("Internal", i_this, include_signups=False)
 
     period = st.radio("Period", ["1W", "1M", "3M", "All"], index=1, horizontal=True, key="hoppr_period")
 
