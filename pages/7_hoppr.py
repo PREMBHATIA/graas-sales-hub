@@ -165,16 +165,6 @@ def load_user_state():
     except Exception as e:
         return pd.DataFrame(), str(e)
 
-@st.cache_data(ttl=3600)
-def load_funnel():
-    from services.sheets_client import fetch_sheet_tab
-    try:
-        df = fetch_sheet_tab(HOPPR_SHEET_ID, "Final Funnel")
-        return df if not df.empty else pd.DataFrame(), None
-    except Exception as e:
-        return pd.DataFrame(), str(e)
-
-
 @st.cache_data(ttl=1800)
 def load_internal_daily():
     """Internal Hoppr usage by Graas employees — daily series.
@@ -199,7 +189,6 @@ def load_internal_daily():
 raw_daily,      _err_daily      = load_hoppr_daily()
 raw_eval,       _err_eval       = load_evaluation_sheet()
 raw_user_state, _err_user_state = load_user_state()
-raw_funnel,     _err_funnel     = load_funnel()
 internal_daily, _err_internal   = load_internal_daily()
 
 # ── Data health: one banner at the top, impact-first ─────────────────────────
@@ -233,12 +222,6 @@ _data_health_banner([
         "df": raw_user_state,
         "powers": ["Accounts tab classification + segments + recommended actions"],
         "tab_hint": "User_State",
-    },
-    {
-        "name": "Hoppr Final Funnel",
-        "df": raw_funnel,
-        "powers": ["Acquisition Funnel chart on Home tab"],
-        "tab_hint": "Final Funnel",
     },
     {
         "name": "Internal Hoppr Usage (Graas employees)",
@@ -1061,26 +1044,6 @@ with tab_home:
                 show.columns = ["Date", "Seller", "Email", "Question"]
                 show["Question"] = show["Question"].str[:200]
                 st.dataframe(show.sort_values("Date", ascending=False), use_container_width=True, hide_index=True)
-
-    # ── Acquisition funnel ────────────────────────────────────────────────────
-    if not raw_funnel.empty:
-        with st.expander("🔄 Acquisition Funnel", expanded=False):
-            def _si(df, r, c):
-                try: return int(float(str(df.iloc[r, c]).replace(",", "").strip()))
-                except: return 0
-            sv = [(s, v) for s, v in zip(
-                ["Chat Visits", "Unique Users", "Signups", "Connect Flow", "Connected"],
-                [_si(raw_funnel, 1, 7), _si(raw_funnel, 4, 8), _si(raw_funnel, 9, 7),
-                 _si(raw_funnel, 13, 6), _si(raw_funnel, 17, 5)]
-            ) if v > 0]
-            if sv:
-                ss, vv = zip(*sv)
-                fig_f = go.Figure(go.Funnel(
-                    y=list(ss), x=list(vv), textinfo="value+percent initial",
-                    marker=dict(color=["#4F46E5", "#6366F1", "#7C3AED", "#8B5CF6", "#10B981"]),
-                ))
-                fig_f.update_layout(height=300, template="plotly_dark", margin=dict(l=20, r=20, t=20, b=20))
-                st.plotly_chart(fig_f, use_container_width=True)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
