@@ -28,6 +28,7 @@ pg = st.navigation(
         "Hoppr": [
             st.Page("pages/7_hoppr.py",      title="📊 Hoppr",      url_path="hoppr"),
             st.Page("pages/8_ask_hoppr.py",  title="💬 Ask Hoppr",  url_path="ask-hoppr"),
+            st.Page("pages/B_mcp_beta.py",   title="🔌 MCP Beta usage  ✨ NEW", url_path="mcp-beta"),
         ],
         # Shared / cross-product reference material — kept at the bottom so it
         # reads as "the team's library", not as an All-e-specific page.
