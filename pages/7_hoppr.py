@@ -860,14 +860,14 @@ with tab_home:
         # Headers appear once at the top. Each row is just the row label +
         # the four numbers. No delta pills, no repeated headers.
         _HDR_STYLE = (
-            "font-size:0.82rem;color:#9CA3AF;font-weight:600;"
+            "font-size:0.82rem;color:#4B5563;font-weight:600;"
             "letter-spacing:0.02em;text-transform:none;padding-bottom:4px;"
         )
         _LBL_STYLE = (
-            "padding-top:6px;font-weight:600;color:#9CA3AF;font-size:0.9rem;"
+            "padding-top:6px;font-weight:600;color:#374151;font-size:0.9rem;"
         )
         _VAL_STYLE = (
-            "font-size:2rem;font-weight:600;color:#E5E7EB;line-height:1.1;"
+            "font-size:2rem;font-weight:600;color:#111827;line-height:1.1;"
         )
 
         # Header row
