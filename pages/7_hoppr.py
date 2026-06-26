@@ -851,9 +851,42 @@ with tab_home:
         today_ts = daily["date"].max()
         ext_slice = _slice_by_period(daily, period, today_ts)
 
-        # ── 2-row × 4-metric KPI grid ────────────────────────────────────
-        # Headers appear once at the top. Each row is just the row label +
-        # the four numbers. No delta pills, no repeated headers.
+        # ── EXTERNAL: true period-uniques from the raw eval log ──
+        # Summing daily uniques over-counts users who appear on multiple
+        # days (the old bug). We compute nunique() on the raw rows instead.
+        ext_queries = int(ext_slice["total_queries"].sum())
+        ext_signups = int(ext_slice["new_signups"].sum()) if "new_signups" in ext_slice.columns else 0
+        ext_unique_users = 0
+        ext_unique_sellers = 0
+        if not eval_processed.empty and "_date" in eval_processed.columns:
+            ep_slice = eval_processed if period == "All" else eval_processed[
+                eval_processed["_date"] >= today_ts - pd.Timedelta(
+                    days={"1W": 7, "1M": 30, "3M": 90}[period]
+                )
+            ]
+            if not ep_slice.empty:
+                ext_unique_users = int(
+                    ep_slice["_email"].dropna().astype(str)
+                    .pipe(lambda s: s[s.str.contains("@", na=False)])
+                    .nunique()
+                )
+                ext_unique_sellers = int(
+                    ep_slice["_seller"].dropna().astype(str)
+                    .pipe(lambda s: s[(s != "") & (s != "nan")])
+                    .nunique()
+                )
+
+        # ── INTERNAL: peak daily uniques (true period-uniques not derivable
+        # from the pre-aggregated Internal Users-1 source).
+        int_queries = int_peak_users = int_peak_sellers = 0
+        if not internal_daily.empty:
+            int_slice = _slice_by_period(internal_daily, period, today_ts)
+            if not int_slice.empty:
+                int_queries     = int(int_slice["total_queries"].sum())
+                int_peak_users   = int(int_slice["unique_users"].max())
+                int_peak_sellers = int(int_slice["unique_sellers"].max())
+
+        # ── Grid render ────────────────────────────────────────────────
         _HDR_STYLE = (
             "font-size:0.82rem;color:#4B5563;font-weight:600;"
             "letter-spacing:0.02em;text-transform:none;padding-bottom:4px;"
@@ -865,36 +898,42 @@ with tab_home:
             "font-size:2rem;font-weight:600;color:#111827;line-height:1.1;"
         )
 
-        # Header row — labels carry the active period so the user knows
-        # what window they're looking at.
+        def _cell(html):
+            st.markdown(html, unsafe_allow_html=True)
+
         h = st.columns([1, 2, 2, 2, 2])
-        with h[0]: st.markdown("", unsafe_allow_html=True)
-        with h[1]: st.markdown(f"<div style='{_HDR_STYLE}'>Queries ({_period_suffix})</div>", unsafe_allow_html=True)
-        with h[2]: st.markdown(f"<div style='{_HDR_STYLE}'>Unique Users ({_period_suffix})</div>", unsafe_allow_html=True)
-        with h[3]: st.markdown(f"<div style='{_HDR_STYLE}'>Unique Sellers ({_period_suffix})</div>", unsafe_allow_html=True)
-        with h[4]: st.markdown(f"<div style='{_HDR_STYLE}'>New Signups ({_period_suffix})</div>", unsafe_allow_html=True)
+        with h[0]: _cell("")
+        with h[1]: _cell(f"<div style='{_HDR_STYLE}'>Queries ({_period_suffix})</div>")
+        with h[2]: _cell(f"<div style='{_HDR_STYLE}'>Unique Users ({_period_suffix})</div>")
+        with h[3]: _cell(f"<div style='{_HDR_STYLE}'>Unique Sellers ({_period_suffix})</div>")
+        with h[4]: _cell(f"<div style='{_HDR_STYLE}'>New Signups ({_period_suffix})</div>")
 
-        def _kpi_row(label, week_df, include_signups=True):
-            cols = st.columns([1, 2, 2, 2, 2])
-            with cols[0]:
-                st.markdown(f"<div style='{_LBL_STYLE}'>{label}</div>", unsafe_allow_html=True)
+        def _val(v):
+            return f"<div style='{_VAL_STYLE}'>{v:,}</div>" if isinstance(v, int) else f"<div style='{_VAL_STYLE}'>{v}</div>"
 
-            def _v(col):
-                return f"{int(week_df[col].sum()):,}"
+        # External row — all values are TRUE counts over the period.
+        r1 = st.columns([1, 2, 2, 2, 2])
+        with r1[0]: _cell(f"<div style='{_LBL_STYLE}'>External</div>")
+        with r1[1]: _cell(_val(ext_queries))
+        with r1[2]: _cell(_val(ext_unique_users))
+        with r1[3]: _cell(_val(ext_unique_sellers))
+        with r1[4]: _cell(_val(ext_signups))
 
-            with cols[1]: st.markdown(f"<div style='{_VAL_STYLE}'>{_v('total_queries')}</div>", unsafe_allow_html=True)
-            with cols[2]: st.markdown(f"<div style='{_VAL_STYLE}'>{_v('unique_users')}</div>", unsafe_allow_html=True)
-            with cols[3]: st.markdown(f"<div style='{_VAL_STYLE}'>{_v('unique_sellers')}</div>", unsafe_allow_html=True)
-            with cols[4]:
-                val = _v("new_signups") if include_signups and "new_signups" in week_df.columns else "—"
-                st.markdown(f"<div style='{_VAL_STYLE}'>{val}</div>", unsafe_allow_html=True)
-
-        _kpi_row("External", ext_slice, include_signups=True)
-
-        # Internal Hoppr usage — Graas employees dogfooding Hoppr.
+        # Internal row — queries are true sum; users/sellers are PEAK DAILY
+        # (marked with † and explained in the caption below).
         if not internal_daily.empty:
-            int_slice = _slice_by_period(internal_daily, period, today_ts)
-            _kpi_row("Internal", int_slice, include_signups=False)
+            r2 = st.columns([1, 2, 2, 2, 2])
+            with r2[0]: _cell(f"<div style='{_LBL_STYLE}'>Internal</div>")
+            with r2[1]: _cell(_val(int_queries))
+            with r2[2]: _cell(f"<div style='{_VAL_STYLE}'>{int_peak_users:,}<sup style='font-size:0.55em;color:#9CA3AF;'>†</sup></div>")
+            with r2[3]: _cell(f"<div style='{_VAL_STYLE}'>{int_peak_sellers:,}<sup style='font-size:0.55em;color:#9CA3AF;'>†</sup></div>")
+            with r2[4]: _cell(_val("—"))
+
+            st.caption(
+                "† Internal Unique Users / Sellers = **peak day** in the period "
+                "(true period-uniques aren't derivable from the pre-aggregated "
+                "`Internal Users-1` sheet — it has daily counts only, no user IDs)."
+            )
 
     if not daily.empty:
         today_ts   = daily["date"].max()
