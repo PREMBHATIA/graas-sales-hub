@@ -340,7 +340,7 @@ QUESTION_BUCKETS = {
         "benchmark", "benchmarks", "industry average", "industry avg",
         "category leader", "category benchmark",
     ],
-    "About the Data": [
+    "Data Scope / Features": [
         "what period", "what time period", "which period",
         "what date range", "what time range", "which date range",
         "what month", "which month", "what year", "which year",
