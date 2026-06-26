@@ -174,12 +174,33 @@ def load_funnel():
     except Exception as e:
         return pd.DataFrame(), str(e)
 
+
+@st.cache_data(ttl=1800)
+def load_internal_daily():
+    """Internal Hoppr usage by Graas employees — daily series.
+    Sheet has DATE / TOTAL_NO_OF_QUERIES / UNIQUE_USERS / UNIQUE_SELLERS."""
+    from services.sheets_client import fetch_sheet_tab
+    try:
+        df = fetch_sheet_tab(HOPPR_SHEET_ID, "Internal Users-1")
+        if df.empty:
+            return pd.DataFrame(), None
+        out = pd.DataFrame({
+            "date":           pd.to_datetime(df.get("DATE"), errors="coerce"),
+            "total_queries":  pd.to_numeric(df.get("TOTAL_NO_OF_QUERIES"), errors="coerce").fillna(0).astype(int),
+            "unique_users":   pd.to_numeric(df.get("UNIQUE_USERS"), errors="coerce").fillna(0).astype(int),
+            "unique_sellers": pd.to_numeric(df.get("UNIQUE_SELLERS"), errors="coerce").fillna(0).astype(int),
+        }).dropna(subset=["date"]).sort_values("date").reset_index(drop=True)
+        return out, None
+    except Exception as e:
+        return pd.DataFrame(), str(e)
+
 # ── Fetch ─────────────────────────────────────────────────────────────────────
 
 raw_daily,      _err_daily      = load_hoppr_daily()
 raw_eval,       _err_eval       = load_evaluation_sheet()
 raw_user_state, _err_user_state = load_user_state()
 raw_funnel,     _err_funnel     = load_funnel()
+internal_daily, _err_internal   = load_internal_daily()
 
 # ── Data health: one banner at the top, impact-first ─────────────────────────
 # Silent on the happy path. When something breaks (tab renamed, column gone,
@@ -218,6 +239,12 @@ _data_health_banner([
         "df": raw_funnel,
         "powers": ["Acquisition Funnel chart on Home tab"],
         "tab_hint": "Final Funnel",
+    },
+    {
+        "name": "Internal Hoppr Usage (Graas employees)",
+        "df": internal_daily,
+        "powers": ["Home tab 'Internal' KPI row", "Dashed internal-queries line on the chart"],
+        "tab_hint": "Internal Users-1",
     },
 ])
 if "_loading_rows_filtered" in st.session_state:
@@ -834,19 +861,45 @@ with tab_home:
         def safe_delta(a, b):
             return f"{((a - b) / b * 100):+.0f}%" if b else None
 
-        c1, c2, c3, c4 = st.columns(4)
-        with c1:
-            tw, lw = this_week["total_queries"].sum(), last_week["total_queries"].sum()
-            st.metric("Queries (7d)", f"{tw:,}", safe_delta(tw, lw))
-        with c2:
-            tw, lw = this_week["unique_users"].sum(), last_week["unique_users"].sum()
-            st.metric("Unique Users (7d)", f"{tw:,}", safe_delta(tw, lw))
-        with c3:
-            tw, lw = this_week["unique_sellers"].sum(), last_week["unique_sellers"].sum()
-            st.metric("Unique Sellers (7d)", f"{tw:,}", safe_delta(tw, lw))
-        with c4:
-            tw, lw = this_week["new_signups"].sum(), last_week["new_signups"].sum()
-            st.metric("New Signups (7d)", f"{tw:,}", safe_delta(tw, lw))
+        # ── Two-row KPI grid: label column + 4 metric columns ────────────
+        # Row 1: External (real customer Hoppr usage, from eval log)
+        # Row 2: Internal Hoppr Usage (Graas employees, from Internal Users-1)
+        def _kpi_row(label, this_week_df, last_week_df, include_signups=True):
+            cols = st.columns([1, 2, 2, 2, 2])
+            with cols[0]:
+                st.markdown(
+                    f"<div style='padding-top:18px;font-weight:600;color:#9CA3AF;"
+                    f"font-size:0.85rem;'>{label}</div>",
+                    unsafe_allow_html=True,
+                )
+            with cols[1]:
+                tw = int(this_week_df["total_queries"].sum())
+                lw = int(last_week_df["total_queries"].sum())
+                st.metric("Queries (7d)", f"{tw:,}", safe_delta(tw, lw))
+            with cols[2]:
+                tw = int(this_week_df["unique_users"].sum())
+                lw = int(last_week_df["unique_users"].sum())
+                st.metric("Unique Users (7d)", f"{tw:,}", safe_delta(tw, lw))
+            with cols[3]:
+                tw = int(this_week_df["unique_sellers"].sum())
+                lw = int(last_week_df["unique_sellers"].sum())
+                st.metric("Unique Sellers (7d)", f"{tw:,}", safe_delta(tw, lw))
+            with cols[4]:
+                if include_signups and "new_signups" in this_week_df.columns:
+                    tw = int(this_week_df["new_signups"].sum())
+                    lw = int(last_week_df["new_signups"].sum())
+                    st.metric("New Signups (7d)", f"{tw:,}", safe_delta(tw, lw))
+                else:
+                    st.metric("New Signups (7d)", "—")
+
+        _kpi_row("External", this_week, last_week, include_signups=True)
+
+        # Internal slice — same 7d / prior 7d window as customer KPIs.
+        if not internal_daily.empty:
+            i_this = internal_daily[internal_daily["date"] >= today_ts - pd.Timedelta(days=7)]
+            i_last = internal_daily[(internal_daily["date"] >= today_ts - pd.Timedelta(days=14)) &
+                                    (internal_daily["date"] <  today_ts - pd.Timedelta(days=7))]
+            _kpi_row("Internal", i_this, i_last, include_signups=False)
 
     period = st.radio("Period", ["1W", "1M", "3M", "All"], index=1, horizontal=True, key="hoppr_period")
 
@@ -877,6 +930,16 @@ with tab_home:
         fig.add_trace(go.Scatter(x=daily_f["date"], y=daily_f["new_signups"],
                                  mode="lines+markers", name="New Signups",
                                  line=dict(color="#10B981", dash="dot")))
+        # Internal Hoppr usage — only the queries line, dashed gray so it
+        # reads as "background context", not a competing primary signal.
+        if not internal_daily.empty:
+            i_f = internal_daily[internal_daily["date"] >= daily_f["date"].min()]
+            if not i_f.empty:
+                fig.add_trace(go.Scatter(
+                    x=i_f["date"], y=i_f["total_queries"],
+                    mode="lines", name="Internal Queries",
+                    line=dict(color="#9CA3AF", dash="dash", width=1.5),
+                ))
         fig.update_layout(height=340, template="plotly_dark", margin=dict(l=20, r=20, t=20, b=20))
         st.plotly_chart(fig, use_container_width=True)
 
