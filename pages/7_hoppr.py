@@ -26,7 +26,7 @@ except Exception:
 # Hardcoded fallback — same sheet the Command Center uses
 HOPPR_SHEET_ID = os.getenv("HOPPR_SHEET_ID", "1IR6KuRhPMRj_JsF261ZEUjLlHXu6UZ33diZQRw2MqJM")
 
-st.markdown("## 📊 Hoppr")
+st.markdown("## 📊 Hoppr (+ MCP Beta)")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
