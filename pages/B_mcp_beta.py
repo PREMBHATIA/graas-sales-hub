@@ -176,6 +176,13 @@ daily = (qsl.assign(_d=qsl["_ts"].dt.normalize())
          .reset_index())
 
 if not daily.empty:
+    # Reindex to a continuous daily range so days with zero questions
+    # render as 0-height bars instead of letting Plotly interpolate
+    # sub-day ticks across the gap.
+    full_range = pd.date_range(daily["_d"].min(), daily["_d"].max(), freq="D")
+    daily = (daily.set_index("_d").reindex(full_range, fill_value=0)
+                  .rename_axis("_d").reset_index())
+
     fig = go.Figure()
     fig.add_trace(go.Bar(x=daily["_d"], y=daily["sellers"],
                          name="Active Sellers", marker_color="#7C3AED", opacity=0.5))
@@ -185,9 +192,12 @@ if not daily.empty:
     fig.add_trace(go.Scatter(x=daily["_d"], y=daily["sql"],
                              mode="lines+markers", name="SQL Queries",
                              line=dict(color="#10B981", dash="dot")))
-    fig.update_layout(height=320, template="plotly_dark",
-                      margin=dict(l=20, r=20, t=20, b=20),
-                      legend=dict(orientation="h", yanchor="bottom", y=1.02))
+    fig.update_layout(
+        height=320, template="plotly_dark",
+        margin=dict(l=20, r=20, t=20, b=20),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02),
+        xaxis=dict(type="date", dtick="D1", tickformat="%b %-d"),
+    )
     st.plotly_chart(fig, use_container_width=True)
 
 
