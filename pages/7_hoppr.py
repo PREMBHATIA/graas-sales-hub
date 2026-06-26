@@ -727,7 +727,9 @@ def apply_period(df: pd.DataFrame, period: str, date_col: str = "_date"):
 # TABS
 # ══════════════════════════════════════════════════════════════════════════════
 
-tab_home, tab_accounts, tab_ask = st.tabs(["🏠 Home", "👥 Accounts", "💬 Ask Hoppr"])
+tab_home, tab_accounts, tab_ask, tab_mcp = st.tabs(
+    ["🏠 Home", "👥 Accounts", "💬 Ask Hoppr", "🔌 MCP Beta  ✨ NEW"]
+)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1711,3 +1713,14 @@ Answer questions by referencing the data below. Be specific — use seller IDs, 
             if st.button("🗑️ Clear chat", key="clear_hoppr_chat"):
                 st.session_state.hoppr_chat = []
                 st.rerun()
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 4 — MCP BETA
+#   Renders services/mcp_beta_view.py inline. Kept as a sub-tab (not its own
+#   sidebar page) because audience + warehouse overlap with Hoppr.
+# ══════════════════════════════════════════════════════════════════════════════
+
+with tab_mcp:
+    from services.mcp_beta_view import render as _render_mcp_beta
+    _render_mcp_beta()
