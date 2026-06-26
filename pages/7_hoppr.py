@@ -835,9 +835,21 @@ tab_home, tab_accounts, tab_ask = st.tabs(["🏠 Home", "👥 Accounts", "💬 A
 
 with tab_home:
 
+    # Period drives BOTH the KPI grid and the chart below, so the cards
+    # and the visual always tell the same story.
+    period = st.radio("Period", ["1W", "1M", "3M", "All"], index=1, horizontal=True, key="hoppr_period")
+    _PERIOD_LABEL = {"1W": "7d", "1M": "30d", "3M": "90d", "All": "all-time"}
+    _period_suffix = _PERIOD_LABEL.get(period, period)
+
+    def _slice_by_period(df, period_key, today_ts):
+        if df.empty or period_key not in {"1W", "1M", "3M"}:
+            return df
+        days = {"1W": 7, "1M": 30, "3M": 90}[period_key]
+        return df[df["date"] >= today_ts - pd.Timedelta(days=days)]
+
     if not daily.empty:
-        today_ts  = daily["date"].max()
-        this_week = daily[daily["date"] >= today_ts - pd.Timedelta(days=7)]
+        today_ts = daily["date"].max()
+        ext_slice = _slice_by_period(daily, period, today_ts)
 
         # ── 2-row × 4-metric KPI grid ────────────────────────────────────
         # Headers appear once at the top. Each row is just the row label +
@@ -853,13 +865,14 @@ with tab_home:
             "font-size:2rem;font-weight:600;color:#111827;line-height:1.1;"
         )
 
-        # Header row
+        # Header row — labels carry the active period so the user knows
+        # what window they're looking at.
         h = st.columns([1, 2, 2, 2, 2])
         with h[0]: st.markdown("", unsafe_allow_html=True)
-        with h[1]: st.markdown(f"<div style='{_HDR_STYLE}'>Queries (7d)</div>", unsafe_allow_html=True)
-        with h[2]: st.markdown(f"<div style='{_HDR_STYLE}'>Unique Users (7d)</div>", unsafe_allow_html=True)
-        with h[3]: st.markdown(f"<div style='{_HDR_STYLE}'>Unique Sellers (7d)</div>", unsafe_allow_html=True)
-        with h[4]: st.markdown(f"<div style='{_HDR_STYLE}'>New Signups (7d)</div>", unsafe_allow_html=True)
+        with h[1]: st.markdown(f"<div style='{_HDR_STYLE}'>Queries ({_period_suffix})</div>", unsafe_allow_html=True)
+        with h[2]: st.markdown(f"<div style='{_HDR_STYLE}'>Unique Users ({_period_suffix})</div>", unsafe_allow_html=True)
+        with h[3]: st.markdown(f"<div style='{_HDR_STYLE}'>Unique Sellers ({_period_suffix})</div>", unsafe_allow_html=True)
+        with h[4]: st.markdown(f"<div style='{_HDR_STYLE}'>New Signups ({_period_suffix})</div>", unsafe_allow_html=True)
 
         def _kpi_row(label, week_df, include_signups=True):
             cols = st.columns([1, 2, 2, 2, 2])
@@ -876,14 +889,12 @@ with tab_home:
                 val = _v("new_signups") if include_signups and "new_signups" in week_df.columns else "—"
                 st.markdown(f"<div style='{_VAL_STYLE}'>{val}</div>", unsafe_allow_html=True)
 
-        _kpi_row("External", this_week, include_signups=True)
+        _kpi_row("External", ext_slice, include_signups=True)
 
         # Internal Hoppr usage — Graas employees dogfooding Hoppr.
         if not internal_daily.empty:
-            i_this = internal_daily[internal_daily["date"] >= today_ts - pd.Timedelta(days=7)]
-            _kpi_row("Internal", i_this, include_signups=False)
-
-    period = st.radio("Period", ["1W", "1M", "3M", "All"], index=1, horizontal=True, key="hoppr_period")
+            int_slice = _slice_by_period(internal_daily, period, today_ts)
+            _kpi_row("Internal", int_slice, include_signups=False)
 
     if not daily.empty:
         today_ts   = daily["date"].max()
