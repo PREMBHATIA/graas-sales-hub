@@ -255,6 +255,22 @@ else:
 
 country = process_hoppr_country(raw_daily) if not raw_daily.empty else pd.DataFrame()
 
+# ── Hard cutoff: ignore anything before this date everywhere on the page.
+# The 2025 / pre-launch rows in the eval log + User_State + analysis sheet
+# drag down completeness stats, distort trend charts, and create stale
+# "last active" entries. Trim once at the top so every downstream view is
+# clean by default.
+HOPPR_DATA_START = pd.Timestamp("2026-01-01")
+
+if not daily.empty and "date" in daily.columns:
+    daily = daily[daily["date"] >= HOPPR_DATA_START].reset_index(drop=True)
+if not country.empty and "date" in country.columns:
+    country = country[country["date"] >= HOPPR_DATA_START].reset_index(drop=True)
+if not internal_daily.empty and "date" in internal_daily.columns:
+    internal_daily = internal_daily[
+        internal_daily["date"] >= HOPPR_DATA_START
+    ].reset_index(drop=True)
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # QUESTION CLASSIFICATION
@@ -474,6 +490,10 @@ if not raw_eval.empty:
         edf["_question"] = edf[q_col_e].astype(str)
         edf["_answer"]   = edf[a_col_e].astype(str) if a_col_e else ""
         edf = edf.dropna(subset=["_date"])
+
+        # ── Hard cutoff: 2025 / pre-launch rows out before counting ────────
+        # Mirrors the daily-aggregate filter further up; same rationale.
+        edf = edf[edf["_date"] >= HOPPR_DATA_START]
 
         # ── Filter "Loading..." log noise out of all analytics ─────────────
         # These rows are Hoppr's incomplete-response logs, not real prompts.
