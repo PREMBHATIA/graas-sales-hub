@@ -526,20 +526,23 @@ if not eval_processed.empty and "_answer" in eval_processed.columns:
     _pct_real = _real_count / len(eval_processed) * 100 if len(eval_processed) else 0
     _q_loading = st.session_state.get("_loading_rows_filtered", 0)
 
-    _msg = (
-        f"📊 **Hoppr logging health:** "
-        f"{_real_count} of {len(eval_processed) + _q_loading} total rows have BOTH "
-        f"question + answer captured ({_pct_real:.0f}% complete). "
-        f"**{_missing_count}** rows have a question but `Loading…` in the answer column · "
-        f"**{_q_loading}** rows had `Loading…` in the question column too. "
-        f"Reading from `{q_col_e}` / `{a_col_e}`."
-    )
-    if _pct_real < 70:
-        st.warning(_msg)
-    else:
-        st.success(_msg)
-
-    with st.expander("🔬 Browse ALL eval-sheet columns (verify column mapping)"):
+    # Tucked into a collapsed expander — these are diagnostics for when
+    # something's wrong with the upstream logging, not headline numbers.
+    # Live page reads from filtered `eval_processed`, which already drops
+    # `Loading…` rows for analytics — so this banner is purely informational.
+    with st.expander(
+        f"🔧 Data diagnostics (post-{HOPPR_DATA_START.strftime('%d %b %Y')}) — "
+        f"{_pct_real:.0f}% of rows complete · {_q_loading} 'Loading…' rows filtered",
+        expanded=False,
+    ):
+        st.caption(
+            f"**Hoppr logging health:** "
+            f"{_real_count} of {len(eval_processed) + _q_loading} total rows have BOTH "
+            f"question + answer captured ({_pct_real:.0f}% complete). "
+            f"**{_missing_count}** rows have a question but `Loading…` in the answer column · "
+            f"**{_q_loading}** rows had `Loading…` in the question column too. "
+            f"Reading from `{q_col_e}` / `{a_col_e}`."
+        )
         st.caption("Picks one row with a real question, shows what every column "
                    "contains so you can verify which column has Hoppr's answer.")
         real_row = None
