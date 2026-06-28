@@ -103,17 +103,17 @@ def render() -> None:
         return
 
     period = st.radio(
-        "Period", ["1W", "1M", "3M", "All"],
+        "Period", ["1W", "1M", "3M", "YTD"],
         index=1, horizontal=True, key="mcp_period",
     )
-    _period_suffix = {"1W": "7d", "1M": "30d", "3M": "90d", "All": "all-time"}[period]
+    _period_suffix = {"1W": "7d", "1M": "30d", "3M": "90d", "YTD": "YTD"}[period]
 
     today_ts = questions_log["_ts"].max()
-    if period == "All":
-        qsl = questions_log
+    if period == "YTD":
+        cutoff = pd.Timestamp(today_ts.year, 1, 1)
     else:
-        days = {"1W": 7, "1M": 30, "3M": 90}[period]
-        qsl = questions_log[questions_log["_ts"] >= today_ts - pd.Timedelta(days=days)]
+        cutoff = today_ts - pd.Timedelta(days={"1W": 7, "1M": 30, "3M": 90}[period])
+    qsl = questions_log[questions_log["_ts"] >= cutoff]
 
     # ── KPI strip ────────────────────────────────────────────────────────────
     _HDR_STYLE = ("font-size:0.82rem;color:#4B5563;font-weight:600;"

@@ -737,7 +737,8 @@ def apply_period(df: pd.DataFrame, period: str, date_col: str = "_date"):
     data_start = df[date_col].min()
     cutoffs    = {"1W": today_ts - pd.Timedelta(days=7),
                   "1M": today_ts - pd.Timedelta(days=30),
-                  "3M": today_ts - pd.Timedelta(days=90)}
+                  "3M": today_ts - pd.Timedelta(days=90),
+                  "YTD": pd.Timestamp(today_ts.year, 1, 1)}
     if period in cutoffs:
         return df[df[date_col] >= max(cutoffs[period], data_start)]
     return df
@@ -760,12 +761,17 @@ with tab_home:
 
     # Period drives BOTH the KPI grid and the chart below, so the cards
     # and the visual always tell the same story.
-    period = st.radio("Period", ["1W", "1M", "3M", "All"], index=1, horizontal=True, key="hoppr_period")
-    _PERIOD_LABEL = {"1W": "7d", "1M": "30d", "3M": "90d", "All": "all-time"}
+    period = st.radio("Period", ["1W", "1M", "3M", "YTD"], index=1, horizontal=True, key="hoppr_period")
+    _PERIOD_LABEL = {"1W": "7d", "1M": "30d", "3M": "90d", "YTD": "YTD"}
     _period_suffix = _PERIOD_LABEL.get(period, period)
 
     def _slice_by_period(df, period_key, today_ts):
-        if df.empty or period_key not in {"1W", "1M", "3M"}:
+        if df.empty:
+            return df
+        if period_key == "YTD":
+            year_start = pd.Timestamp(today_ts.year, 1, 1)
+            return df[df["date"] >= year_start]
+        if period_key not in {"1W", "1M", "3M"}:
             return df
         days = {"1W": 7, "1M": 30, "3M": 90}[period_key]
         return df[df["date"] >= today_ts - pd.Timedelta(days=days)]
@@ -782,11 +788,11 @@ with tab_home:
         ext_unique_users = 0
         ext_unique_sellers = 0
         if not eval_processed.empty and "_date" in eval_processed.columns:
-            ep_slice = eval_processed if period == "All" else eval_processed[
-                eval_processed["_date"] >= today_ts - pd.Timedelta(
-                    days={"1W": 7, "1M": 30, "3M": 90}[period]
-                )
-            ]
+            if period == "YTD":
+                _ep_cutoff = pd.Timestamp(today_ts.year, 1, 1)
+            else:
+                _ep_cutoff = today_ts - pd.Timedelta(days={"1W": 7, "1M": 30, "3M": 90}[period])
+            ep_slice = eval_processed[eval_processed["_date"] >= _ep_cutoff]
             if not ep_slice.empty:
                 ext_unique_users = int(
                     ep_slice["_email"].dropna().astype(str)
@@ -1182,7 +1188,7 @@ with tab_accounts:
 
             sel_dd = st.selectbox("Select account", dd_opts, key="dd_seller")
         with dd_col2:
-            dd_period = st.radio("Usage period", ["1W", "1M", "3M", "All"], index=2,
+            dd_period = st.radio("Usage period", ["1W", "1M", "3M", "YTD"], index=2,
                                  horizontal=False, key="dd_period")
 
         if sel_dd:
