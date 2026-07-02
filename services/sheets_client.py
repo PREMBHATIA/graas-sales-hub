@@ -389,44 +389,61 @@ def list_drive_folder_all_files(folder_id: str) -> list:
     return []
 
 
-def list_drive_folder_docs(folder_id: str) -> list:
+def list_drive_folder_docs(folder_id: str, retries: int = 2,
+                           raise_on_error: bool = False) -> list:
     """List Google Docs inside a Drive folder (Shared Drive supported).
 
-    Returns [{id, name, modified_time}] sorted newest-first. Filters out
-    non-Doc files (PDFs, slides etc.) so callers can assume export-as-text
-    will work on every returned id.
+    Returns [{id, name, modified_time, app_properties}] sorted newest-first.
+    Filters out non-Doc files (PDFs, slides etc.) so callers can assume
+    export-as-text will work on every returned id.
+
+    Retries transient Drive errors a few times before giving up. By default
+    returns [] on persistent failure (back-compat). Pass raise_on_error=True
+    to raise instead — so a caller can tell "folder is genuinely empty" apart
+    from "the listing call failed" (the Recent-briefs tiles rely on this so a
+    transient Drive hiccup never looks like the briefs were deleted).
     """
     creds = _get_drive_credentials()
     if creds is None:
+        if raise_on_error:
+            raise RuntimeError("Drive credentials unavailable")
         return []
-    try:
-        import urllib.parse
-        session = greq.AuthorizedSession(creds)
-        q = urllib.parse.quote(
-            f"'{folder_id}' in parents "
-            f"and mimeType='application/vnd.google-apps.document' "
-            f"and trashed=false"
-        )
-        url = (
-            f"https://www.googleapis.com/drive/v3/files"
-            f"?q={q}&supportsAllDrives=true&includeItemsFromAllDrives=true"
-            f"&pageSize=100&orderBy=modifiedTime desc"
-            f"&fields=files(id,name,modifiedTime,appProperties)"
-        )
-        r = session.get(url, timeout=15)
-        if r.status_code == 200:
-            files = r.json().get("files", [])
-            return [
-                {
-                    "id": f["id"],
-                    "name": f["name"],
-                    "modified_time": f.get("modifiedTime", ""),
-                    "app_properties": f.get("appProperties", {}) or {},
-                }
-                for f in files
-            ]
-    except Exception:
-        pass
+    import urllib.parse, time
+    session = greq.AuthorizedSession(creds)
+    q = urllib.parse.quote(
+        f"'{folder_id}' in parents "
+        f"and mimeType='application/vnd.google-apps.document' "
+        f"and trashed=false"
+    )
+    url = (
+        f"https://www.googleapis.com/drive/v3/files"
+        f"?q={q}&supportsAllDrives=true&includeItemsFromAllDrives=true"
+        f"&pageSize=100&orderBy=modifiedTime desc"
+        f"&fields=files(id,name,modifiedTime,appProperties)"
+    )
+    last_err = None
+    for attempt in range(retries + 1):
+        try:
+            r = session.get(url, timeout=15)
+            if r.status_code == 200:
+                files = r.json().get("files", [])
+                return [
+                    {
+                        "id": f["id"],
+                        "name": f["name"],
+                        "modified_time": f.get("modifiedTime", ""),
+                        "app_properties": f.get("appProperties", {}) or {},
+                    }
+                    for f in files
+                ]
+            last_err = f"HTTP {r.status_code}: {r.text[:150]}"
+        except Exception as e:
+            last_err = f"{type(e).__name__}: {e}"
+        if attempt < retries:
+            time.sleep(0.5 * (attempt + 1))
+    if raise_on_error:
+        raise RuntimeError(
+            f"Drive list failed after {retries + 1} attempts — {last_err}")
     return []
 
 
