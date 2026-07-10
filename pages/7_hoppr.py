@@ -191,6 +191,11 @@ raw_eval,       _err_eval       = load_evaluation_sheet()
 raw_user_state, _err_user_state = load_user_state()
 internal_daily, _err_internal   = load_internal_daily()
 
+# MCP Beta usage (sellers querying the same warehouse via Claude/GPT). Reuses the
+# MCP Beta tab's loader so the Home 'MCP' row and the MCP Beta tab stay in sync.
+from services.mcp_beta_view import _load_questions_log as _load_mcp_questions_log
+mcp_log, _err_mcp = _load_mcp_questions_log()
+
 # ── Data health: one banner at the top, impact-first ─────────────────────────
 # Silent on the happy path. When something breaks (tab renamed, column gone,
 # empty result) the banner names the source AND every page section it affects.
@@ -865,6 +870,34 @@ with tab_home:
                 "† Internal Unique Users / Sellers = **peak day** in the period "
                 "(true period-uniques aren't derivable from the pre-aggregated "
                 "`Internal Users-1` sheet — it has daily counts only, no user IDs)."
+            )
+
+        # ── MCP row: sellers querying the same warehouse via Claude/GPT (MCP
+        #    integration) — a third usage surface, sliced to the same period as
+        #    External/Internal. New signups don't apply to this surface.
+        if not mcp_log.empty and "_ts" in mcp_log.columns:
+            if period == "YTD":
+                _mcp_cut = pd.Timestamp(today_ts.year, 1, 1)
+            else:
+                _mcp_cut = today_ts - pd.Timedelta(
+                    days={"1W": 7, "1M": 30, "3M": 90}[period])
+            _mcp_sl = mcp_log[mcp_log["_ts"] >= _mcp_cut]
+            _mcp_q = int(len(_mcp_sl))
+            _mcp_u = int(_mcp_sl.get("USER_EMAIL", pd.Series(dtype=str))
+                         .dropna().astype(str)
+                         .pipe(lambda s: s[s.str.contains("@", na=False)]).nunique())
+            _mcp_s = int(_mcp_sl.get("SELLER_ID", pd.Series(dtype=str))
+                         .dropna().astype(str)
+                         .pipe(lambda s: s[(s != "") & (s != "nan")]).nunique())
+            r3 = st.columns([1, 2, 2, 2, 2])
+            with r3[0]: _cell(f"<div style='{_LBL_STYLE}'>MCP</div>")
+            with r3[1]: _cell(_val(_mcp_q))
+            with r3[2]: _cell(_val(_mcp_u))
+            with r3[3]: _cell(_val(_mcp_s))
+            with r3[4]: _cell(_val("—"))
+            st.caption(
+                "MCP = sellers querying the Graas warehouse via Claude / GPT "
+                "(same data, different surface). Full detail on the 🔌 MCP Beta tab."
             )
 
     if not daily.empty:
