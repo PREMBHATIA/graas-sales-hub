@@ -51,6 +51,29 @@ def _load_questions_log():
 
 
 @st.cache_data(ttl=1800)
+def _load_daily_summary():
+    """MCP daily aggregate — REPORT_DATE / USERS / QUESTIONS / SQL_QUERIES.
+
+    Fuller history than the (recent-only) Questions Log, so it's the right
+    source for the daily trend line and period totals on the Hoppr Home tab.
+    """
+    from services.sheets_client import fetch_sheet_tab
+    try:
+        df = fetch_sheet_tab(MCP_SHEET_ID, "Daily Summary")
+        if df.empty:
+            return pd.DataFrame(), None
+        out = pd.DataFrame({
+            "date":      pd.to_datetime(df.get("REPORT_DATE"), errors="coerce"),
+            "users":     pd.to_numeric(df.get("USERS"), errors="coerce").fillna(0).astype(int),
+            "questions": pd.to_numeric(df.get("QUESTIONS"), errors="coerce").fillna(0).astype(int),
+            "sql_queries": pd.to_numeric(df.get("SQL_QUERIES"), errors="coerce").fillna(0).astype(int),
+        }).dropna(subset=["date"]).sort_values("date").reset_index(drop=True)
+        return out, None
+    except Exception as e:
+        return pd.DataFrame(), str(e)
+
+
+@st.cache_data(ttl=1800)
 def _load_tool_calls():
     from services.sheets_client import fetch_sheet_tab
     try:

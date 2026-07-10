@@ -193,8 +193,12 @@ internal_daily, _err_internal   = load_internal_daily()
 
 # MCP Beta usage (sellers querying the same warehouse via Claude/GPT). Reuses the
 # MCP Beta tab's loader so the Home 'MCP' row and the MCP Beta tab stay in sync.
-from services.mcp_beta_view import _load_questions_log as _load_mcp_questions_log
-mcp_log, _err_mcp = _load_mcp_questions_log()
+from services.mcp_beta_view import (
+    _load_questions_log as _load_mcp_questions_log,
+    _load_daily_summary as _load_mcp_daily,
+)
+mcp_log, _err_mcp = _load_mcp_questions_log()        # per-question (recent) — powers the "asking about" text breakdown
+mcp_daily, _err_mcp_daily = _load_mcp_daily()        # daily aggregate (full history) — powers the row + trend line
 
 # ── Data health: one banner at the top, impact-first ─────────────────────────
 # Silent on the happy path. When something breaks (tab renamed, column gone,
@@ -807,7 +811,15 @@ with tab_home:
         # Summing daily uniques over-counts users who appear on multiple
         # days (the old bug). We compute nunique() on the raw rows instead.
         ext_queries = int(ext_slice["total_queries"].sum())
-        ext_signups = int(ext_slice["new_signups"].sum()) if "new_signups" in ext_slice.columns else 0
+        # New Signups come specifically from the Hoppr__Anaysis NEW_SIGNUPS column.
+        # The eval-derived `daily` frame carries no signup data (it zeros them), so
+        # read signups from the analysis frame directly — otherwise this reads 0.
+        ext_signups = 0
+        if not daily_from_analysis.empty and "new_signups" in daily_from_analysis.columns:
+            _sig_sl = _slice_by_period(
+                daily_from_analysis[daily_from_analysis["date"] >= HOPPR_DATA_START],
+                period, today_ts)
+            ext_signups = int(_sig_sl["new_signups"].sum()) if not _sig_sl.empty else 0
         ext_unique_users = 0
         ext_unique_sellers = 0
         if not eval_processed.empty and "_date" in eval_processed.columns:
@@ -888,31 +900,26 @@ with tab_home:
             )
 
         # ── MCP row: sellers querying the same warehouse via Claude/GPT (MCP
-        #    integration) — a third usage surface, sliced to the same period as
-        #    External/Internal. New signups don't apply to this surface.
-        if not mcp_log.empty and "_ts" in mcp_log.columns:
-            if period == "YTD":
-                _mcp_cut = pd.Timestamp(today_ts.year, 1, 1)
-            else:
-                _mcp_cut = today_ts - pd.Timedelta(
-                    days={"1W": 7, "1M": 30, "3M": 90}[period])
-            _mcp_sl = mcp_log[mcp_log["_ts"] >= _mcp_cut]
-            _mcp_q = int(len(_mcp_sl))
-            _mcp_u = int(_mcp_sl.get("USER_EMAIL", pd.Series(dtype=str))
-                         .dropna().astype(str)
-                         .pipe(lambda s: s[s.str.contains("@", na=False)]).nunique())
-            _mcp_s = int(_mcp_sl.get("SELLER_ID", pd.Series(dtype=str))
-                         .dropna().astype(str)
-                         .pipe(lambda s: s[(s != "") & (s != "nan")]).nunique())
+        #    integration) — a third usage surface. Uses the MCP "Daily Summary"
+        #    aggregate (full history). Like Internal, Users/Sellers are the peak
+        #    day† — the pre-aggregated source has no per-user IDs for true
+        #    period-uniques. (MCP user ≈ seller, so both columns show the same.)
+        if not mcp_daily.empty and "date" in mcp_daily.columns:
+            _mcp_sl = _slice_by_period(mcp_daily, period, today_ts)
+            _mcp_q = int(_mcp_sl["questions"].sum()) if not _mcp_sl.empty else 0
+            _mcp_u = int(_mcp_sl["users"].max()) if not _mcp_sl.empty else 0
+            _mcp_peak = (f"<div style='{_VAL_STYLE}'>{_mcp_u:,}"
+                         f"<sup style='font-size:0.55em;color:#9CA3AF;'>†</sup></div>")
             r3 = st.columns([1, 2, 2, 2, 2])
             with r3[0]: _cell(f"<div style='{_LBL_STYLE}'>MCP</div>")
             with r3[1]: _cell(_val(_mcp_q))
-            with r3[2]: _cell(_val(_mcp_u))
-            with r3[3]: _cell(_val(_mcp_s))
+            with r3[2]: _cell(_mcp_peak)
+            with r3[3]: _cell(_mcp_peak)
             with r3[4]: _cell(_val("—"))
             st.caption(
                 "MCP = sellers querying the Graas warehouse via Claude / GPT "
-                "(same data, different surface). Full detail on the 🔌 MCP Beta tab."
+                "(same data, different surface). Users/Sellers = peak day†. "
+                "Full detail on the 🔌 MCP Beta tab."
             )
 
     if not daily.empty:
@@ -952,16 +959,14 @@ with tab_home:
                     mode="lines", name="Queries (int)",
                     line=dict(color="#9CA3AF", dash="dash", width=1.5),
                 ))
-        # MCP queries — red dotted, kept visually distinct because usage is
-        # currently internal-driven (team testing the warehouse via Claude/GPT),
-        # not external adoption yet.
-        if not mcp_log.empty and "_ts" in mcp_log.columns:
-            _mcp_d = (mcp_log.assign(_d=mcp_log["_ts"].dt.normalize())
-                      .groupby("_d").size().reset_index(name="q"))
-            _mcp_d = _mcp_d[_mcp_d["_d"] >= daily_f["date"].min()]
+        # MCP queries — red dotted, from the MCP "Daily Summary" aggregate (full
+        # history, unlike the recent-only Questions Log). Kept visually distinct
+        # because usage is currently internal-driven, not external adoption yet.
+        if not mcp_daily.empty and "date" in mcp_daily.columns:
+            _mcp_d = mcp_daily[mcp_daily["date"] >= daily_f["date"].min()]
             if not _mcp_d.empty:
                 fig.add_trace(go.Scatter(
-                    x=_mcp_d["_d"], y=_mcp_d["q"],
+                    x=_mcp_d["date"], y=_mcp_d["questions"],
                     mode="lines+markers", name="Queries (MCP)",
                     line=dict(color="#EF4444", dash="dot", width=1.8),
                 ))
