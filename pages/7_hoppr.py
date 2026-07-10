@@ -937,6 +937,19 @@ with tab_home:
                     mode="lines", name="Queries (int)",
                     line=dict(color="#9CA3AF", dash="dash", width=1.5),
                 ))
+        # MCP queries — red dotted, kept visually distinct because usage is
+        # currently internal-driven (team testing the warehouse via Claude/GPT),
+        # not external adoption yet.
+        if not mcp_log.empty and "_ts" in mcp_log.columns:
+            _mcp_d = (mcp_log.assign(_d=mcp_log["_ts"].dt.normalize())
+                      .groupby("_d").size().reset_index(name="q"))
+            _mcp_d = _mcp_d[_mcp_d["_d"] >= daily_f["date"].min()]
+            if not _mcp_d.empty:
+                fig.add_trace(go.Scatter(
+                    x=_mcp_d["_d"], y=_mcp_d["q"],
+                    mode="lines+markers", name="Queries (MCP)",
+                    line=dict(color="#EF4444", dash="dot", width=1.8),
+                ))
         fig.update_layout(height=340, template="plotly_dark", margin=dict(l=20, r=20, t=20, b=20))
         st.plotly_chart(fig, use_container_width=True)
 
