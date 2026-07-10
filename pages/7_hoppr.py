@@ -233,12 +233,36 @@ raw_user_state, _err_user_state = load_user_state()
 internal_daily, _err_internal   = load_internal_daily()
 signups_daily,  _err_signups    = load_new_signups()
 
-# MCP Beta usage (sellers querying the same warehouse via Claude/GPT). Reuses the
-# MCP Beta tab's loader so the Home 'MCP' row and the MCP Beta tab stay in sync.
+# MCP Beta usage (sellers querying the same warehouse via Claude/GPT).
+# Import only PRE-EXISTING symbols from the shared module (_load_questions_log +
+# the sheet id). Streamlit Cloud can serve a stale cached copy of a changed
+# service module, so importing a brand-new symbol from it can ImportError — the
+# daily-aggregate loader is therefore defined locally here (this page re-runs).
 from services.mcp_beta_view import (
     _load_questions_log as _load_mcp_questions_log,
-    _load_daily_summary as _load_mcp_daily,
+    MCP_SHEET_ID as _MCP_SHEET_ID,
 )
+
+
+@st.cache_data(ttl=1800)
+def _load_mcp_daily():
+    """MCP daily aggregate — the 'Daily Summary' tab (REPORT_DATE / USERS /
+    QUESTIONS). Full history, unlike the recent-only Questions Log."""
+    from services.sheets_client import fetch_sheet_tab
+    try:
+        df = fetch_sheet_tab(_MCP_SHEET_ID, "Daily Summary")
+        if df.empty:
+            return pd.DataFrame(), None
+        out = pd.DataFrame({
+            "date":      pd.to_datetime(df.get("REPORT_DATE"), errors="coerce"),
+            "users":     pd.to_numeric(df.get("USERS"), errors="coerce").fillna(0).astype(int),
+            "questions": pd.to_numeric(df.get("QUESTIONS"), errors="coerce").fillna(0).astype(int),
+        }).dropna(subset=["date"]).sort_values("date").reset_index(drop=True)
+        return out, None
+    except Exception as e:
+        return pd.DataFrame(), str(e)
+
+
 mcp_log, _err_mcp = _load_mcp_questions_log()        # per-question (recent) — powers the "asking about" text breakdown
 mcp_daily, _err_mcp_daily = _load_mcp_daily()        # daily aggregate (full history) — powers the row + trend line
 
