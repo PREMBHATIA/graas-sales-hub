@@ -456,24 +456,39 @@ if not raw_eval.empty:
         or next((c for c in ecols if "date" in c.lower() or "timestamp" in c.lower()), None)
     )
 
-    # ── Question/answer: USER CONFIRMED col F (idx 5) = question, col G (idx 6) = answer.
-    # Use index FIRST. Named detection was finding the wrong "Answer" column.
-    if len(ecols) > 6:
-        q_col_e = ecols[5]
-        a_col_e = ecols[6]
+    # ── Question / answer detection — robust to column shifts + mislabeled headers.
+    #    History: the eval sheet's Q/A headers AND positions have both proven
+    #    unreliable. A column got inserted so the header "Question" (and index 5)
+    #    pointed at a numbering column ("1") while the real question text sat under
+    #    the "Answer" header — which silently classified every row as "General".
+    #    So we ignore Q/A headers and positions: drop the known metadata columns,
+    #    then take the two longest free-text columns. Earlier column (by sheet
+    #    order) = question, later = answer.
+    _META_NAMES = {
+        "seller id", "seller_id", "seller", "account", "email id", "email",
+        "email_id", "date", "timestamp", "response time", "response_time",
+        "session id", "session_id",
+    }
+
+    def _avg_text_len(col: str) -> float:
+        v = edf[col].astype(str).str.strip()
+        v = v[~v.str.lower().isin(["", "nan", "loading...", "loading"])]
+        return float(v.str.len().mean()) if len(v) else 0.0
+
+    _cand = [c for c in ecols
+             if c.lower() not in _META_NAMES
+             and c not in (sid_col_e, email_col_e, date_col_e)]
+    _qa = [c for c in sorted(_cand, key=_avg_text_len, reverse=True)
+           if _avg_text_len(c) >= 10][:2]
+    _qa = sorted(_qa, key=lambda c: ecols.index(c))  # sheet order: question first
+    if len(_qa) >= 2:
+        q_col_e, a_col_e = _qa[0], _qa[1]
+    elif len(_qa) == 1:
+        q_col_e, a_col_e = _qa[0], None
     else:
-        # Sheet has fewer than 7 columns → fall back to named detection
-        q_col_e = (
-            next((c for c in ecols if "question" in c.lower()), None)
-            or next((c for c in ecols if "query" in c.lower() and "count" not in c.lower()), None)
-            or next((c for c in ecols if "user_input" in c.lower() or "user_message" in c.lower()), None)
-            or next((c for c in ecols if c.lower() in ("input", "message", "prompt")), None)
-        )
-        a_col_e = (
-            next((c for c in ecols if "answer" in c.lower()), None)
-            or next((c for c in ecols if "response" in c.lower() or "reply" in c.lower()), None)
-            or next((c for c in ecols if "output" in c.lower() or "bot_message" in c.lower()), None)
-        )
+        # Degenerate sheet (no free-text columns) — best-effort named fallback.
+        q_col_e = next((c for c in ecols if "question" in c.lower()), None)
+        a_col_e = next((c for c in ecols if "answer" in c.lower()), None)
 
     # ── Always store debug info ───────────────────────────────────────────────
     st.session_state["eval_col_debug"] = (
