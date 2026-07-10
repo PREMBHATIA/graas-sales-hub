@@ -1011,12 +1011,12 @@ with tab_home:
 
         fig = go.Figure()
         fig.add_trace(go.Scatter(x=daily_f["date"], y=daily_f["total_queries"],
-                                 mode="lines+markers", name="Queries (ext)",
+                                 mode="lines+markers", name="Hoppr · Queries (ext)",
                                  line=dict(color="#4F46E5", width=2)))
         fig.add_trace(go.Bar(x=daily_f["date"], y=daily_f["unique_sellers"],
-                             name="Unique Sellers (ext)", marker_color="#7C3AED", opacity=0.5))
+                             name="Hoppr · Sellers (ext)", marker_color="#7C3AED", opacity=0.5))
         fig.add_trace(go.Scatter(x=daily_f["date"], y=daily_f["new_signups"],
-                                 mode="lines+markers", name="New Signups",
+                                 mode="lines+markers", name="Hoppr · New Signups",
                                  line=dict(color="#10B981", dash="dot")))
         # Internal Hoppr usage — only the queries line, dashed gray so it
         # reads as "background context", not a competing primary signal.
@@ -1025,7 +1025,7 @@ with tab_home:
             if not i_f.empty:
                 fig.add_trace(go.Scatter(
                     x=i_f["date"], y=i_f["total_queries"],
-                    mode="lines", name="Queries (int)",
+                    mode="lines", name="Hoppr · Queries (int)",
                     line=dict(color="#9CA3AF", dash="dash", width=1.5),
                 ))
         # MCP queries — red dotted, from the MCP "Daily Summary" aggregate (full
@@ -1036,7 +1036,7 @@ with tab_home:
             if not _mcp_d.empty:
                 fig.add_trace(go.Scatter(
                     x=_mcp_d["date"], y=_mcp_d["questions"],
-                    mode="lines+markers", name="Queries (MCP)",
+                    mode="lines+markers", name="MCP · Queries",
                     line=dict(color="#EF4444", dash="dot", width=1.8),
                 ))
         fig.update_layout(height=340, template="plotly_dark", margin=dict(l=20, r=20, t=20, b=20))
