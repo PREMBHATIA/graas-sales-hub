@@ -986,7 +986,7 @@ with tab_home:
     # ── What sellers are asking ───────────────────────────────────────────────
     if not eval_processed.empty:
         st.markdown("---")
-        st.markdown("### 📊 What Sellers Are Asking About")
+        st.markdown("### 📊 What Hoppr Sellers Are Asking About")
         ev_f = apply_period(eval_processed, period)
         if not ev_f.empty:
             bucket_rows = [{"bucket": b} for buckets in ev_f["_buckets"] for b in buckets]
@@ -1052,6 +1052,34 @@ with tab_home:
                     for q in general_qs.head(25):
                         st.text(f"• {q[:180]}")
 
+    # ── What MCP users are asking about — its own graphic, right under the Hoppr
+    #    one. MCP questions phrase differently; buckets need not match Hoppr's. ──
+    if not mcp_log.empty and "QUESTION_TEXT" in mcp_log.columns and "_ts" in mcp_log.columns:
+        st.markdown("---")
+        st.markdown("### 🔌 What MCP Users Are Asking About")
+        st.caption("Sellers querying the Graas warehouse via Claude / GPT (MCP) — same period as above.")
+        if period == "YTD":
+            _mcp_cut2 = pd.Timestamp(mcp_log["_ts"].max().year, 1, 1)
+        else:
+            _mcp_cut2 = mcp_log["_ts"].max() - pd.Timedelta(
+                days={"1W": 7, "1M": 30, "3M": 90}[period])
+        _mcp_qsl = mcp_log[mcp_log["_ts"] >= _mcp_cut2]
+        _mcp_buckets = [b for q in _mcp_qsl["QUESTION_TEXT"].dropna().astype(str)
+                        for b in classify_question(q)]
+        if _mcp_buckets:
+            _mbc = pd.Series(_mcp_buckets).value_counts().reset_index()
+            _mbc.columns = ["Question Type", "Count"]
+            _fig_m = px.bar(_mbc, x="Count", y="Question Type", orientation="h",
+                            color="Question Type",
+                            color_discrete_sequence=px.colors.qualitative.Bold,
+                            labels={"Count": "Queries", "Question Type": ""})
+            _fig_m.update_layout(height=400, template="plotly_dark",
+                                 margin=dict(l=20, r=20, t=10, b=20),
+                                 showlegend=False, yaxis=dict(autorange="reversed"))
+            st.plotly_chart(_fig_m, use_container_width=True)
+        else:
+            st.caption("_No MCP questions in this period._")
+
     # ── Data accuracy ─────────────────────────────────────────────────────────
     if not eval_processed.empty:
         st.markdown("---")
@@ -1087,34 +1115,6 @@ with tab_home:
                 show.columns = ["Date", "Seller", "Email", "Question"]
                 show["Question"] = show["Question"].str[:200]
                 st.dataframe(show.sort_values("Date", ascending=False), use_container_width=True, hide_index=True)
-
-    # ── What MCP users are asking about — its own graphic (the chart above is
-    #    Hoppr-only; MCP questions phrase differently and classify richly). ────
-    if not mcp_log.empty and "QUESTION_TEXT" in mcp_log.columns and "_ts" in mcp_log.columns:
-        st.markdown("---")
-        st.markdown("### 🔌 What MCP Users Are Asking About")
-        st.caption("Sellers querying the Graas warehouse via Claude / GPT (MCP) — same period as above.")
-        if period == "YTD":
-            _mcp_cut2 = pd.Timestamp(mcp_log["_ts"].max().year, 1, 1)
-        else:
-            _mcp_cut2 = mcp_log["_ts"].max() - pd.Timedelta(
-                days={"1W": 7, "1M": 30, "3M": 90}[period])
-        _mcp_qsl = mcp_log[mcp_log["_ts"] >= _mcp_cut2]
-        _mcp_buckets = [b for q in _mcp_qsl["QUESTION_TEXT"].dropna().astype(str)
-                        for b in classify_question(q)]
-        if _mcp_buckets:
-            _mbc = pd.Series(_mcp_buckets).value_counts().reset_index()
-            _mbc.columns = ["Question Type", "Count"]
-            _fig_m = px.bar(_mbc, x="Count", y="Question Type", orientation="h",
-                            color="Question Type",
-                            color_discrete_sequence=px.colors.qualitative.Bold,
-                            labels={"Count": "Queries", "Question Type": ""})
-            _fig_m.update_layout(height=400, template="plotly_dark",
-                                 margin=dict(l=20, r=20, t=10, b=20),
-                                 showlegend=False, yaxis=dict(autorange="reversed"))
-            st.plotly_chart(_fig_m, use_container_width=True)
-        else:
-            st.caption("_No MCP questions in this period._")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
