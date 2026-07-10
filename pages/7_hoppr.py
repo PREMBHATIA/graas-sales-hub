@@ -184,12 +184,54 @@ def load_internal_daily():
     except Exception as e:
         return pd.DataFrame(), str(e)
 
+
+@st.cache_data(ttl=1800)
+def load_new_signups():
+    """Day-level new signups — the authoritative UTM-derived counts from the
+    'IMP - New Signups' tab (already a tab in the Hoppr sheet). The header sits a
+    row or two down, so we locate it, then sum 'New Signups' + 'New Channels
+    Connected' per date across sources."""
+    from services.sheets_client import fetch_sheet_tab
+    try:
+        raw = fetch_sheet_tab(HOPPR_SHEET_ID, "IMP - New Signups")
+        if raw.empty:
+            return pd.DataFrame(), None
+        hdr = None
+        for i, row in raw.iterrows():
+            vals = [str(v).strip() for v in row.values]
+            if "DATE" in vals and any("New Signups" in v for v in vals):
+                hdr = i
+                break
+        if hdr is None:
+            return pd.DataFrame(), "header row not found"
+        H = [str(v).strip() for v in raw.iloc[hdr].values]
+        d = raw.iloc[hdr + 1:]
+        di = H.index("DATE")
+        si = next(i for i, h in enumerate(H) if "New Signups" in h)
+        ci = next((i for i, h in enumerate(H) if "Connected" in h), None)
+        out = pd.DataFrame({
+            "date": pd.to_datetime(d.iloc[:, di].astype(str).str.strip(), errors="coerce"),
+            "new_signups": pd.to_numeric(d.iloc[:, si], errors="coerce").fillna(0),
+            "connected": (pd.to_numeric(d.iloc[:, ci], errors="coerce").fillna(0)
+                          if ci is not None else 0),
+        }).dropna(subset=["date"])
+        out = (out.groupby("date", as_index=False)
+                  .agg(new_signups=("new_signups", "sum"),
+                       connected=("connected", "sum")))
+        out["new_signups"] = out["new_signups"].astype(int)
+        out["connected"] = out["connected"].astype(int)
+        return out.sort_values("date").reset_index(drop=True), None
+    except Exception as e:
+        return pd.DataFrame(), str(e)
+
+
 # ── Fetch ─────────────────────────────────────────────────────────────────────
 
 raw_daily,      _err_daily      = load_hoppr_daily()
 raw_eval,       _err_eval       = load_evaluation_sheet()
 raw_user_state, _err_user_state = load_user_state()
 internal_daily, _err_internal   = load_internal_daily()
+signups_daily,  _err_signups    = load_new_signups()
 
 # MCP Beta usage (sellers querying the same warehouse via Claude/GPT). Reuses the
 # MCP Beta tab's loader so the Home 'MCP' row and the MCP Beta tab stay in sync.
@@ -811,11 +853,14 @@ with tab_home:
         # Summing daily uniques over-counts users who appear on multiple
         # days (the old bug). We compute nunique() on the raw rows instead.
         ext_queries = int(ext_slice["total_queries"].sum())
-        # New Signups come specifically from the Hoppr__Anaysis NEW_SIGNUPS column.
-        # The eval-derived `daily` frame carries no signup data (it zeros them), so
-        # read signups from the analysis frame directly — otherwise this reads 0.
+        # New Signups — authoritative day-level counts from the 'IMP - New Signups'
+        # tab (Rohan's UTM-derived source, already in the Hoppr sheet). Fall back to
+        # the Hoppr__Anaysis NEW_SIGNUPS column if that tab is unavailable/empty.
         ext_signups = 0
-        if not daily_from_analysis.empty and "new_signups" in daily_from_analysis.columns:
+        if not signups_daily.empty and "new_signups" in signups_daily.columns:
+            _sig_sl = _slice_by_period(signups_daily, period, today_ts)
+            ext_signups = int(_sig_sl["new_signups"].sum()) if not _sig_sl.empty else 0
+        elif not daily_from_analysis.empty and "new_signups" in daily_from_analysis.columns:
             _sig_sl = _slice_by_period(
                 daily_from_analysis[daily_from_analysis["date"] >= HOPPR_DATA_START],
                 period, today_ts)
