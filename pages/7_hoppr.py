@@ -254,9 +254,10 @@ def _load_mcp_daily():
         if df.empty:
             return pd.DataFrame(), None
         out = pd.DataFrame({
-            "date":      pd.to_datetime(df.get("REPORT_DATE"), errors="coerce"),
-            "users":     pd.to_numeric(df.get("USERS"), errors="coerce").fillna(0).astype(int),
-            "questions": pd.to_numeric(df.get("QUESTIONS"), errors="coerce").fillna(0).astype(int),
+            "date":        pd.to_datetime(df.get("REPORT_DATE"), errors="coerce"),
+            "users":       pd.to_numeric(df.get("USERS"), errors="coerce").fillna(0).astype(int),
+            "questions":   pd.to_numeric(df.get("QUESTIONS"), errors="coerce").fillna(0).astype(int),
+            "sql_queries": pd.to_numeric(df.get("SQL_QUERIES"), errors="coerce").fillna(0).astype(int),
         }).dropna(subset=["date"]).sort_values("date").reset_index(drop=True)
         return out, None
     except Exception as e:
@@ -934,33 +935,36 @@ with tab_home:
         def _cell(html):
             st.markdown(html, unsafe_allow_html=True)
 
-        h = st.columns([1, 2, 2, 2, 2])
+        h = st.columns([1, 2, 2, 2, 2, 2])
         with h[0]: _cell("")
         with h[1]: _cell(f"<div style='{_HDR_STYLE}'>Queries ({_period_suffix})</div>")
         with h[2]: _cell(f"<div style='{_HDR_STYLE}'>Unique Users ({_period_suffix})</div>")
         with h[3]: _cell(f"<div style='{_HDR_STYLE}'>Unique Sellers ({_period_suffix})</div>")
         with h[4]: _cell(f"<div style='{_HDR_STYLE}'>New Signups ({_period_suffix})</div>")
+        with h[5]: _cell(f"<div style='{_HDR_STYLE}'>SQL Queries ({_period_suffix})</div>")
 
         def _val(v):
             return f"<div style='{_VAL_STYLE}'>{v:,}</div>" if isinstance(v, int) else f"<div style='{_VAL_STYLE}'>{v}</div>"
 
         # External row — all values are TRUE counts over the period.
-        r1 = st.columns([1, 2, 2, 2, 2])
+        r1 = st.columns([1, 2, 2, 2, 2, 2])
         with r1[0]: _cell(f"<div style='{_LBL_STYLE}'>External</div>")
         with r1[1]: _cell(_val(ext_queries))
         with r1[2]: _cell(_val(ext_unique_users))
         with r1[3]: _cell(_val(ext_unique_sellers))
         with r1[4]: _cell(_val(ext_signups))
+        with r1[5]: _cell(_val("—"))
 
         # Internal row — queries are true sum; users/sellers are PEAK DAILY
         # (marked with † and explained in the caption below).
         if not internal_daily.empty:
-            r2 = st.columns([1, 2, 2, 2, 2])
+            r2 = st.columns([1, 2, 2, 2, 2, 2])
             with r2[0]: _cell(f"<div style='{_LBL_STYLE}'>Internal</div>")
             with r2[1]: _cell(_val(int_queries))
             with r2[2]: _cell(f"<div style='{_VAL_STYLE}'>{int_peak_users:,}<sup style='font-size:0.55em;color:#9CA3AF;'>†</sup></div>")
             with r2[3]: _cell(f"<div style='{_VAL_STYLE}'>{int_peak_sellers:,}<sup style='font-size:0.55em;color:#9CA3AF;'>†</sup></div>")
             with r2[4]: _cell(_val("—"))
+            with r2[5]: _cell(_val("—"))
 
             st.caption(
                 "† Internal Unique Users / Sellers = **peak day** in the period "
@@ -977,14 +981,17 @@ with tab_home:
             _mcp_sl = _slice_by_period(mcp_daily, period, today_ts)
             _mcp_q = int(_mcp_sl["questions"].sum()) if not _mcp_sl.empty else 0
             _mcp_u = int(_mcp_sl["users"].max()) if not _mcp_sl.empty else 0
+            _mcp_sql = (int(_mcp_sl["sql_queries"].sum())
+                        if not _mcp_sl.empty and "sql_queries" in _mcp_sl.columns else 0)
             _mcp_peak = (f"<div style='{_VAL_STYLE}'>{_mcp_u:,}"
                          f"<sup style='font-size:0.55em;color:#9CA3AF;'>†</sup></div>")
-            r3 = st.columns([1, 2, 2, 2, 2])
+            r3 = st.columns([1, 2, 2, 2, 2, 2])
             with r3[0]: _cell(f"<div style='{_LBL_STYLE}'>MCP</div>")
             with r3[1]: _cell(_val(_mcp_q))
             with r3[2]: _cell(_mcp_peak)
             with r3[3]: _cell(_mcp_peak)
             with r3[4]: _cell(_val("—"))
+            with r3[5]: _cell(_val(_mcp_sql))
             st.caption(
                 "MCP = sellers querying the Graas warehouse via Claude / GPT "
                 "(same data, different surface). Users/Sellers = peak day†. "
