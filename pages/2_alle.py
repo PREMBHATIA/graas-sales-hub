@@ -252,14 +252,15 @@ if "source" in df_all.columns and "first_conv" in df_all.columns:
 def _load_alle_props_by_month():
     import re as _re
     counts = [0] * 12
+    clients = [[] for _ in range(12)]
     rev_id = os.getenv("REVENUE_SHEET_ID", "")
     if not rev_id:
-        return counts
+        return counts, clients
     try:
         from services.sheets_client import fetch_sheet_tab
         pdf = fetch_sheet_tab(rev_id, "Proposals")
         if pdf.empty:
-            return counts
+            return counts, clients
         _MON = {"jan": 0, "feb": 1, "mar": 2, "apr": 3, "may": 4, "jun": 5,
                 "jul": 6, "aug": 7, "sep": 8, "oct": 9, "nov": 10, "dec": 11}
         for _, _row in pdf.iterrows():
@@ -272,15 +273,17 @@ def _load_alle_props_by_month():
                 _mi = _MON.get(_mm.group(1).lower())
                 if _mi is not None:
                     counts[_mi] += 1
-        return counts
+                    clients[_mi].append(_client)
+        return counts, clients
     except Exception:
-        return counts
+        return counts, clients
 
-alle_props_by_month = _load_alle_props_by_month()
+alle_props_by_month, alle_prop_clients = _load_alle_props_by_month()
 
 actual_new_mtgs = []
 actual_cumul_mtgs = []
 actual_proposals = []
+actual_proposal_clients = []
 cumul = 0
 _current_month_idx_for_cumul = datetime.now().month - 1  # 0-based
 for i, m in enumerate(months):
@@ -290,20 +293,24 @@ for i, m in enumerate(months):
     else:
         n = 0
     p = alle_props_by_month[i]  # All-e proposals from the revenue 'Proposals' tab
+    pc = ", ".join(alle_prop_clients[i])  # names of clients proposed to this month
     # Past + current month: carry the running cumul forward (even if 0 new mtgs).
     # Future months: None so the chart doesn't draw them.
     if i <= _current_month_idx_for_cumul:
         actual_new_mtgs.append(n)
         actual_cumul_mtgs.append(cumul)
         actual_proposals.append(p)
+        actual_proposal_clients.append(pc)
     else:
         actual_new_mtgs.append(None)
         actual_cumul_mtgs.append(None)
         actual_proposals.append(None)
+        actual_proposal_clients.append("")
 
 gtm_target["A_New_Mtgs"] = actual_new_mtgs
 gtm_target["A_Cumul_Mtgs"] = actual_cumul_mtgs
 gtm_target["A_Proposals"] = actual_proposals
+gtm_target["A_Proposal_Clients"] = actual_proposal_clients
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -487,33 +494,6 @@ with tab_gtm:
     )
     st.plotly_chart(fig_cumul, use_container_width=True)
 
-    # ── Proposals Sent — Cumulative vs POC Target ──────────────────────────────
-    st.markdown("### Proposals Sent — Cumulative vs POC Target")
-    st.caption("Cumulative proposals sent (actual) against the cumulative Free-POC target.")
-    _prop_cumul, _run = [], 0
-    for _p in actual_proposals[:current_month_idx + 1]:
-        _run += (_p if _p is not None else 0)
-        _prop_cumul.append(_run)
-    fig_props = go.Figure()
-    fig_props.add_trace(go.Scatter(
-        x=_chart_months,
-        y=gtm_target["T_Free_POCs"].iloc[:current_month_idx + 1],
-        mode="lines+markers", name="Target POCs",
-        line=dict(color="#6B7280", dash="dash", width=2),
-    ))
-    fig_props.add_trace(go.Scatter(
-        x=_chart_months, y=_prop_cumul,
-        mode="lines+markers", name="Proposals Sent (cumulative)",
-        line=dict(color="#10B981", width=3),
-        marker=dict(size=10),
-    ))
-    fig_props.update_layout(
-        height=350, template="plotly_dark",
-        margin=dict(l=20, r=20, t=20, b=20),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02),
-    )
-    st.plotly_chart(fig_props, use_container_width=True)
-
     # ── Full Roadmap Table ────────────────────────────────────────────────────
     st.markdown("### Full Roadmap — Targets")
 
@@ -522,14 +502,14 @@ with tab_gtm:
     # Pilot Rev + MRR columns removed (low signal at this stage).
     roadmap_display = gtm_target.iloc[:current_month_idx + 2][[
         "Month",
-        "A_New_Mtgs", "A_Cumul_Mtgs", "A_Proposals",
+        "A_New_Mtgs", "A_Cumul_Mtgs", "A_Proposals", "A_Proposal_Clients",
         "T_New_Mtgs", "T_Cumul_Mtgs", "T_Free_POCs",
         "T_Pilots_Started", "T_Pilots_Finished", "T_Live_Customers",
     ]].copy()
 
     roadmap_display = roadmap_display.rename(columns={
         "A_New_Mtgs": "Actual Mtgs", "A_Cumul_Mtgs": "Actual Cumul",
-        "A_Proposals": "Actual Proposals",
+        "A_Proposals": "Actual Proposals", "A_Proposal_Clients": "Proposal Clients",
         "T_New_Mtgs": "Target Mtgs", "T_Cumul_Mtgs": "Target Cumul",
         "T_Free_POCs": "Target POCs", "T_Pilots_Started": "Target Pilots",
         "T_Pilots_Finished": "Pilots Done", "T_Live_Customers": "Live Cust",
