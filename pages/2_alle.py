@@ -496,7 +496,7 @@ with tab_gtm:
 
     roadmap_display = roadmap_display.rename(columns={
         "A_New_Mtgs": "Actual Mtgs", "A_Cumul_Mtgs": "Actual Cumul",
-        "A_Proposals": "Proposals",
+        "A_Proposals": "Actual Proposals",
         "T_New_Mtgs": "Target Mtgs", "T_Cumul_Mtgs": "Target Cumul",
         "T_Free_POCs": "Target POCs", "T_Pilots_Started": "Target Pilots",
         "T_Pilots_Finished": "Pilots Done", "T_Live_Customers": "Live Cust",
@@ -504,7 +504,7 @@ with tab_gtm:
 
     # Color-code Actuals (green tint) vs Targets (muted gray) so the eye
     # can immediately tell "what we did" from "what we aimed at".
-    _actual_cols = ["Actual Mtgs", "Actual Cumul", "Proposals"]
+    _actual_cols = ["Actual Mtgs", "Actual Cumul", "Actual Proposals"]
     _target_cols = ["Target Mtgs", "Target Cumul", "Target POCs",
                     "Target Pilots", "Pilots Done", "Live Cust"]
     _num_cols = _actual_cols + _target_cols
