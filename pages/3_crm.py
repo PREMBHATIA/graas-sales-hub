@@ -527,6 +527,40 @@ contacts['recency_key'] = contacts['days_silent'].apply(_recency_key)
 
 # ══════════════════════════════════════════════════════════════════════════════
 
+# Tab isolation: Streamlit runs EVERY tab body on each rerun, so an unhandled
+# error in one tab aborts the whole script and blanks every *other* tab too
+# (e.g. a crash in Email Composer or Newsworthy leaves Analytics blank — the
+# error renders into the hidden crashing tab, so it looks like nothing happened).
+# _tab_guard confines a failure to its own tab and shows it there. st.rerun() /
+# st.stop() raise ScriptControlException — those must propagate so buttons work.
+from contextlib import contextmanager as _contextmanager
+try:
+    from streamlit.runtime.scriptrunner import (
+        StopException as _StopExc,
+        RerunException as _RerunExc,
+    )
+    _CONTROL_EXC = (_StopExc, _RerunExc)
+except Exception:  # pragma: no cover — import path varies across versions
+    _CONTROL_EXC = ()
+
+
+@_contextmanager
+def _tab_guard(label):
+    try:
+        yield
+    except Exception as e:
+        # Let Streamlit's own control-flow exceptions through untouched.
+        if (_CONTROL_EXC and isinstance(e, _CONTROL_EXC)) or type(e).__name__ in (
+            "StopException", "RerunException", "ScriptControlException",
+        ):
+            raise
+        st.error(
+            f"⚠️ The **{label}** section hit an error and couldn't render. "
+            "The other tabs still work — expand below for the traceback."
+        )
+        st.exception(e)
+
+
 tab_contacts, tab_segments, tab_compose, tab_news, tab_analytics = st.tabs([
     "👥 Contacts",
     "🎯 Segments",
@@ -540,7 +574,7 @@ tab_contacts, tab_segments, tab_compose, tab_news, tab_analytics = st.tabs([
 # TAB 1: CONTACTS
 # ══════════════════════════════════════════════════════════════════════════════
 
-with tab_contacts:
+with tab_contacts, _tab_guard("Contacts"):
 
     # ── Add-to-overlay form ──────────────────────────────────────────────────
     with st.expander("➕ Add contact (overlay)", expanded=False):
@@ -795,7 +829,7 @@ with tab_contacts:
 # TAB 2: SEGMENTS
 # ══════════════════════════════════════════════════════════════════════════════
 
-with tab_segments:
+with tab_segments, _tab_guard("Segments"):
     st.markdown("### Re-engagement Buckets")
     st.caption(
         "Sourced from Amruta's *All-e email re-engagement* playbook (V1, 7 May 2026). "
@@ -1129,7 +1163,7 @@ BUCKET_TO_FRAMEWORK = {
     "Voice-Waiting":            "F — Voice Warm-Up (Voice-Waiting)",
 }
 
-with tab_compose:
+with tab_compose, _tab_guard("Email Composer"):
     # ── Auto-reset body/subject when template changes ─────────────────────────
     # IMPORTANT history of this code:
     # - Originally also reset on recipient change, to prevent personal lines
@@ -1820,7 +1854,7 @@ with tab_compose:
 #   per instance serves both surfaces.
 # ══════════════════════════════════════════════════════════════════════════════
 
-with tab_news:
+with tab_news, _tab_guard("Newsworthy"):
     st.markdown("### 📰 Newsworthy")
     st.caption(
         "Top 3 high-impact commerce-tech stories from the last 21 days. "
@@ -1889,7 +1923,7 @@ with tab_news:
 # TAB 5: ANALYTICS
 # ══════════════════════════════════════════════════════════════════════════════
 
-with tab_analytics:
+with tab_analytics, _tab_guard("Analytics"):
     st.markdown("### 📊 Outreach Analytics")
     st.caption("Email outreach metrics from the Graas Outreach Log. "
                "Sent is tracked today; opens / replies / unsubscribes need Phase 2 (hosted pixel + reply polling).")
