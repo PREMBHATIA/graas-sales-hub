@@ -244,6 +244,40 @@ if "source" in df_all.columns and "first_conv" in df_all.columns:
         if 1 <= int(m_num) <= 12:
             partner_new_mtgs[int(m_num) - 1] = len(grp)
 
+# All-e proposals sent by month — sourced from the revenue sheet's 'Proposals'
+# tab (the source of truth), filtered to All-e products only. The presales
+# tracker's 'Proposal Sent Date' column is sparsely filled, so it undercounts.
+# Cross-product proposals live in the cross-product section, not here.
+@st.cache_data(ttl=1800)
+def _load_alle_props_by_month():
+    import re as _re
+    counts = [0] * 12
+    rev_id = os.getenv("REVENUE_SHEET_ID", "")
+    if not rev_id:
+        return counts
+    try:
+        from services.sheets_client import fetch_sheet_tab
+        pdf = fetch_sheet_tab(rev_id, "Proposals")
+        if pdf.empty:
+            return counts
+        _MON = {"jan": 0, "feb": 1, "mar": 2, "apr": 3, "may": 4, "jun": 5,
+                "jul": 6, "aug": 7, "sep": 8, "oct": 9, "nov": 10, "dec": 11}
+        for _, _row in pdf.iterrows():
+            _client = str(_row.get("Client Name", "")).strip()
+            _product = str(_row.get("Product", "")).lower()
+            if not _client or "all-e" not in _product:
+                continue
+            _mm = _re.match(r"\s*([A-Za-z]{3})", str(_row.get("Date sent", "")))
+            if _mm:
+                _mi = _MON.get(_mm.group(1).lower())
+                if _mi is not None:
+                    counts[_mi] += 1
+        return counts
+    except Exception:
+        return counts
+
+alle_props_by_month = _load_alle_props_by_month()
+
 actual_new_mtgs = []
 actual_cumul_mtgs = []
 actual_proposals = []
@@ -252,11 +286,10 @@ _current_month_idx_for_cumul = datetime.now().month - 1  # 0-based
 for i, m in enumerate(months):
     if m in gtm_actual_mtgs:
         n = len(gtm_actual_mtgs[m]["meetings"])
-        p = len(gtm_actual_mtgs[m]["proposals"])
         cumul += n
     else:
         n = 0
-        p = 0
+    p = alle_props_by_month[i]  # All-e proposals from the revenue 'Proposals' tab
     # Past + current month: carry the running cumul forward (even if 0 new mtgs).
     # Future months: None so the chart doesn't draw them.
     if i <= _current_month_idx_for_cumul:
