@@ -548,8 +548,16 @@ with tab_gtm:
             .set_properties(subset=_target_cols, **{
                 "color": "#9CA3AF",  # gray-400 — visible but recessed
             })
+            .set_properties(subset=["Proposal Clients"], **{
+                "font-size": "0.78rem", "color": "#374151",
+            })
     )
-    st.dataframe(_styled, use_container_width=True, hide_index=True)
+    st.dataframe(
+        _styled, use_container_width=True, hide_index=True,
+        column_config={
+            "Proposal Clients": st.column_config.TextColumn(width="large"),
+        },
+    )
 
     st.caption("Assumption: 13 Paid Pilots → 10 Customers in Production = $195K + $148K = **$343K invoiced revenue in 2026**")
 
