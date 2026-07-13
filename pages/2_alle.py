@@ -160,10 +160,9 @@ else:
 
 # ══════════════════════════════════════════════════════════════════════════════
 
-tab_gtm, tab_notes, tab_pipeline, tab_deals = st.tabs([
+tab_gtm, tab_notes, tab_deals = st.tabs([
     "🎯 GTM Tracker",
     "📝 Meeting Notes",
-    "🔄 Pipeline",
     "📋 Active Deals",
 ])
 
@@ -564,7 +563,7 @@ with tab_gtm:
     # ── Pipeline Heatmap — Milestones × Vertical (2026 YTD) ───────────────────
     st.markdown("---")
     st.markdown("### 🌐 2026 Vertical Overview")
-    st.caption("All counts are 2026 milestones, deduped by lead name. Meetings = first conv this year (= Dropped + still-active). Dropped = leads now marked Dropped. TOF = active, no milestone yet. POC / Proposal Sent / Pilot = leads that hit that milestone date in 2026.")
+    st.caption("All counts are 2026 milestones, deduped by lead name. Meetings = first conv this year (= Dropped + still-active). Dropped = leads now marked Dropped. TOF = active, no milestone yet. Proposal Sent = leads at status '3-Proposal sent'. POC / Pilot = leads that hit that milestone date in 2026.")
     if 'vertical' in df_all.columns and 'first_conv' in df_all.columns:
 
         def _vert(s):
@@ -578,7 +577,15 @@ with tab_gtm:
 
         first_2026     = _in_year('first_conv')
         poc_2026       = _in_year('poc_delivery_date')
-        proposal_2026  = _in_year('proposal_sent_date')
+        # Proposal Sent is counted by STATUS (Lead status == '3-Proposal sent'),
+        # not by the Proposal Sent Date column — that date is sparsely filled, so
+        # date-based counting misses leads that are tagged but undated
+        # (e.g. Microtek, PT Propan).
+        if 'status' in df_all.columns:
+            _status_norm = df_all['status'].fillna('').astype(str).str.strip().str.lower()
+            proposal_2026 = first_2026 & (_status_norm == '3-proposal sent')
+        else:
+            proposal_2026 = _in_year('proposal_sent_date')
         pilot_2026     = _in_year('pilot_start_date')
         tof_2026 = first_2026 & ~poc_2026 & ~proposal_2026 & ~pilot_2026
 
@@ -905,107 +912,7 @@ with tab_notes:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# TAB 1: PIPELINE
-# ══════════════════════════════════════════════════════════════════════════════
-
-with tab_pipeline:
-
-    # ── KPI Cards ─────────────────────────────────────────────────────────────
-    total = len(df)
-    pilots = len(df[df['status'] == '1-Pilot']) if 'status' in df.columns else 0
-    pocs = len(df[df['status'] == '2-POC']) if 'status' in df.columns else 0
-    proposals = len(df[df['status'] == '3-Proposal sent']) if 'status' in df.columns else 0
-    tof = len(df[df['status'] == '4-TOF']) if 'status' in df.columns else 0
-
-    c1, c2, c3, c4, c5 = st.columns(5)
-    with c1:
-        st.metric("Total Leads", total)
-    with c2:
-        st.metric("Pilots", pilots)
-    with c3:
-        st.metric("POC", pocs)
-    with c4:
-        st.metric("Proposals Sent", proposals)
-    with c5:
-        st.metric("Top of Funnel", tof)
-
-    # ── Month View — Actual vs Target (only through current month) ────────────
-    st.markdown("### Monthly Progress vs Target")
-
-    _current_month_idx = datetime.now().month - 1  # 0-based (Jan=0, Apr=3)
-    _show_months = months[:_current_month_idx + 1]  # Jan through current month
-
-    month_rows = []
-    for m in _show_months:
-        idx = months.index(m)
-        t_mtgs = gtm_target.loc[idx, "T_New_Mtgs"]
-        t_cumul = gtm_target.loc[idx, "T_Cumul_Mtgs"]
-        t_pocs = gtm_target.loc[idx, "T_Free_POCs"]
-        t_pilots = gtm_target.loc[idx, "T_Pilots_Started"]
-
-        a_mtgs = actual_new_mtgs[idx]
-        a_cumul = actual_cumul_mtgs[idx]
-        a_props = actual_proposals[idx]
-
-        if a_mtgs is not None:
-            mtg_status = "✅" if a_mtgs >= t_mtgs else "⚠️"
-            month_rows.append({
-                "Month": m,
-                "Mtgs (A/T)": f"{mtg_status} {a_mtgs} / {t_mtgs}",
-                "Cumul (A/T)": f"{a_cumul} / {t_cumul}",
-                "Proposals": a_props,
-                "Target POCs": t_pocs,
-                "Target Pilots": t_pilots,
-            })
-        else:
-            month_rows.append({
-                "Month": m,
-                "Mtgs (A/T)": f"— / {t_mtgs}",
-                "Cumul (A/T)": f"— / {t_cumul}",
-                "Proposals": "—",
-                "Target POCs": t_pocs,
-                "Target Pilots": t_pilots,
-            })
-
-    st.dataframe(pd.DataFrame(month_rows), use_container_width=True, hide_index=True)
-
-    # ── Deals by stage ────────────────────────────────────────────────────────
-    st.markdown("### Deals by Stage")
-    if 'status' in df.columns:
-        for status_label, color, icon in [
-            ("1-Pilot", "#10B981", "🟢"),
-            ("2-POC", "#06B6D4", "🔵"),
-            ("3-Proposal sent", "#F59E0B", "🟡"),
-        ]:
-            stage_deals = df[df['status'] == status_label].sort_values('days_since_contact', na_position='last')
-            if not stage_deals.empty:
-                st.markdown(f"#### {icon} {status_label} ({len(stage_deals)} deals)")
-                for _, deal in stage_deals.iterrows():
-                    days = f"{int(deal['days_since_contact'])}d ago" if pd.notna(deal['days_since_contact']) else "—"
-                    vertical = deal.get('vertical', '')
-                    source = deal.get('source', '')
-                    st.markdown(f"- **{deal['lead_name']}** ({vertical}) — {source} — last contact {days}")
-
-    # ── Funnel Chart (below) ──────────────────────────────────────────────────
-    st.markdown("---")
-    st.markdown("### Sales Funnel")
-
-    funnel_stages = ["4 - Top of Funnel", "3 - Proposal Sent", "2 - POC", "1 - Pilot"]
-    funnel_values = [tof, proposals, pocs, pilots]
-
-    fig_funnel = go.Figure(go.Funnel(
-        y=funnel_stages,
-        x=funnel_values,
-        textinfo="value+text",
-        marker=dict(color=["#6B7280", "#F59E0B", "#06B6D4", "#10B981"]),
-        connector=dict(line=dict(color="#374151", width=2)),
-    ))
-    fig_funnel.update_layout(height=350, template="plotly_dark", margin=dict(l=20, r=20, t=20, b=20))
-    st.plotly_chart(fig_funnel, use_container_width=True)
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# TAB 2: ACTIVE DEALS
+# TAB 1: ACTIVE DEALS
 # ══════════════════════════════════════════════════════════════════════════════
 
 with tab_deals:
