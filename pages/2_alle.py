@@ -245,7 +245,8 @@ if "source" in df_all.columns and "first_conv" in df_all.columns:
             partner_new_mtgs[int(m_num) - 1] = len(grp)
 
 # All-e proposals sent by month — sourced from the revenue sheet's 'Proposals'
-# tab (the source of truth), filtered to All-e products only. The presales
+# tab (the source of truth), filtered to All-e products (incl. Agent Foundry).
+# The presales
 # tracker's 'Proposal Sent Date' column is sparsely filled, so it undercounts.
 # Cross-product proposals live in the cross-product section, not here.
 @st.cache_data(ttl=1800)
@@ -266,7 +267,8 @@ def _load_alle_props_by_month():
         for _, _row in pdf.iterrows():
             _client = str(_row.get("Client Name", "")).strip()
             _product = str(_row.get("Product", "")).lower()
-            if not _client or "all-e" not in _product:
+            # All-e includes Agent Foundry (e.g. Castrol COPS).
+            if not _client or ("all-e" not in _product and "agent foundry" not in _product):
                 continue
             _mm = _re.match(r"\s*([A-Za-z]{3})", str(_row.get("Date sent", "")))
             if _mm:
