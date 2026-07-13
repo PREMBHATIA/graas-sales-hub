@@ -454,6 +454,33 @@ with tab_gtm:
     )
     st.plotly_chart(fig_cumul, use_container_width=True)
 
+    # ── Proposals Sent — Cumulative vs POC Target ──────────────────────────────
+    st.markdown("### Proposals Sent — Cumulative vs POC Target")
+    st.caption("Cumulative proposals sent (actual) against the cumulative Free-POC target.")
+    _prop_cumul, _run = [], 0
+    for _p in actual_proposals[:current_month_idx + 1]:
+        _run += (_p if _p is not None else 0)
+        _prop_cumul.append(_run)
+    fig_props = go.Figure()
+    fig_props.add_trace(go.Scatter(
+        x=_chart_months,
+        y=gtm_target["T_Free_POCs"].iloc[:current_month_idx + 1],
+        mode="lines+markers", name="Target POCs",
+        line=dict(color="#6B7280", dash="dash", width=2),
+    ))
+    fig_props.add_trace(go.Scatter(
+        x=_chart_months, y=_prop_cumul,
+        mode="lines+markers", name="Proposals Sent (cumulative)",
+        line=dict(color="#10B981", width=3),
+        marker=dict(size=10),
+    ))
+    fig_props.update_layout(
+        height=350, template="plotly_dark",
+        margin=dict(l=20, r=20, t=20, b=20),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02),
+    )
+    st.plotly_chart(fig_props, use_container_width=True)
+
     # ── Full Roadmap Table ────────────────────────────────────────────────────
     st.markdown("### Full Roadmap — Targets")
 
