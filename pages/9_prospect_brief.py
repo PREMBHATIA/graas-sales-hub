@@ -135,8 +135,19 @@ if not SKILL_TEXT:
 # Override per-session in the UI, or set PROSPECT_BRIEF_DRIVE_FOLDER in env.
 DEFAULT_DRIVE_FOLDER = os.getenv(
     "PROSPECT_BRIEF_DRIVE_FOLDER",
-    "0ABwowt8s9tmzUk9PVA",  # Shared Drive: Prospect Brief (via SalesHub)
+    # "Prospect Briefs" folder — shared with the graas.ai domain (reader) and
+    # command-center (fileOrganizer). Briefs land here and inherit the domain
+    # share, so anyone at graas.ai can open them from the tiles — no per-doc
+    # approval — while the KB (a separate, unshared folder) stays private.
+    "12GtdM6jKWu2QXT8D_6WoGq4wvmkcce7Q",
 )
+
+# Per-file domain sharing is now handled by the shared "Prospect Briefs" folder
+# above (briefs inherit its graas.ai-reader permission), so this is OFF by
+# default. Set PROSPECT_BRIEF_SHARE_DOMAIN=graas.ai to also stamp each brief
+# individually (belt-and-suspenders, e.g. if briefs are written outside the
+# shared folder).
+BRIEF_SHARE_DOMAIN = os.getenv("PROSPECT_BRIEF_SHARE_DOMAIN", "")
 
 
 # ── CRM context lookup (so picking a known company auto-fills) ────────────────
@@ -508,6 +519,15 @@ BRIEF_JSON_SCHEMA = """{
     }
   ],
   "_situation_and_opportunity_CAP": "4-6 ROWS MAX. One row per operational area where Graas slots in. SKIP areas with no Graas fit (those go to the trimmed what_they_have background ledger). This table REPLACES the old separate pain_capability_cfo table — do not also output pain_capability_cfo unless you can't fit a pain into this merged shape.",
+  "incumbency_map": [
+    {
+      "platform": "A named AI / commerce / data system they ALREADY run — e.g. 'Salesforce Agentforce + Data 360', 'Google Vertex AI search on the webstore', 'Capillary CDP'.",
+      "built_by": "The external SI / agency / vendor that built or operates it — RESEARCH THIS, do not leave blank. e.g. 'Blend Media (martech agency)', 'Devoteam (Google Diamond SI)'. This is who Graas would be displacing or must avoid colliding with. 'In-house' or 'Unknown' if genuinely so.",
+      "internal_owner": "Who owns this relationship inside the company — name + role if found. e.g. 'Rhapsody Budiono (Head of Technology)', 'Hasan Aula (Deputy CEO, sponsor)'. 'Unknown' if not found.",
+      "verdict": "ONE of: 'Contested — incumbent entrenched, do NOT wedge here' | 'Greenfield — no owner, the wedge' | 'Ally-able — owner could champion Graas'."
+    }
+  ],
+  "_incumbency_map_NOTE": "2-5 rows. For EVERY major AI/commerce/data platform the prospect runs, name the external SI/agency behind it AND the internal owner. This is the competitive-incumbency map — it decides where NOT to fight: a space already owned by a strong SI is a reason to AVOID it, not attack it. The wedge is the GREENFIELD lane no incumbent owns (often B2B / distribution / reseller ordering). Renders as a 'Who owns what' table and directly feeds product_route.",
   "what_they_have": [
     {"dimension": "Funding status", "what_we_know": "Listed / PE-backed / VC-funded (round, year, lead) / bootstrapped; profitable or loss-making", "confidence": "Confirmed|Public estimate|Inferred|Unknown", "source": "short source"},
     {"dimension": "Top brands", "what_we_know": "3-5 recognisable brands", "confidence": "...", "source": "..."},
@@ -517,7 +537,7 @@ BRIEF_JSON_SCHEMA = """{
   "_what_they_have_NOTE": "TRIMMED to 4-6 NON-OPERATIONAL background rows ONLY: Funding status, Top brands, Top competitors, Founded/IPO, Business model (if not captured in Exec Summary). Operational dimensions (Scale, Channel structure, Tech stack, External-facing agents, AI maturity) have MOVED into situation_and_opportunity rows. Renders as a small 'Background' callout in the appendix, not the main brief.",
   "recent_news": ["MAX 2 bullets, the most material events in the last 12 months. With inline citation."],
   "what_missing": ["Gap phrased as a question or honest gap statement.", "..."],
-  "product_route": "All-e / Knowledge Graph / Layered — 2-3 lines on why this follows from motion + signals; name wedge vs expansion.",
+  "product_route": "All-e / Knowledge Graph / Layered — 2-3 lines. Pick the wedge where there is real pain AND no entrenched incumbent (cross-check incumbency_map). Explicitly AVOID any space already owned by a strong SI/agency — NAME the incumbent you're side-stepping. Prefer the GREENFIELD lane (often B2B / distribution / reseller ordering) even when the loudest pain sits in a contested B2C / eCommerce space. State the call plainly: 'don't fight in X (owned by Y) — plant the flag in Z.' Name wedge vs expansion.",
   "_persona_map_REMOVED": "The persona_map field is DEPRECATED — do not output it.",
   "_pain_capability_cfo_REMOVED": "DEPRECATED — merged into situation_and_opportunity. Do not output pain_capability_cfo unless an operational pain genuinely doesn't fit the merged shape (rare).",
   "metric_that_matters": "The metric this moves for [CFO or decision-maker name, role] is [single literal metric].",
@@ -531,8 +551,9 @@ BRIEF_JSON_SCHEMA = """{
   ],
   "_discovery_RULES": "BOTH lists are EXACTLY 5 entries each (10 total). OPERATIONAL questions only — never ask about an attendee's role/background (that's already in people_path_in as 'Unknown' which IS the ask). Each question ≤20 words. Drop anything generic or already-confirmed elsewhere in the brief.",
   "people_path_in": [
-    {"name": "...", "role": "...", "why_matter": "1-line relevance", "type": "Decision-maker | Champion | Finance buyer | Meeting attendee", "linkedin": "ONE optional line (background + prior companies). Omit field if no useful info.", "lead_with": "ONE phrase, 8-20 words — for THIS person specifically, which product/section to lead with and ONE reason grounded in their LinkedIn signal. e.g. 'Lead with hoppr + cite SOC2/PDPA up front — he's a Certified Ethical Hacker.' Only populate for meeting attendees; omit field for non-attendees."}
+    {"name": "...", "role": "...", "why_matter": "1-line relevance AND how to play them — include stance where it matters, e.g. 'owns the Devoteam/Google relationship — landmine on eCom, ally on the data layer' or 'who actually signs — aim GT numbers at him'.", "type": "Champion | Economic buyer (signs) | Tech owner (CTO / Head of Tech) | Platform-relationship owner | Meeting attendee", "linkedin": "ONE optional line (background + prior companies). Omit field if no useful info.", "lead_with": "ONE phrase, 8-20 words — for THIS person specifically, which product/section to lead with and ONE reason grounded in their LinkedIn signal. e.g. 'Lead with hoppr + cite SOC2/PDPA up front — he's a Certified Ethical Hacker.' Only populate for meeting attendees; omit field for non-attendees."}
   ],
+  "_people_path_in_NOTE": "Map the whole BUYING GROUP, not just who's in the meeting. Surface — even if NOT attending — the economic buyer (who actually signs), the technology owner (CTO / Head of Tech), and the internal owner of each incumbent platform from incumbency_map. Tag each via type + a how-to-play stance in why_matter (champion / signer / landmine defending an incumbent / ally). A brief that lists only the meeting attendee has missed the org.",
   "why_now": [
     "2-4 phrases — the macro / regulatory / segment-momentum reasons this prospect should act NOW (not in 6 months). e.g. 'IDR depreciation + softer consumer = 2026 is an efficiency year, not a growth year — hoppr/All-e attack cost-to-serve directly.'",
     "'Health Law 17/2023 mandates pharmacy distribution digitalisation — EMOS is their response; Graas accelerates the mandate.'",
@@ -924,7 +945,22 @@ def _build_new_brief_prompt(
         f"each marketplace presence), B2B ordering platforms, telemedicine/health "
         f"apps, DTC web, mobile apps, field-force apps, marketplace seller "
         f"centres. Don't stop at one or two. Each digital surface is a potential "
-        f"Graas entry point and MUST be enumerated in asset_graas_map.\n\n"
+        f"Graas entry point and MUST be enumerated in asset_graas_map.\n"
+        f"3. **Who built / owns each platform (incumbency).** For EVERY named AI / "
+        f"commerce / data platform (Salesforce/Agentforce, Google Vertex, a CDP, a "
+        f"search or chatbot stack), research the external SI / agency / vendor that "
+        f"built or runs it AND the internal owner of that relationship — put them in "
+        f"incumbency_map. These SIs are the real competition: a space an entrenched "
+        f"SI already owns is where you must NOT wedge.\n"
+        f"4. **Map the whole buying group, not just the attendee.** Surface the "
+        f"economic buyer (who signs), the technology owner (CTO / Head of Tech), and "
+        f"each incumbent-platform owner — even if not in the meeting — into "
+        f"people_path_in, each tagged with how to play them (champion / signer / "
+        f"landmine / ally). A single-name people table is a research miss.\n"
+        f"5. **Wedge = pain x no incumbent.** Set product_route to the lane with real "
+        f"pain AND no entrenched SI; name the contested space you're avoiding and who "
+        f"owns it. Don't default to the loudest B2C pain if an SI already owns it — "
+        f"the greenfield B2B / distribution lane usually wins.\n\n"
         f"**AVAILABLE GRAAS PROOF POINTS — STRICT RULE.** You may cite ONLY "
         f"customers/POCs from the list below (these are the proposals we have on "
         f"file in the Reference Proposals folder — every name + outcome here is "
@@ -957,6 +993,9 @@ def _build_new_brief_prompt(
         f"operational_area / what_they_have_today / pain_or_gap / graas_fit "
         f"(≤5 words, product + 1-3 word descriptor) / cfo_metric (≤5 words). "
         f"This REPLACES the old separate pain_capability_cfo table.), "
+        f"incumbency_map (**2-5 rows** — for each major platform: built-by (SI/agency) · "
+        f"internal owner · verdict [contested / greenfield / ally-able]; decides where "
+        f"NOT to fight and feeds product_route), "
         f"what_they_have (**TRIMMED to 4-6 non-operational background rows**: "
         f"Funding status · Top brands · Top competitors · Founded/IPO · Business "
         f"model. Operational dimensions moved to situation_and_opportunity.), "
@@ -989,7 +1028,7 @@ def _build_new_brief_prompt(
         f"(REMOVED — merged into situation_and_opportunity).\n\n"
         f"**APPENDIX LAYOUT NOTE.** The renderer splits the brief into a MAIN section "
         f"(strategic_hook, exec_summary, stat_band, why_now, meeting_game_plan, "
-        f"situation_and_opportunity, people_path_in, objection_handling, "
+        f"situation_and_opportunity, incumbency_map, people_path_in, objection_handling, "
         f"next_step, opening_hook) and an APPENDIX section (asset_graas_map, "
         f"product_route, graas_proof_points, discovery_must_haves, "
         f"discovery_nice_to_haves, Meeting Notes (blank for the salesperson), "
@@ -1577,6 +1616,7 @@ with right:
                     create_google_doc_from_docx,
                     update_google_doc_docx,
                     list_drive_folder_docs,
+                    grant_domain_access,
                 )
                 target_folder = drive_folder or DEFAULT_DRIVE_FOLDER
                 existing_doc_id = ""
@@ -1660,6 +1700,8 @@ with right:
                         )
                         from services.sheets_client import set_drive_app_properties
                         set_drive_app_properties(existing_doc_id, _props)
+                        if BRIEF_SHARE_DOMAIN:
+                            grant_domain_access(existing_doc_id, BRIEF_SHARE_DOMAIN)
                         _write_brief_link_to_pipeline(
                             company_name, _url, _brief_mode,
                             f"{datetime.now():%Y-%m-%d}",
@@ -1681,6 +1723,8 @@ with right:
                         if _new_id:
                             from services.sheets_client import set_drive_app_properties
                             set_drive_app_properties(_new_id, _props)
+                            if BRIEF_SHARE_DOMAIN:
+                                grant_domain_access(_new_id, BRIEF_SHARE_DOMAIN)
                             _write_brief_link_to_pipeline(
                                 company_name, _res.get("doc_url", ""),
                                 _brief_mode, f"{datetime.now():%Y-%m-%d}",
@@ -1912,6 +1956,9 @@ with right:
                         url = f"https://docs.google.com/document/d/{st.session_state['last_brief_doc_id']}/edit"
                         st.session_state["last_brief_doc_url"] = url
                         _sap(st.session_state["last_brief_doc_id"], _mp)
+                        if BRIEF_SHARE_DOMAIN:
+                            from services.sheets_client import grant_domain_access as _gda
+                            _gda(st.session_state["last_brief_doc_id"], BRIEF_SHARE_DOMAIN)
                         try:
                             _ublp(_pl_co, url, _pl_mode, _pl_date)
                         except Exception:
@@ -1930,6 +1977,9 @@ with right:
                         st.session_state["last_brief_doc_url"] = res["doc_url"]
                         if res.get("doc_id"):
                             _sap(res["doc_id"], _mp)
+                            if BRIEF_SHARE_DOMAIN:
+                                from services.sheets_client import grant_domain_access as _gda
+                                _gda(res["doc_id"], BRIEF_SHARE_DOMAIN)
                         try:
                             _ublp(_pl_co, res["doc_url"], _pl_mode, _pl_date)
                         except Exception:

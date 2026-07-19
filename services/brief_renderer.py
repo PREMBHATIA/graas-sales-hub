@@ -551,6 +551,23 @@ def render_brief_docx(data: dict) -> bytes:
     if data.get("metric_that_matters"):
         _add_kv_para(doc, "The metric that matters", data["metric_that_matters"])
 
+    # ── Who owns what — incumbency map (agencies/SIs + where NOT to fight) ──
+    inc = data.get("incumbency_map") or []
+    if inc:
+        _add_h2(doc, "Who owns what — and where not to fight")
+        rows = [
+            [r.get("platform", ""), r.get("built_by", ""),
+             r.get("internal_owner", ""), r.get("verdict", "")]
+            for r in inc[:6]
+        ]
+        _add_table(
+            doc,
+            headers=["Platform / system", "Built by (SI / agency)", "Internal owner", "Verdict"],
+            rows=rows,
+            col_widths_cm=[3.6, 4.4, 4.0, 6.0],
+            highlighted_rows=_ch("incumbency_map"),
+        )
+
     # ── What they have MOVED to appendix — see below ───────────────────────
     # The full 10-row research ledger now lives as a small 'Background'
     # callout in the appendix. Operational rows (Scale, Channel structure,
@@ -927,6 +944,20 @@ td.src { font-size: 7pt; font-style: italic; color: #777; }
                 f"<td>{_esc(r.get('what_we_know'))}</td>"
                 f"<td>{_esc(r.get('confidence'))}</td>"
                 f"<td class='src'>{_esc(r.get('source'))}</td></tr>"
+            )
+        parts.append("</table>")
+
+    inc = data.get("incumbency_map") or []
+    if inc:
+        parts.append("<h2>Who owns what — and where not to fight</h2><table>")
+        parts.append("<tr><th>Platform / system</th><th>Built by (SI / agency)</th>"
+                     "<th>Internal owner</th><th>Verdict</th></tr>")
+        for _idx, r in enumerate(inc[:6]):
+            parts.append(
+                f"<tr{_trc('incumbency_map', _idx)}><td>{_esc(r.get('platform'))}</td>"
+                f"<td>{_esc(r.get('built_by'))}</td>"
+                f"<td>{_esc(r.get('internal_owner'))}</td>"
+                f"<td>{_esc(r.get('verdict'))}</td></tr>"
             )
         parts.append("</table>")
 

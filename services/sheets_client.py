@@ -793,6 +793,50 @@ def share_drive_file_with_notification(
         return {"ok": False, "sent": sent, "failed": failed + [{"email": "*", "error": f"{type(e).__name__}: {e}"}]}
 
 
+def grant_domain_access(
+    doc_id: str,
+    domain: str = "graas.ai",
+    role: str = "writer",
+) -> dict:
+    """Give everyone in `domain` link-access to a Drive file — no approval prompt.
+
+    Adds a single Drive permission of type "domain", so any signed-in
+    graas.ai user who opens the file's link (e.g. from the SalesHub tiles) can
+    access it without being an individual collaborator or a member of the
+    Shared Drive it lives in. allowFileDiscovery=false keeps it link-only
+    (not surfaced in everyone's Drive search). Idempotent — re-adding the same
+    domain permission is a no-op the API tolerates.
+
+    NOTE: if the destination Shared Drive restricts sharing to members only,
+    Drive returns 403 here — in that case loosen the Shared Drive's sharing
+    setting (allow non-members) or add a graas.ai group as a Drive member.
+
+    Returns {"ok": bool, "error": str|None}.
+    """
+    creds = _get_drive_credentials()
+    if creds is None:
+        return {"ok": False, "error": "Drive credentials unavailable"}
+    try:
+        session = greq.AuthorizedSession(creds)
+        resp = session.post(
+            f"https://www.googleapis.com/drive/v3/files/{doc_id}/permissions"
+            f"?supportsAllDrives=true",
+            json={
+                "type": "domain",
+                "role": role,
+                "domain": domain,
+                "allowFileDiscovery": False,
+            },
+            timeout=15,
+        )
+        if resp.status_code in (200, 201):
+            return {"ok": True, "error": None}
+        return {"ok": False,
+                "error": f"HTTP {resp.status_code} — {resp.text[:200]}"}
+    except Exception as e:
+        return {"ok": False, "error": f"{type(e).__name__}: {e}"}
+
+
 def _url_quote(s: str) -> str:
     from urllib.parse import quote
     return quote(s, safe="")

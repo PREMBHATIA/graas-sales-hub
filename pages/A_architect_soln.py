@@ -558,6 +558,13 @@ with right:
                         if res["ok"]:
                             url = f"https://docs.google.com/document/d/{st.session_state['last_soln_doc_id']}/edit"
                             st.session_state["last_soln_doc_url"] = url
+                            try:
+                                from services.sheets_client import grant_domain_access as _gda
+                                _dom = os.getenv("PROSPECT_BRIEF_SHARE_DOMAIN", "graas.ai")
+                                if _dom:
+                                    _gda(st.session_state["last_soln_doc_id"], _dom)
+                            except Exception:
+                                pass
                             st.success(f"✅ Updated Doc. [Open it →]({url})")
                         else:
                             st.error(f"Update failed: {res['error']}")
@@ -571,6 +578,13 @@ with right:
                         if res["ok"]:
                             st.session_state["last_soln_doc_url"] = res["doc_url"]
                             st.session_state["last_soln_doc_id"] = res["doc_id"]
+                            try:
+                                from services.sheets_client import grant_domain_access as _gda
+                                _dom = os.getenv("PROSPECT_BRIEF_SHARE_DOMAIN", "graas.ai")
+                                if res.get("doc_id") and _dom:
+                                    _gda(res["doc_id"], _dom)
+                            except Exception:
+                                pass
                             st.success(f"✅ Created in Drive. [Open it →]({res['doc_url']})")
                         else:
                             st.error(f"Drive create failed: {res.get('error') or 'unknown'}")
