@@ -40,10 +40,17 @@ def _load_questions_log():
             return pd.DataFrame(), None
         df = df.copy()
         df["_ts"] = pd.to_datetime(df.get("TS"), errors="coerce")
+        # Guarantee every column the view reads exists so downstream aggs /
+        # selects reference them directly without KeyError. Fill an absent
+        # column with "" — except STATUS, which defaults to "ok" so a
+        # not-logged status isn't miscounted as an error (would flip Error
+        # Rate to 100%).
         for c in ("SELLER_ID", "USER_EMAIL", "QUESTION_TEXT", "TOOL_NAME",
-                  "STATUS", "ERROR_CATEGORY"):
+                  "STATUS", "ERROR_CATEGORY", "SQL_QUERY"):
             if c in df.columns:
                 df[c] = df[c].astype(str).str.strip()
+            else:
+                df[c] = "ok" if c == "STATUS" else ""
         df = df.dropna(subset=["_ts"]).reset_index(drop=True)
         return df, None
     except Exception as e:
