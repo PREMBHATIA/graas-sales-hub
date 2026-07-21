@@ -2029,6 +2029,25 @@ with tab_analytics, _tab_guard("Analytics"):
                 st.caption("No template data yet.")
 
         with col_d:
+            st.markdown("#### 📨 Opens & clicks by template (the A/B answer)")
+            try:
+                from services.email_sender import engagement_by_template
+                _eng = engagement_by_template(days=30)
+                if _eng.empty:
+                    st.caption(
+                        "No tracked sends yet — engagement appears once emails go "
+                        "out with PIXEL_BASE_URL configured."
+                    )
+                else:
+                    st.dataframe(_eng, use_container_width=True, hide_index=True)
+                    st.caption(
+                        "Counted once per send. **Judge the A/B on Click %** — opens are "
+                        "directional only (Apple Mail pre-fetches images and Gmail proxies "
+                        "them, so open rate is inflated); a click is a deliberate action."
+                    )
+            except Exception as _eng_err:
+                st.caption(f"Engagement unavailable: {_eng_err}")
+
             st.markdown("#### By bucket (last 30d)")
             if "bucket" in sent_30d.columns and not sent_30d.empty:
                 by_b = (sent_30d.groupby("bucket").size().reset_index(name="Sends")

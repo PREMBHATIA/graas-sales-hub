@@ -19,7 +19,10 @@ with EDITOR permission, otherwise sends will be blocked.
 """
 
 import os
+import re
 import smtplib
+import uuid
+from urllib.parse import quote
 from datetime import datetime, timezone, timedelta
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -46,11 +49,64 @@ LOG_TAB_NAME = "Sends"
 LOG_HEADERS = [
     "timestamp_utc", "sender_label", "from_email", "reply_to",
     "to_email", "to_name", "company", "bucket", "template",
-    "subject", "body", "status", "error_msg",
+    "subject", "body", "status", "error_msg", "tracking_id",
 ]
 
 SUPPRESSION_TAB_NAME = "Suppressions"
 SUPPRESSION_HEADERS = ["email", "reason", "added_at_utc", "added_by"]
+
+# ── Open / click tracking ────────────────────────────────────────────────────
+# PIXEL_BASE_URL = the deployed Apps Script web-app URL that logs hits into the
+# "Tracking" tab of the same Outreach Log sheet. If it's unset, every helper
+# below degrades to a no-op and mail sends exactly as before — so this is safe
+# to ship before the endpoint exists.
+#
+# Caveat worth remembering when reading the numbers: Apple Mail Privacy
+# Protection pre-fetches images whether or not a human opened the mail, and
+# Gmail proxies/caches them. Treat OPEN rate as directional only — compare
+# variants against each other, never quote the absolute number. CLICKS are a
+# deliberate human action and are the metric to trust.
+
+_URL_RE = re.compile(r'(https?://[^\s<>"]+)')
+
+
+def _tracking_base() -> str:
+    return (os.getenv("PIXEL_BASE_URL") or "").strip()
+
+
+def _tracking_pixel_html(tracking_id: str) -> str:
+    """1x1 hidden beacon appended to the HTML part."""
+    base = _tracking_base()
+    if not base or not tracking_id:
+        return ""
+    return (
+        f'<img src="{base}?t={tracking_id}&e=open" width="1" height="1" '
+        f'style="display:none;max-height:0;overflow:hidden" alt="">'
+    )
+
+
+def _linkify_with_tracking(html: str, tracking_id: str) -> str:
+    """Turn bare URLs in the (already HTML-escaped) body into anchors.
+
+    The composer body is plain text that we escape into HTML, so there are no
+    <a> tags to rewrite — we create them. When tracking is configured the href
+    goes through the endpoint, which logs the click and redirects on.
+    """
+    base = _tracking_base()
+
+    def _sub(m: "re.Match") -> str:
+        raw = m.group(1)
+        trail = ""
+        while raw and raw[-1] in ".,);:":       # don't swallow sentence punctuation
+            trail, raw = raw[-1] + trail, raw[:-1]
+        dest = raw.replace("&amp;", "&")        # undo the body escaping for the real URL
+        if base and tracking_id:
+            href = f'{base}?t={tracking_id}&e=click&u={quote(dest, safe="")}'
+        else:
+            href = raw
+        return f'<a href="{href}">{raw}</a>{trail}'
+
+    return _URL_RE.sub(_sub, html)
 
 
 # ── Public API ───────────────────────────────────────────────────────────────
@@ -248,12 +304,18 @@ def send_email(
     msg["Reply-To"] = formataddr((sender_name, reply_to))
     msg["Message-ID"] = make_msgid(domain="graas.ai")
 
+    # Per-send token — ties the open/click beacons back to this log row.
+    tracking_id = uuid.uuid4().hex
+
     # Plain text + minimal HTML (just escapes the body and preserves line breaks)
     msg.attach(MIMEText(body, "plain", "utf-8"))
+    _escaped = (body.replace("&", "&amp;").replace("<", "&lt;")
+                    .replace(">", "&gt;").replace("\n", "<br>"))
     html_body = (
         "<html><body style=\"font-family: -apple-system, system-ui, sans-serif; "
         "color: #111; line-height: 1.5;\">"
-        + body.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
+        + _linkify_with_tracking(_escaped, tracking_id)
+        + _tracking_pixel_html(tracking_id)
         + "</body></html>"
     )
     msg.attach(MIMEText(html_body, "html", "utf-8"))
@@ -287,6 +349,7 @@ def send_email(
         body,
         status,
         error_msg,
+        tracking_id,
     ]
     sheet_id = os.getenv("EMAIL_LOG_SHEET_ID", "")
     if sheet_id:
@@ -305,6 +368,74 @@ def recent_sends(limit: int = 20):
     if df.empty:
         return df
     return df.tail(limit).iloc[::-1].reset_index(drop=True)
+
+
+TRACKING_TAB_NAME = "Tracking"
+
+
+def fetch_tracking_events():
+    """Raw open/click beacons — written by the Apps Script web app.
+
+    Columns: ts_utc | tracking_id | event | dest_url.
+    """
+    import pandas as pd
+    sheet_id = os.getenv("EMAIL_LOG_SHEET_ID", "")
+    if not sheet_id:
+        return pd.DataFrame()
+    try:
+        return fetch_log_rows(sheet_id, TRACKING_TAB_NAME)
+    except Exception:
+        return pd.DataFrame()
+
+
+def engagement_by_template(days: int = 30):
+    """Opens / clicks per template — i.e. the A/B answer.
+
+    Counts are UNIQUE per send (per tracking_id), so one recipient opening
+    five times still counts once. Read Click % as the real signal: opens are
+    inflated by Apple Mail Privacy Protection pre-fetching images.
+    """
+    import pandas as pd
+    sends = recent_sends(limit=100000)
+    if sends.empty or "tracking_id" not in sends.columns:
+        return pd.DataFrame()
+
+    s = sends.copy()
+    s["tracking_id"] = s["tracking_id"].astype(str).str.strip()
+    s = s[s["tracking_id"] != ""]
+    if "status" in s.columns:
+        s = s[s["status"].astype(str).str.strip().str.lower() == "sent"]
+    if days and "timestamp_utc" in s.columns:
+        _ts = pd.to_datetime(s["timestamp_utc"], errors="coerce", utc=True)
+        s = s[_ts >= (pd.Timestamp.now(tz="UTC") - pd.Timedelta(days=days))]
+    if s.empty:
+        return pd.DataFrame()
+
+    if "template" not in s.columns:
+        s["template"] = "(none)"
+    s["template"] = (s["template"].astype(str).str.strip()
+                     .replace({"": "(none)", "nan": "(none)"}))
+
+    opened, clicked = set(), set()
+    ev = fetch_tracking_events()
+    if not ev.empty and "tracking_id" in ev.columns:
+        e = ev.copy()
+        e["tracking_id"] = e["tracking_id"].astype(str).str.strip()
+        e["event"] = e.get("event", "").astype(str).str.strip().str.lower()
+        opened = set(e.loc[e["event"] == "open", "tracking_id"])
+        clicked = set(e.loc[e["event"] == "click", "tracking_id"])
+
+    s["_opened"] = s["tracking_id"].isin(opened)
+    s["_clicked"] = s["tracking_id"].isin(clicked)
+
+    out = (s.groupby("template")
+             .agg(Sent=("tracking_id", "nunique"),
+                  Opened=("_opened", "sum"),
+                  Clicked=("_clicked", "sum"))
+             .reset_index())
+    out["Open %"] = (out["Opened"] / out["Sent"] * 100).round(0)
+    out["Click %"] = (out["Clicked"] / out["Sent"] * 100).round(0)
+    return out.sort_values("Sent", ascending=False).reset_index(drop=True)
 
 
 # ── Suppression list ─────────────────────────────────────────────────────────
