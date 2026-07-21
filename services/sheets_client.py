@@ -135,6 +135,15 @@ def append_log_row(sheet_id: str, tab_name: str, row: list, headers: Optional[li
             existing = worksheet.row_values(1)
             if not existing:
                 worksheet.append_row(headers, value_input_option="USER_ENTERED")
+            elif len(existing) < len(headers) and headers[:len(existing)] == existing:
+                # Schema grew (new trailing column, e.g. tracking_id). The row
+                # data gets appended fine, but an unnamed column is silently
+                # dropped by every downstream read — so name it here.
+                for _i in range(len(existing), len(headers)):
+                    try:
+                        worksheet.update_cell(1, _i + 1, headers[_i])
+                    except Exception:
+                        break
         worksheet.append_row(row, value_input_option="USER_ENTERED")
         return True
     except Exception:
