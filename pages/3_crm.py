@@ -1985,7 +1985,7 @@ with tab_analytics, _tab_guard("Analytics"):
         k2.metric("👀 Opened (7d)", "—" if _opened_7d is None else _opened_7d,
                   help="Unique sends opened. Directional only — Apple Mail pre-fetches "
                        "images and Gmail proxies them, so this over-counts.")
-        k3.metric("🖱️ Clicked (7d)", "—" if _clicked_7d is None else _clicked_7d,
+        k3.metric("🔗 Clicked (7d)", "—" if _clicked_7d is None else _clicked_7d,
                   help="Unique sends with a link click — a deliberate human action, "
                        "so this is the number to trust for 'what resonated'.")
         k4.metric("↩️ Replied", "—", help="Not tracked yet — needs Gmail API reply polling")
