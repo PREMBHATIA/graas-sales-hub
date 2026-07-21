@@ -1926,7 +1926,8 @@ with tab_news, _tab_guard("Newsworthy"):
 with tab_analytics, _tab_guard("Analytics"):
     st.markdown("### 📊 Outreach Analytics")
     st.caption("Email outreach metrics from the Graas Outreach Log. "
-               "Sent is tracked today; opens / replies / unsubscribes need Phase 2 (hosted pixel + reply polling).")
+               "Sent, opens and clicks are tracked. Replies and unsubscribes are not yet — "
+               "they need Gmail reply-polling and a hosted unsubscribe endpoint.")
 
     from services.email_sender import (
         recent_sends as _recent_sends,
@@ -1958,12 +1959,37 @@ with tab_analytics, _tab_guard("Analytics"):
         sent_30d = sent_df[sent_df["_ts"] >= now_utc - pd.Timedelta(days=30)]
         failed_7d = log_df[(log_df["status"] != "sent") & (log_df["_ts"] >= now_utc - pd.Timedelta(days=7))]
 
+        # ── Engagement from the open/click beacons ────────────────────────────
+        # Unique per send (tracking_id), so one recipient opening five times
+        # counts once. None => tracking not configured / nothing to match yet.
+        _opened_7d = _clicked_7d = None
+        try:
+            from services.email_sender import fetch_tracking_events
+            if "tracking_id" in sent_7d.columns:
+                _ids = {t for t in sent_7d["tracking_id"].astype(str).str.strip() if t}
+                if _ids:
+                    _opened_7d = _clicked_7d = 0
+                    _ev = fetch_tracking_events()
+                    if not _ev.empty and "tracking_id" in _ev.columns:
+                        _e = _ev.copy()
+                        _e["tracking_id"] = _e["tracking_id"].astype(str).str.strip()
+                        _e["event"] = _e.get("event", "").astype(str).str.strip().str.lower()
+                        _opened_7d = len(_ids & set(_e.loc[_e["event"] == "open", "tracking_id"]))
+                        _clicked_7d = len(_ids & set(_e.loc[_e["event"] == "click", "tracking_id"]))
+        except Exception:
+            pass
+
         # ── KPI tiles ─────────────────────────────────────────────────────────
-        k1, k2, k3, k4 = st.columns(4)
+        k1, k2, k3, k4, k5 = st.columns(5)
         k1.metric("📤 Sent (7d)", len(sent_7d), help=f"{len(sent_30d)} in last 30 days · {len(sent_df)} all-time")
-        k2.metric("👀 Opened", "—", help="Phase 2: requires hosted tracking pixel")
-        k3.metric("↩️ Replied", "—", help="Phase 2: requires Gmail API reply polling")
-        k4.metric("🚫 Unsubscribed", "—", help="Phase 2: requires hosted unsubscribe endpoint")
+        k2.metric("👀 Opened (7d)", "—" if _opened_7d is None else _opened_7d,
+                  help="Unique sends opened. Directional only — Apple Mail pre-fetches "
+                       "images and Gmail proxies them, so this over-counts.")
+        k3.metric("🖱️ Clicked (7d)", "—" if _clicked_7d is None else _clicked_7d,
+                  help="Unique sends with a link click — a deliberate human action, "
+                       "so this is the number to trust for 'what resonated'.")
+        k4.metric("↩️ Replied", "—", help="Not tracked yet — needs Gmail API reply polling")
+        k5.metric("🚫 Unsubscribed", "—", help="Not tracked yet — needs a hosted unsubscribe endpoint")
 
         # Weekly cap row
         cap = _get_weekly_cap()
