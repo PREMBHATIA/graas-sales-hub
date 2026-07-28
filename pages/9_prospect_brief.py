@@ -41,30 +41,14 @@ st.caption("Pre-call research → 2-3 page account brief, then a living doc upda
 with st.expander("ℹ️ How to use this — read once, then collapse", expanded=False):
     st.markdown("#### The 30-second version")
     st.markdown(
-        "**Type in a company name.** I'll research it, figure out gaps "
-        "Graas can fill, and suggest a script + discovery questions for "
-        "the call.\n\n"
-        "**Post your call**, drop your notes — paste the Granola summary "
-        "or Zoom transcript straight into the post-call section, OR just "
-        "edit the Google Doc brief directly. Either way, I read your "
-        "changes on the next regen and use them as the new baseline."
+        "**Type in a company name.** I research it with a best-in-class "
+        "model + web search — hunt their actual live stack (ERP, CRM, "
+        "AI/search/chatbot + who built it), map where Graas might fit "
+        "(as a question, not a claim), flag landmines, and hand you a tight "
+        "two-pager for the call. One Doc per customer, auto-saved to Drive.\n\n"
+        "Add the meeting date + attendee names/titles to get the buying "
+        "group mapped with LinkedIn links."
     )
-
-    st.markdown("#### Two modes")
-    m1, m2 = st.columns(2)
-    with m1:
-        st.markdown("##### 🆕 New brief (pre-call)")
-        st.markdown(
-            "Pick the company from CRM (or type) + paste any research notes "
-            "you have. Auto-saves to Drive when done."
-        )
-    with m2:
-        st.markdown("##### 🔁 Update existing (post-call)")
-        st.markdown(
-            "4-card wizard: paste prior brief URL → paste call notes → "
-            "click Update. Updates the same Doc in place; tile flips to "
-            "Post call-N."
-        )
 
     st.markdown("#### Tips that change output quality")
     st.markdown(
@@ -73,24 +57,18 @@ with st.expander("ℹ️ How to use this — read once, then collapse", expanded
         "instead of silently picking one.\n"
         "- **Note what you don't know** (*\"not yet clear if they have a DMS\"*) "
         "→ becomes a discovery question.\n"
-        "- **Paste call notes verbatim**. Don't pre-summarise — the diff against "
-        "the discovery agenda works better with raw notes.\n"
-        "- **Edit the Doc freely**. Your edits are preserved on the next regen — "
-        "the bot reads them and uses them as the new baseline. Don't redo work."
+        "- **Name the attendees** (titles too) → the buying group gets mapped "
+        "with LinkedIn links and a how-to-play line each."
     )
 
-    st.markdown("#### ✨ What's new")
+    st.markdown("#### What you get")
     st.markdown(
-        "- **One Doc per customer, auto-saved** — also auto-linked into "
-        "pipeline sheet column S.\n"
-        "- **Post-call wizard** + **Meeting Notes scratchpad** to write "
-        "into during the call.\n"
-        "- **Yellow row highlights** show what changed each call · "
-        "**Timeline** tells you deal pace.\n"
-        "- **I preserve your edits** on the next regen — your framings are "
-        "the new baseline.\n"
-        "- **Past-meeting auto-detect** in your research notes → brief "
-        "promoted to Post call-1 automatically."
+        "A two-pager: **Snapshot** · **Who's who** (LinkedIn) · **The stack** "
+        "(systems · vendors/SIs · owners · verdict) · **Where Graas might fit** "
+        "(question-framed, mapped to the 4 offerings) · **Landmines** · "
+        "**Wedges worth exploring** · **Appendix** (discovery + confirmed "
+        "research). One Doc per customer, auto-saved + linked into pipeline "
+        "sheet column S."
     )
     st.markdown("---")
 
@@ -275,141 +253,6 @@ with left:
                         "- Two sources disagree on revenue — flag the conflict\n"
                         "- (Leave blank to let Claude research from public sources)",
         )
-        existing_brief_id = ""
-        call_notes = ""
-    else:
-        # ── Post-call wizard — 4 side-by-side cards. Cards 1+2 must be valid
-        # before card 3's button enables. Card 4 shows the result after build.
-        meeting_date = ""
-        attendees_raw = ""
-        research_text = ""
-
-        # Live URL validation for card 1 — probe Drive metadata so we can
-        # tell the user "we can see it" vs "SA can't read this" vs "not a
-        # Doc" without making them guess.
-        _pc_url = st.session_state.get("brief_existing_id", "")
-        _pc_url_status = ("⏳", "Paste the prior brief's Doc URL above")
-        _pc_doc_title = ""
-        if _pc_url.strip():
-            _m = re.search(r"/d(?:ocument)?/d?/?([A-Za-z0-9_-]{20,})", _pc_url)
-            _did = _m.group(1) if _m else (_pc_url.strip() if re.match(r"^[A-Za-z0-9_-]{20,}$", _pc_url.strip()) else "")
-            if not _did:
-                _pc_url_status = ("❌", "Couldn't parse a Doc ID from that URL")
-            else:
-                try:
-                    import google.auth.transport.requests as _greq
-                    from services.sheets_client import _get_drive_credentials
-                    _sess = _greq.AuthorizedSession(_get_drive_credentials())
-                    _resp = _sess.get(
-                        f"https://www.googleapis.com/drive/v3/files/{_did}"
-                        "?fields=name,mimeType&supportsAllDrives=true",
-                        timeout=10,
-                    )
-                    if _resp.status_code == 200:
-                        _meta = _resp.json()
-                        _pc_doc_title = _meta.get("name", "(no name)")
-                        _pc_url_status = ("✅", _pc_doc_title)
-                    else:
-                        _pc_url_status = ("❌", f"SA can't read this file (HTTP {_resp.status_code})")
-                except Exception as _e:
-                    _pc_url_status = ("❌", f"Fetch failed: {type(_e).__name__}")
-
-        _card1_valid = _pc_url_status[0] == "✅"
-        _pc_notes = st.session_state.get("brief_call_notes", "")
-        _card2_valid = len(_pc_notes.strip()) >= 30
-        _ready = _card1_valid and _card2_valid
-
-        # 1×3 single-row layout. Card 4 (Done) removed — its content
-        # duplicates the right-pane success banner + Save section, so it
-        # was visual noise. Fixed-height containers so all 3 cards line
-        # up evenly (card 2's textarea would otherwise stretch its row).
-        _CARD_H = 400
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            with st.container(border=True, height=_CARD_H):
-                _b = "✅" if _card1_valid else ("❌" if _pc_url.strip() else "1.")
-                st.markdown(f"**{_b} Prior brief**")
-                st.caption("Paste the URL of the previous version")
-                st.text_input(
-                    "Doc URL",
-                    key="brief_existing_id",
-                    label_visibility="collapsed",
-                    placeholder="docs.google.com/document/d/…",
-                )
-                st.caption(f"{_pc_url_status[0]} {_pc_url_status[1]}")
-                # Convenience link → SalesHub Shared Drive root so user can
-                # browse to a prior brief without leaving the page.
-                _sh_drive_url = "https://drive.google.com/drive/folders/0ABwowt8s9tmzUk9PVA"
-                st.markdown(
-                    f"<div style='margin-top:10px;font-size:9pt;'>"
-                    f"📁 <a href='{_sh_drive_url}' target='_blank' "
-                    f"style='color:#2742FF;text-decoration:none;'>"
-                    f"Browse SalesHub Drive folder →</a></div>",
-                    unsafe_allow_html=True,
-                )
-        with c2:
-            with st.container(border=True, height=_CARD_H):
-                _b = "✅" if _card2_valid else "2."
-                st.markdown(f"**{_b} Call notes**")
-                st.caption("Granola / Zoom · email thread · WhatsApp · or paste your own")
-                st.text_area(
-                    "Notes",
-                    key="brief_call_notes",
-                    label_visibility="collapsed",
-                    height=200,
-                    placeholder="Paste raw notes, email trail, or WhatsApp chat — don't pre-summarise",
-                )
-                _msg = (f"✅ {len(_pc_notes.strip())} chars" if _card2_valid
-                        else f"⏳ {len(_pc_notes.strip())} chars (need ≥30)")
-                st.caption(_msg)
-                # If the selected company has a notes link in CRM col K,
-                # surface it — that content auto-pulls + merges with what
-                # the user types below at Build time.
-                _crm_link = (crm_data or {}).get("notes_link", "")
-                if _crm_link:
-                    _short = _crm_link if len(_crm_link) <= 60 else _crm_link[:57] + "…"
-                    st.caption(
-                        f"📎 Will also auto-pull from CRM col K: `{_short}`"
-                    )
-        with c3:
-            with st.container(border=True, height=_CARD_H):
-                _b = "▶️" if _ready else "🔒"
-                st.markdown(f"**{_b} Update brief**")
-                st.caption("Folds the notes into the existing brief")
-                build_clicked = st.button(
-                    "Update brief",
-                    type="primary",
-                    use_container_width=True,
-                    key="brief_pc_build_btn",
-                    disabled=not _ready,
-                )
-                if _ready:
-                    st.caption("✅ Ready to build")
-                elif _card1_valid:
-                    st.caption("🔒 Need call notes (card 2)")
-                elif _card2_valid:
-                    st.caption("🔒 Need a valid Doc URL (card 1)")
-                else:
-                    st.caption("🔒 Fill cards 1 + 2")
-
-                # Working state + last-attempt outcome. Streamlit shows its own
-                # top-of-page "RUNNING" indicator during the rerun, but users
-                # don't always notice it — surface the same signal in-card.
-                if build_clicked:
-                    st.caption("⏳ Working… activity panel below shows live progress.")
-                else:
-                    _last_pc = st.session_state.get("last_pc_attempt_outcome")
-                    if _last_pc and _last_pc.get("status") == "error":
-                        _msg = str(_last_pc.get("message", ""))[:140]
-                        st.error(
-                            f"❌ Last attempt failed — click **Update brief** again.\n\n`{_msg}`"
-                        )
-
-        # Mirror wizard state into the var names the downstream generation
-        # code expects (existing_brief_id, call_notes, build_clicked).
-        existing_brief_id = _pc_url
-        call_notes = _pc_notes
-
     # Save destination + share — tucked away in an expander; defaults
     # are right 99% of the time, so most users never touch this.
     with st.expander("⚙️ Advanced — Drive folder + share list", expanded=False):
@@ -530,126 +373,6 @@ BRIEF_JSON_SCHEMA = """{
 
 
 REFERENCE_PROPOSALS_FOLDER_ID = "1tBMrcpiIDVhg5e0-N1ytjuzbDexQyheX"
-
-
-# DEPRECATED static list — kept only as a SHAPE REFERENCE for what
-# _fetch_commerce_tech_story() returns. The page no longer reads from
-# this list (it would be fabricated content). The live fetch returns the
-# same dict shape: {tag, title, body, why, source_label, source_url}.
-# REMOVE this entire constant in a follow-up cleanup once the live
-# fetch has been in production for a few weeks.
-_COMMERCE_TECH_STORIES_DEPRECATED = [
-    {
-        "tag": "🇺🇸 US · agentic commerce",
-        "title": "Amazon Rufus — shopping becomes a conversation",
-        "body": (
-            "Amazon's Rufus AI assistant is now embedded inside the Amazon "
-            "app, answering product questions, comparing SKUs and "
-            "personalising recommendations live. Early reports show "
-            "Rufus users have higher session times and AOV than search-only."
-        ),
-        "why": (
-            "The default eCom UX is shifting from search-and-filter to "
-            "ask-and-receive. Every retailer with a marketplace presence "
-            "(or their own storefront) now has to answer: do we build "
-            "our own agentic layer, or watch Amazon set the bar?"
-        ),
-        "source_label": "Amazon news blog",
-        "source_url": "https://www.aboutamazon.com/news/retail/amazon-rufus-generative-ai-shopping-assistant",
-    },
-    {
-        "tag": "🇮🇳 India · quick commerce",
-        "title": "Zepto, Blinkit, Instamart — 10-min war goes nuclear",
-        "body": (
-            "Quick commerce in India crossed $5B GMV run-rate, with Zepto "
-            "raising at $5B valuation and Blinkit profitable in 8 cities. "
-            "Dark-store density is the moat, but AI-driven SKU optimisation "
-            "per dark store is where the margin lives."
-        ),
-        "why": (
-            "Distribution + AI + dark-store ops = the new D2C playbook in "
-            "SEA-style markets. Every kirana-distribution prospect is "
-            "watching this. Q-commerce is also redefining 'what fast "
-            "fulfilment looks like' for FMCG brands sitting upstream."
-        ),
-        "source_label": "TechCrunch India",
-        "source_url": "https://www.google.com/search?q=Zepto+Blinkit+Instamart+quick+commerce+valuation+2026&tbm=nws",
-    },
-    {
-        "tag": "🇺🇸 US · merchant tooling",
-        "title": "Shopify Magic + Sidekick — AI co-pilot for every merchant",
-        "body": (
-            "Shopify shipped Magic (AI copy, product images, FAQs) and "
-            "Sidekick (conversational store manager) to all merchants — no "
-            "extra fee. SMBs now have a built-in AI co-pilot for marketing, "
-            "support and inventory questions."
-        ),
-        "why": (
-            "Verticalised AI inside a platform crushes standalone tools. "
-            "If you're selling a third-party AI capability into a Shopify "
-            "merchant, you have ~12 months before Shopify ships their own "
-            "version. Move fast or pick a non-overlapping wedge."
-        ),
-        "source_label": "Shopify",
-        "source_url": "https://www.shopify.com/magic",
-    },
-    {
-        "tag": "🇮🇩 SEA · live commerce",
-        "title": "TikTok Shop Indonesia — #2 platform in 18 months",
-        "body": (
-            "TikTok Shop is now the #2 ecom platform in Indonesia after "
-            "Tokopedia, with creator-led live shopping driving the lift. "
-            "Local sellers report 30-50% of GMV via live sessions; "
-            "the algorithm rewards conversational, not catalogue, UX."
-        ),
-        "why": (
-            "Live commerce + creator discovery is the SEA default — not "
-            "an experiment. Indonesian retail prospects (pharmacy, FMCG, "
-            "fashion) need agentic product search + cart flows that work "
-            "inside chat / live, not just web storefronts."
-        ),
-        "source_label": "Reuters",
-        "source_url": "https://www.google.com/search?q=TikTok+Shop+Indonesia+live+commerce+platform+share&tbm=nws",
-    },
-    {
-        "tag": "🇺🇸 US · capital signal",
-        "title": "SpaceX $350B secondary — what late-stage tech capital says",
-        "body": (
-            "SpaceX closed a secondary at $350B valuation, making it the "
-            "most valuable private company globally. Even with rate-cycle "
-            "headwinds, investors are writing massive cheques for "
-            "infrastructure + defensible moats."
-        ),
-        "why": (
-            "Late-stage capital still flowing — but to category-defining "
-            "infra plays. For Graas customers in capital-restructuring "
-            "years (Pyfa, Kalbe-style), this signals where the "
-            "competitive AI investment is going and what the bar is for "
-            "'tech budget' framing."
-        ),
-        "source_label": "Bloomberg",
-        "source_url": "https://www.google.com/search?q=SpaceX+secondary+sale+350B+valuation&tbm=nws",
-    },
-    {
-        "tag": "🌏 Global · AI for retail",
-        "title": "Anthropic + OpenAI verticalise into retail/commerce",
-        "body": (
-            "Both Anthropic (Claude for Enterprise) and OpenAI (Operator + "
-            "Custom GPTs for retail) are shipping verticalised agentic "
-            "features for ecom. Retailer-specific evals, prebuilt connectors "
-            "to Shopify/SAP/Salesforce, and managed agentic workflows."
-        ),
-        "why": (
-            "The general-purpose AI window is closing for retailers. "
-            "Vertical AI = Graas's lane. If a prospect is evaluating "
-            "OpenAI's retail features, the question becomes 'commerce-"
-            "native vs general-purpose with retail skin' — anchor on "
-            "Graas's commerce-only DNA."
-        ),
-        "source_label": "Anthropic news",
-        "source_url": "https://www.anthropic.com/news",
-    },
-]
 
 
 def _normalize_company_key(name: str) -> str:
@@ -884,107 +607,6 @@ def _build_new_brief_prompt(
     )
 
 
-def _build_update_prompt(existing_brief_text: str, call_notes: str, company: str) -> str:
-    """Compose the user-turn prompt for a post-call update — returns updated JSON."""
-    today = datetime.now().strftime("%Y-%m-%d")
-    return (
-        f"Update the existing Prospect Brief for **{company or '<NAME>'}** with new "
-        f"call notes from today ({today}).\n\n"
-        f"**USER EDITS ARE AUTHORITATIVE — INCREMENTAL UPDATE ONLY.** The "
-        f"existing brief text below is what currently lives in the Doc. "
-        f"Between bot generations, the salesperson manually edits the Doc — "
-        f"fixing facts, tightening prose, adding the right framing, removing "
-        f"things they don't agree with. Their edits are AUTHORITATIVE. Treat "
-        f"the existing brief as the new baseline; do NOT rewrite content "
-        f"that's already there.\n\n"
-        f"Signals that text in the existing brief is a USER EDIT (preserve "
-        f"verbatim):\n"
-        f"  • Specific numbers / dates / proper nouns the bot wouldn't have "
-        f"invented (e.g. '₹6,057 Cr FY26', 'Founded 1991 (K Raheja Corp)', "
-        f"'INTUNE at 84 stores', 'India Weds ₹300 Cr')\n"
-        f"  • Named events / programmes the salesperson knows about (e.g. "
-        f"'Shoppers Stop 2.0 relaunch 2024', 'BCG transformation partnership')\n"
-        f"  • Concrete quote-style framings ('Anchor on Personal Shopper at "
-        f"₹1,200 Cr', 'lead with the loss-making INTUNE EBITDA frame')\n"
-        f"  • Compact phrasing that's tighter than typical bot output\n"
-        f"  • Anything that contradicts general public info but matches what "
-        f"the salesperson would know from inside the room\n\n"
-        f"Your job is to ADD what the new call notes surfaced — NOT to "
-        f"rewrite the brief from scratch. For each section: start with the "
-        f"existing text. Where the new notes add an item → APPEND it. Where "
-        f"the new notes upgrade an Inferred fact to Confirmed → UPDATE the "
-        f"confidence on that row, keep the user's wording. Where the new "
-        f"notes contradict a fact → flag in Conflicts & Unknowns showing both. "
-        f"Only rewrite a cell if the new call notes contain a specific "
-        f"contradiction or upgrade. Leave the rest as the user wrote it.\n\n"
-        f"If unsure whether a phrase is bot- or user-written → ASSUME USER and "
-        f"preserve. False preservation is cheap (you reuse good prose); false "
-        f"rewrite is expensive (the user loses work and has to redo it).\n\n"
-        f"Diff the notes against the discovery agenda. For each open question:\n"
-        f"- Answered → move it into the fact tables, upgrade Confidence to Confirmed, "
-        f"strike from the agenda.\n"
-        f"- Contradicted → update the fact and flag in Conflicts & Unknowns.\n"
-        f"- Unanswered → leave in the agenda for the next call.\n"
-        f"Capture anything new the call surfaced (pains, people, systems, agents, "
-        f"competitors, budget/timeline).\n\n"
-        f"Re-check the product route — new info may shift All-e ↔ KG or open the "
-        f"layered angle. Update the CFO metric if needed.\n\n"
-        f"**BACKFILL THE INCUMBENCY + BUYING-GROUP FIELDS (older briefs predate "
-        f"them, and the user may have added this as free text — pull it into the "
-        f"structured fields, don't leave it stranded):**\n"
-        f"(a) **incumbency_map** — for every major AI / commerce / data platform they "
-        f"run, name the external SI / agency that built it AND the internal owner, "
-        f"with a contested / greenfield / ally-able verdict. Take anything the user "
-        f"already wrote (e.g. 'built by Devoteam', 'owned by Head of Technology') and "
-        f"RESEARCH the rest. These SIs are the real competition.\n"
-        f"(b) **people_path_in** — surface the FULL buying group: the economic buyer "
-        f"(who signs), the tech owner (CTO / Head of Tech), and each incumbent-"
-        f"platform owner — not just the meeting attendee — each tagged with how to "
-        f"play them (champion / signer / landmine / ally).\n"
-        f"(c) **product_route / wedge** — pick the lane with real pain AND no "
-        f"entrenched incumbent; NAME the contested space you're avoiding and who owns "
-        f"it; prefer the greenfield B2B / distribution lane over a contested B2C "
-        f"pain. If the user's edits already argue this, keep their call.\n\n"
-        f"Decide and record the **next_step** explicitly with one line on why.\n\n"
-        f"Update header.status: append `→ Post call-N — {today}` where N is the next "
-        f"number after the latest. Keep prior status entries intact in the string.\n\n"
-        f"**CHANGE TRACKING (critical for highlighting).** Populate the "
-        f"`_changed_rows` object with the row indices YOU updated (or added) "
-        f"in each table-shaped field as a result of THIS call. Keys: "
-        f"what_they_have, asset_graas_map, persona_map, pain_capability_cfo, "
-        f"graas_proof_points, people_path_in, meeting_game_plan, "
-        f"objection_handling. Values: 0-based arrays of row indices that "
-        f"changed. Example: if you upgraded the Scale row (index 1) in "
-        f"what_they_have and added a new persona at the end of persona_map "
-        f"(now 4 rows total, the new one at index 3), return "
-        f"{{'what_they_have': [1], 'persona_map': [3], ...}} (empty arrays "
-        f"for tables you didn't touch). The renderer paints those rows yellow "
-        f"so the salesperson sees what's new at a glance. Don't be stingy — "
-        f"if a row's content shifted in any meaningful way, flag it.\n\n"
-        f"**POST-CALL LOG (critical for this update flow).** PREPEND a new entry "
-        f"to the `post_call_log` array as the FIRST item (most recent on top). "
-        f"PRESERVE every prior entry verbatim — never delete or rewrite old "
-        f"entries. The new entry must include: call_number = (highest existing "
-        f"call_number + 1, or 1 if empty), date = {today}, what_we_learned "
-        f"(1-2 phrases on the call's headline outcome), now_confirmed (facts "
-        f"upgraded from Inferred to Confirmed because of this call), "
-        f"newly_surfaced (new pains/people/systems/competitors/budget the call "
-        f"revealed), still_open (discovery questions the call did NOT answer), "
-        f"route_or_next_step_change (one phrase on what shifted in route / "
-        f"metric_that_matters / next_step, or 'no change'). This section is "
-        f"what the salesperson reads first when re-opening the brief — make it "
-        f"crisp and load-bearing.\n\n"
-        f"Output rules: same 2-pager density (phrases not sentences); keep all mandatory "
-        f"fields populated; if a fact stays unverified use *Info not publicly available* "
-        f"+ Unknown.\n\n"
-        f"=== NEW CALL NOTES ===\n{call_notes}\n\n"
-        f"=== EXISTING BRIEF (plain text export of the Doc) ===\n{existing_brief_text}\n\n"
-        f"=== JSON SCHEMA (return exactly this shape) ===\n{BRIEF_JSON_SCHEMA}\n\n"
-        f"Return ONLY the updated JSON object. No prose, no code fences. Must parse "
-        f"with json.loads()."
-    )
-
-
 def _extract_json_object(text: str) -> dict:
     """Extract the first JSON object from a model response.
 
@@ -1154,56 +776,10 @@ with right:
                 meeting_date=meeting_date,
                 attendees=attendees_raw,
             )
-        else:
-            if not company_name:
-                st.error("Pick or type a company name first (Card 0 / step 2).")
-                st.stop()
-            doc_id = _extract_doc_id(existing_brief_id)
-            if not doc_id:
-                st.error("Paste a valid Google Doc URL or ID for the existing brief.")
-                st.stop()
-            if not call_notes.strip():
-                st.error("Paste the new call notes.")
-                st.stop()
-            from services.sheets_client import fetch_drive_doc_text, fetch_crm_notes_link
-            existing_text = fetch_drive_doc_text(doc_id)
-            if not existing_text:
-                st.error(f"Could not fetch the existing brief at `{doc_id}`. "
-                         f"Check the URL/ID and that the service account has access.")
-                st.stop()
-            # Auto-pull CRM col K (Granola / Google Doc / other notes link)
-            # so the salesperson doesn't have to copy-paste. The fetched
-            # content is APPENDED to whatever they typed in the call notes
-            # textarea — both sources merge into the input to Claude.
-            _crm_notes_link = (crm_data or {}).get("notes_link", "")
-            _src_type, _fetched_text = (None, "")
-            if _crm_notes_link:
-                _src_type, _fetched_text = fetch_crm_notes_link(_crm_notes_link)
-            if _fetched_text:
-                call_notes = (
-                    f"=== CALL NOTES FROM CRM (col K, auto-pulled from "
-                    f"{_src_type or 'link'}: {_crm_notes_link}) ===\n"
-                    f"{_fetched_text}\n\n"
-                    f"=== ADDITIONAL NOTES (pasted by user) ===\n"
-                    f"{call_notes}"
-                )
-                st.session_state["last_crm_notes_pull"] = (
-                    "ok", _src_type or "link", len(_fetched_text)
-                )
-            elif _crm_notes_link:
-                st.session_state["last_crm_notes_pull"] = (
-                    "fail", _src_type or "link", 0
-                )
-            user_prompt = _build_update_prompt(existing_text, call_notes, company_name or "<this prospect>")
-
         # Call Claude with streaming so we can surface every web search + draft step
         # live. For "new brief" we hand Claude the web_search tool; for "update from
         # notes" we don't (existing brief + new notes are the source of truth).
-        status_label = (
-            f"Researching **{company_name}** on the web…"
-            if mode.startswith("🆕")
-            else "Diffing call notes against the discovery agenda…"
-        )
+        status_label = f"Researching **{company_name}** on the web…"
         status_box = st.status(status_label, expanded=True)
         try:
             import anthropic
@@ -1389,18 +965,6 @@ with right:
                     "consider regenerating with more research notes."
                 )
 
-            # Inject timeline metadata from the CRM into brief_data so the
-            # renderer can show a Timeline section. Combines first-conv +
-            # last-conv from the pipeline sheet with post_call_log dates +
-            # today — gives the salesperson temporal anchoring (how long
-            # this deal has been running, days-since-last-touch, etc.)
-            # without any LLM involvement (all dates are known facts).
-            brief_data["_timeline_meta"] = {
-                "first_conv": (crm_data or {}).get("first_conv", ""),
-                "latest_conv": (crm_data or {}).get("latest_conv", ""),
-                "today": f"{datetime.now():%Y-%m-%d}",
-            }
-
             from services.brief_renderer import render_brief_html, render_brief_docx
             try:
                 brief_html = render_brief_html(brief_data)
@@ -1418,11 +982,8 @@ with right:
             st.session_state["last_brief_html"] = brief_html
             st.session_state["last_brief_docx"] = brief_docx
             st.session_state["last_brief_company"] = company_name
-            st.session_state["last_brief_mode"] = ("Pre-call draft" if mode.startswith("🆕") else f"Post-call update — {datetime.now():%Y-%m-%d}")
-            if mode.startswith("🔁"):
-                st.session_state["last_brief_doc_id"] = _extract_doc_id(existing_brief_id)
-            else:
-                st.session_state["last_brief_doc_id"] = ""
+            st.session_state["last_brief_mode"] = "Pre-call draft"
+            st.session_state["last_brief_doc_id"] = ""
             st.session_state["last_brief_doc_url"] = ""
 
             def _write_brief_link_to_pipeline(co_name, doc_url, mode, date_s):
@@ -1462,7 +1023,6 @@ with right:
                 from services.sheets_client import (
                     create_google_doc_from_docx,
                     update_google_doc_docx,
-                    list_drive_folder_docs,
                     grant_domain_access,
                 )
                 target_folder = drive_folder or DEFAULT_DRIVE_FOLDER
@@ -1480,35 +1040,6 @@ with right:
                 if _trashed_n:
                     st.session_state["last_brief_trashed_count"] = _trashed_n
 
-                if mode.startswith("🔁"):
-                    # Post-call: prefer the user-pasted source — but only if
-                    # it's a native Google Doc AND in the SalesHub Shared
-                    # Drive (so the update is visible in tiles). Else fall
-                    # back to the latest SalesHub match (or CREATE if none).
-                    _src_id = st.session_state.get("last_brief_doc_id", "")
-                    if _src_id:
-                        import google.auth.transport.requests as _greq
-                        from services.sheets_client import _get_drive_credentials
-                        try:
-                            _sess = _greq.AuthorizedSession(_get_drive_credentials())
-                            _meta = _sess.get(
-                                f"https://www.googleapis.com/drive/v3/files/{_src_id}"
-                                "?fields=mimeType,driveId,parents&supportsAllDrives=true",
-                                timeout=15,
-                            ).json() or {}
-                            _is_native_doc = (
-                                _meta.get("mimeType") ==
-                                "application/vnd.google-apps.document"
-                            )
-                            _in_saleshub = (
-                                _meta.get("driveId") == DEFAULT_DRIVE_FOLDER
-                                or target_folder in (_meta.get("parents") or [])
-                            )
-                            if _is_native_doc and _in_saleshub:
-                                existing_doc_id = _src_id
-                        except Exception:
-                            pass
-
                 # If we still don't have a target (pre-call OR post-call
                 # where source was external), take the latest SalesHub match.
                 if not existing_doc_id and _latest_id:
@@ -1517,10 +1048,8 @@ with right:
                 # Compute the brief mode + call count for stamping into Drive
                 # appProperties — tile renderer reads these to colour pre-call
                 # vs post-call differently.
-                _pcl = brief_data.get("post_call_log") or []
-                _call_count = len(_pcl) if isinstance(_pcl, list) else 0
-                _brief_mode = (f"Post call-{_call_count}" if _call_count > 0
-                               else "Pre-call draft")
+                _call_count = 0
+                _brief_mode = "Pre-call draft"
                 _props = {
                     "brief_mode": _brief_mode,
                     "brief_call_count": _call_count,
@@ -1766,12 +1295,9 @@ with right:
                     st.error("No DOCX bytes in session — regenerate the brief.")
                     st.stop()
                 # appProperties for the tile badge
-                _pcl_for_props = _brief_data.get("post_call_log") or []
-                _cc_for_props = (len(_pcl_for_props) if isinstance(_pcl_for_props, list) else 0)
                 _mp = {
-                    "brief_mode": (f"Post call-{_cc_for_props}" if _cc_for_props > 0
-                                   else "Pre-call draft"),
-                    "brief_call_count": _cc_for_props,
+                    "brief_mode": "Pre-call draft",
+                    "brief_call_count": 0,
                     "brief_company_key": _normalize_company_key(
                         st.session_state.get("last_brief_company", "")
                     ),
