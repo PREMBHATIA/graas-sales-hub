@@ -69,14 +69,24 @@ def body_to_paragraphs(body: str, linkify=None) -> str:
     return "".join(out)
 
 
-def _footer_links(unsubscribe_href: str, *, dark: bool) -> str:
+def _footer_links(unsubscribe_href: str, *, dark: bool = False,
+                  include_linkedin: bool = True) -> str:
     link_col = "#9fb4ff" if dark else "#2742FF"
     a = f"text-decoration:none;color:{link_col};"
-    return (
-        f"<a href='https://graas.ai' style='{a}'>graas.ai</a> &nbsp;·&nbsp; "
-        f"<a href='https://www.linkedin.com/company/graas' style='{a}'>LinkedIn</a> "
-        f"&nbsp;·&nbsp; <a href='{_html.escape(unsubscribe_href)}' style='{a}'>Unsubscribe</a>"
-    )
+    parts = [f"<a href='https://graas.ai' style='{a}'>graas.ai</a>"]
+    if include_linkedin:
+        parts.append(
+            f"<a href='https://www.linkedin.com/company/graas' style='{a}'>LinkedIn</a>"
+        )
+    parts.append(f"<a href='{_html.escape(unsubscribe_href)}' style='{a}'>Unsubscribe</a>")
+    return " &nbsp;·&nbsp; ".join(parts)
+
+
+# Footer brand line — a different, bolder face than the body copy so it reads
+# as a brand statement, not more prose.
+_TAGLINE = "The System of Intelligence for Retail Commerce."
+_TAGLINE_STYLE = (f"font-family:{_FONT};font-weight:700;font-size:13.5px;"
+                  "color:#16161D;letter-spacing:-0.1px;")
 
 
 def wrap_email(variant: str, body_html: str, *, sender_name: str = "",
@@ -86,37 +96,39 @@ def wrap_email(variant: str, body_html: str, *, sender_name: str = "",
     base_td = (f"font-family:{_FONT};font-size:14.5px;line-height:1.6;"
                f"color:#2b2b38;")
 
+    # Small dark chip carries the white wordmark on light footers (shared).
+    chip = (
+        "<table role='presentation' cellpadding='0' cellspacing='0' border='0' "
+        "style='display:inline-block;vertical-align:middle;'><tr>"
+        "<td bgcolor='#0D0D11' style='padding:4px 8px;border-radius:4px;'>"
+        f"{logo} height='12'></td></tr></table>"
+    )
+
     if variant == "branded":
+        # Understated: a single cyan→blue→violet hairline is the only top cue
+        # (no dark header bar), and the footer stays light.
         header = (
-            "<tr><td bgcolor='#0D0D11' style='padding:16px 30px;'>"
-            f"{logo} height='20'></td></tr>"
             "<tr><td bgcolor='#2742FF' height='3' style='height:3px;line-height:3px;"
-            "font-size:0;background:linear-gradient(90deg,#08C1FF,#2742FF);'>&nbsp;</td></tr>"
+            "font-size:0;background:linear-gradient(90deg,#08C1FF,#2742FF 55%,#7C5CFF);'>"
+            "&nbsp;</td></tr>"
+            "<tr><td bgcolor='#ffffff' style='padding:18px 30px 2px;'>" + chip + "</td></tr>"
         )
         footer = (
-            "<tr><td bgcolor='#16161D' style='padding:20px 30px;font-family:" + _FONT +
-            ";font-size:12px;line-height:1.6;color:#8a8f9c;'>"
-            f"{logo} height='15' style='display:block;border:0;opacity:.92;margin-bottom:7px;'>"
-            "<div style='color:#c7ccd6;'>Growth as a Service — agentic commerce for modern brands.</div>"
-            f"<div style='margin-top:6px;'>{_footer_links(unsubscribe_href, dark=True)}</div>"
-            "<div style='margin-top:8px;color:#5c6070;'>Sent by insights@graas.ai · "
-            "You're receiving this as a business contact.</div>"
+            "<tr><td style='padding:16px 30px 22px;border-top:1px solid #eef0f4;"
+            "font-family:" + _FONT + ";font-size:12px;line-height:1.7;color:#9aa1ad;'>"
+            "<div style='" + _TAGLINE_STYLE + "margin-bottom:6px;'>" + _TAGLINE + "</div>"
+            f"{_footer_links(unsubscribe_href, dark=False)}"
             "</td></tr>"
         )
         page_bg = "#eceef3"
     else:  # minimal
         header = "<tr><td style='height:22px;line-height:22px;font-size:0;'>&nbsp;</td></tr>"
-        chip = (
-            "<table role='presentation' cellpadding='0' cellspacing='0' border='0' "
-            "style='display:inline-block;vertical-align:middle;'><tr>"
-            "<td bgcolor='#0D0D11' style='padding:4px 8px;border-radius:4px;'>"
-            f"{logo} height='12'></td></tr></table>"
-        )
         footer = (
             "<tr><td style='padding:14px 30px 22px;border-top:1px solid #eef0f4;"
             "font-family:" + _FONT + ";font-size:12px;line-height:1.7;color:#9aa1ad;'>"
-            f"{chip} &nbsp; Growth as a Service &nbsp;·&nbsp; "
-            f"{_footer_links(unsubscribe_href, dark=False)}"
+            f"{chip} &nbsp; <span style='" + _TAGLINE_STYLE +
+            "vertical-align:middle;'>" + _TAGLINE + "</span> &nbsp;·&nbsp; "
+            f"{_footer_links(unsubscribe_href, include_linkedin=False)}"
             "</td></tr>"
         )
         page_bg = "#f4f5f7"
