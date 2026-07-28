@@ -195,16 +195,13 @@ CRM = load_crm_companies()
 left, right = st.columns([5, 6])
 
 with left:
-    st.markdown("### 1. Mode")
-    mode = st.radio(
-        " ",
-        ["🆕 New brief (pre-call)", "🔁 Update existing (post-call)"],
-        key="brief_mode",
-        label_visibility="collapsed",
-        horizontal=True,
-    )
+    # Single generate path. The old post-call merge/update flow was removed —
+    # regenerating a fresh two-pager beats an ugly merge. `mode` is kept as a
+    # constant so the downstream `mode.startswith("🆕")` branches stay valid
+    # (the "🔁" branches below are now unreachable dead code).
+    mode = "🆕 New brief (pre-call)"
 
-    st.markdown("### 2. Company")
+    st.markdown("### 1. Company")
     # Two paths: pick from CRM, OR type any name (overrides the picker).
     # The text_input is always visible — typing into the selectbox just
     # filters its options, so users who want a non-CRM company have to
@@ -245,7 +242,7 @@ with left:
                 f"**Known contacts:** {crm_data.get('contacts') or '—'}"
             )
 
-    st.markdown("### 3. Inputs")
+    st.markdown("### 2. Inputs")
 
     if mode.startswith("🆕"):
         meeting_date = st.text_input(
@@ -426,7 +423,7 @@ with left:
     # button inside card 3 of the wizard (assigned to `build_clicked` above)
     # and does NOT need a second one here.
     if mode.startswith("🆕"):
-        st.markdown("### 4. Build")
+        st.markdown("### 3. Build")
         build_clicked = st.button(
             "📝 Build brief",
             type="primary",
@@ -461,130 +458,66 @@ BRIEF_JSON_SCHEMA = """{
     "date_prepared": "YYYY-MM-DD",
     "meeting_date": "YYYY-MM-DD or 'TBC'",
     "market": "India / Indonesia / Vietnam / Thailand / Philippines / Malaysia / Singapore — primary",
-    "status": "Pre-call draft  (post-call: 'Pre-call draft → Post call-1 — YYYY-MM-DD …')"
+    "meeting_context": "ONE line — who's in the room + why this meeting is happening. e.g. 'Intro call with Head of Digital, requested after our LinkedIn outreach' or 'TBC — cold pre-brief'."
   },
-  "_changed_rows": {
-    "DESCRIPTION": "Post-call only — populate during update mode; leave as {} (empty object) for pre-call drafts. Maps each table-section name to the array of row indices (0-based) that were changed/added by THIS call. Used by the renderer to apply YELLOW row-highlighting so the salesperson can scan the brief and see at-a-glance what's new without diffing against a prior Doc version.",
-    "what_they_have": [0, 3],
-    "asset_graas_map": [],
-    "persona_map": [],
-    "pain_capability_cfo": [2],
-    "graas_proof_points": [],
-    "people_path_in": [1],
-    "meeting_game_plan": [],
-    "objection_handling": []
+  "summary_boxes": {
+    "industry": "vertical + business model in ≤10 words. e.g. 'B2B industrial MRO marketplace + brand catalog'.",
+    "type": "ONE of: 'OEM / Principal / Brand' | 'Multi-brand distributor' | 'Multi-brand retailer' | 'Marketplace / Platform'. Add a 1-3 word qualifier if useful.",
+    "revenue": "figure + unit + FY, 3-8 words. e.g. '~₹6,500 Cr FY25 (GMV)'. ONE source-clean value — no parentheticals stacked.",
+    "comps": "2-3 named competitors, one clause each. e.g. 'Zetwerk (fabrication), Amazon Business (horizontal), IndiaMART (leads)'.",
+    "scale": "the one operational scale number that matters — SKUs / outlets / sellers / field force / geography. 3-10 words. e.g. '10M+ SKUs · 1.5M+ SMEs · 30 countries'."
   },
-  "post_call_log": [
+  "_summary_boxes_NOTE": "100% FACTUAL header strip — revenue, comps, industry, scale. No opinion, no Graas angle. These are the numbers that would survive a fact-check. Keep each cell tight (it renders in a box).",
+  "key_people": [
     {
-      "call_number": "integer — 1 for the first post-call update, 2 for the second, etc. Pre-call drafts leave this entire array empty.",
-      "date": "YYYY-MM-DD of THIS call",
-      "what_we_learned": "1-2 phrases — the headline outcome of this call. What does the team now know that they didn't before?",
-      "now_confirmed": ["facts previously Inferred/Public estimate that this call nailed down. Each item is one phrase."],
-      "newly_surfaced": ["new pains / people / systems / competitors / budget signals / agents the call revealed. Each item is one phrase."],
-      "still_open": ["open questions from the discovery agenda that this call did NOT answer — they carry forward to the next call."],
-      "route_or_next_step_change": "ONE phrase — what shifted in product_route / metric_that_matters / next_step after this call. If nothing shifted, write 'no change'."
+      "name": "Full name. If you genuinely can't find a real named person for a role, omit the row — do NOT invent names.",
+      "designation": "exact title + org unit. e.g. 'Chief Digital Officer', 'Head of Technology, Enterprise'.",
+      "linkedin": "FULL https://www.linkedin.com/in/... URL if found (renders as a hyperlink). Omit the field entirely if you don't have a real URL — never fabricate a slug.",
+      "play": "ONE phrase, 8-20 words — who they are to the deal AND how to play them. Encode the stance: champion / economic buyer (signs) / tech owner / landmine defending an incumbent / ally. e.g. 'Owns the Google/Devoteam relationship — landmine on search, ally on the data layer' or 'Actually signs — aim the cost-to-serve number at him'."
     }
   ],
-  "strategic_hook": "ONE line, MAX 25 words. The X→Y mapping pitch frame — what they've already built (their assets) → the Graas layer that sits on top. Renders at the top of the brief, sets the meeting frame. e.g. 'You've built KALCare + EMOS + KlikDokter. Graas adds the agentic intelligence layer — without ripping out a single system you run today.' Must reference real assets you found in research.",
-  "asset_graas_map": [
+  "_key_people_NOTE": "3-6 people. The ONLY people list in the brief. Map the BUYING GROUP, not just the meeting attendee: the economic buyer (who signs), the tech owner (CTO / Head of Tech), the champion, and the internal owner of any incumbent platform in `stack`. LinkedIn URLs hyperlink the name. A one-name list is a research miss.",
+  "stack": [
     {
-      "asset": "Their digital surface name + parenthetical scope. MUST be a real product/platform they own. e.g. 'KALCare / Kalbe Store (B2C omnichannel)', 'KlikDokter (telemedicine + e-pharmacy)', 'EMOS / MOSTRANS (Enseval B2B order + transport)'",
-      "what_it_does": "ONE phrase, 8-18 words. What the asset does today, including channels/marketplaces/touchpoints. e.g. 'Official stores on Tokopedia, Shopee, Lazada, Bukalapak, Blibli, JD.id + own webstore'",
-      "graas_layer": "ONE phrase, 6-15 words. Which Graas product/layer sits on top. e.g. 'hoppr + Turbo — unify marketplace data, instant analyst' or 'All-e Prescription Intelligence (Tata 1mg pattern)' or 'All-e for Distributors / Retailers / Field Agents'"
+      "layer": "ONE of: 'ERP' | 'CRM' | 'AI / Agents' | 'Search / Discovery' | 'CDP / Data' | 'Commerce / Storefront' | 'Ordering / B2B' | 'Chatbot' (add others only if load-bearing). MUST cover ERP, CRM, and the AI/agent stack at minimum.",
+      "system": "the named product they run at this layer. e.g. 'SAP S/4HANA', 'Salesforce Sales Cloud', 'Google Vertex AI Search', 'custom React storefront'. 'None found' if genuinely absent — that's a signal, not a gap to hide.",
+      "vendor": "the SI / agency / partner who built or runs it. RESEARCH THIS. e.g. 'Deloitte (SAP)', 'Devoteam (Google Diamond SI)', 'In-house'. 'Unknown' only after you've looked.",
+      "owner": "internal owner name + role if found, else 'Unknown'. Cross-references key_people.",
+      "verdict": "ONE of: 'Contested — incumbent entrenched, do NOT wedge here' | 'Work-on-top-of — integrate, don't replace' | 'Greenfield — no system, the wedge' | 'Ally-able — owner could champion Graas'.",
+      "source": "short source for the system/vendor claim. e.g. 'job posts', 'case study on vendor site', 'press release Mar-25'.",
+      "confidence": "Confirmed | Public estimate | Inferred | Unknown"
     }
   ],
-  "executive_summary": {
-    "category": "vertical + business model in one line — e.g. 'Industrial gases distributor'",
-    "type": "ONE of: 'OEM / Principal / Brand' | 'Multi-brand distributor' | 'Multi-brand retailer'",
-    "motion": "ONE of: 'B2B / General Trade' | 'B2C / eCommerce' | 'Both — wedge is ___'",
-    "comps": "2-3 named competitors with one-clause positioning — e.g. 'Linde (premium), Aboitiz Power (regional scale), Bharat Petroleum (state-owned challenger)'",
-    "history": "founding / trajectory / recent inflection in one line — e.g. 'Founded 1972; family-owned; expanded into specialty gases 2019; now 3rd-largest by volume'",
-    "maturity": "AI & systems maturity assessment in one line — e.g. 'Mid: SAP-ERP since 2018, Salesforce CRM, no agents deployed; piloting GenAI for support tickets (2025)'"
-  },
-  "stat_band": [
-    {"label": "Revenue", "value": "ONE concise value, 3-8 words MAX. Just figure + unit + maybe one qualifier. No sources, no parentheticals. e.g. '~IDR 35T FY25', NOT '~IDR 35.3T (~$2.2B USD) FY2025 (Kalbe consolidated, per Yahoo Finance TTM)'"},
-    {"label": "SKUs", "value": "3-8 words. e.g. '~1,000+ across 6 therapy classes'"},
-    {"label": "Channel touchpoints", "value": "3-8 words. e.g. '>1M outlets · 100+ EMOS users'"},
-    {"label": "Field force", "value": "3-8 words. e.g. '~5K Enseval · ~17K Group'"},
-    {"label": "Geography", "value": "3-8 words. e.g. 'Indonesia + 71 branches + SEA export'"}
-  ],
-  "_type_motion_note": "type and motion now live INSIDE executive_summary (above) — they render as boxes in the Exec Summary section. Top-level keys are kept here only for back-compat with existing briefs in session state; do not populate them in new output.",
-  "situation_and_opportunity": [
+  "_stack_NOTE": "This is the COMBINED asset-map + what-they-have + incumbency table — the analytical core of the brief. 4-8 rows. You MUST hunt for their ACTUAL live systems before writing — never assume greenfield. Find the real chatbot / search / agent on their live site + WHO built it. MUST include rows for ERP, CRM, and AI/Agents. The vendor column is the competitive map: an entrenched SI is a reason to AVOID a lane, not attack it.",
+  "graas_fit": [
     {
-      "operational_area": "ONE label, 1-4 words. The operational area this row covers. e.g. 'Marketplace ops', 'Data / Eng', 'Telemedicine', 'Offline retail', 'Field force', 'AR / Collections'.",
-      "what_they_have_today": "PHRASE, ≤15 words. What's there today in this area — channels/scale/staff/tech. e.g. '60% revenue · Tokopedia/Shopee/Lazada' or 'In-house OMS/WMS · 3 engineers'.",
-      "pain_or_gap": "PHRASE, ≤10 words. The operational pain or capability gap. e.g. 'Performance opaque' or 'Siloed manual extract'. Pre-call: best inference; post-call: confirmed by customer where possible.",
-      "graas_fit": "≤5 WORDS. Product name + 1-3 word descriptor. e.g. 'hoppr', 'MCP/Extract', 'hoppr Rx intel', 'Future: All-e'. NO product descriptions — the product is named elsewhere.",
-      "cfo_metric": "≤5 WORDS. The metric this Graas fit moves. e.g. 'Conversion · GMV/SKU', 'Eng hours saved', 'Cart accuracy', 'Write-offs ↓'."
+      "where": "which stack layer / operational area this hangs off. e.g. 'B2B ordering', 'Search / Discovery', 'Field-force app'.",
+      "fit": "QUESTION-FRAMED hypothesis, ≤20 words. Name the Graas product AND phrase it as a 'could this fit?'. e.g. 'Could All-e for Distributors sit on top of the reseller-ordering flow the SAP layer doesn't touch?' Do NOT assert fitment — hypothesize it.",
+      "verify": "the ONE thing to confirm in the meeting that would make/break this fit. ≤15 words. e.g. 'Is reseller ordering still on WhatsApp + manual, or already digitised?'"
     }
   ],
-  "_situation_and_opportunity_CAP": "4-6 ROWS MAX. One row per operational area where Graas slots in. SKIP areas with no Graas fit (those go to the trimmed what_they_have background ledger). This table REPLACES the old separate pain_capability_cfo table — do not also output pain_capability_cfo unless you can't fit a pain into this merged shape.",
-  "incumbency_map": [
+  "_graas_fit_NOTE": "2-4 hypotheses MAX. Each hangs off a `stack` row. FIT IS A QUESTION, NOT A CLAIM — 'could fit X?' — because forced Graas fitment is the failure mode we're fixing. It's fine to have fewer, sharper hypotheses. If nothing fits cleanly, say so in `honesty.do_not_oversell`.",
+  "do_not": [
+    "Landmine — ONE phrase each. Things NOT to pitch or fight. e.g. 'Don't pitch search — they resell Algolia to their own SME customers', 'Don't fight the SAP layer — Deloitte owns it, 3-yr contract', 'Don't lead B2C — the storefront is a cost centre they're winding down'.",
+    "..."
+  ],
+  "_do_not_NOTE": "2-4 landmines. The single most valuable output for a rep walking in cold. Draw from stack (contested lanes), from products the prospect SELLS (never pitch someone their own product), and from the logo-wall cross-check (see prompt).",
+  "wedges_worth_exploring": [
+    "1-3 SHORT exploratory phrases — the sharpest angles worth a try, NOT a confident recommendation. Question marks welcome. Each absorbs 'where the money/mandate actually is' and hangs off a greenfield/ally-able stack row or a graas_fit hypothesis. e.g. 'Reseller-ordering flow — greenfield, no SI owns it; is it still manual?' or 'The +21%-growth B2B segment looks more open than the contested B2C storefront.'",
+    "..."
+  ],
+  "_wedges_worth_exploring_NOTE": "1-3 items MAX, phrases not paragraphs. This REPLACES the old assertive 'wedge' — the tone is 'worth exploring?', not 'plant the flag here'. If nothing looks open, it's honest to have ONE item that says the angle is unclear until discovery. Question marks are encouraged.",
+  "discovery": [
+    "Up to 5 operational questions for the meeting — flows, metrics, integrations, budgets, ownership. Each ≤20 words. NEVER ask an attendee's role/background. e.g. 'Is reseller ordering digitised or still manual/WhatsApp?', 'Who owns the budget for a digital pilot?', 'What did your own AI build NOT solve that's still a gap?'"
+  ],
+  "_discovery_NOTE": "APPENDIX. MAX 5 questions total. Operational only, ≤20 words each. Fewer, sharper beats a padded list. Lead with the question that tests the shakiest assumption behind any graas_fit hypothesis.",
+  "appendix_research": [
     {
-      "platform": "A named AI / commerce / data system they ALREADY run — e.g. 'Salesforce Agentforce + Data 360', 'Google Vertex AI search on the webstore', 'Capillary CDP'.",
-      "built_by": "The external SI / agency / vendor that built or operates it — RESEARCH THIS, do not leave blank. e.g. 'Blend Media (martech agency)', 'Devoteam (Google Diamond SI)'. This is who Graas would be displacing or must avoid colliding with. 'In-house' or 'Unknown' if genuinely so.",
-      "internal_owner": "Who owns this relationship inside the company — name + role if found. e.g. 'Rhapsody Budiono (Head of Technology)', 'Hasan Aula (Deputy CEO, sponsor)'. 'Unknown' if not found.",
-      "verdict": "ONE of: 'Contested — incumbent entrenched, do NOT wedge here' | 'Greenfield — no owner, the wedge' | 'Ally-able — owner could champion Graas'."
+      "fact": "ONE important, 100%-CONFIRMED fact that didn't make the main two-pager but is worth having on hand — funding round, a confirmed exec hire, a regulatory driver, a segment growth number, a confirmed competitor/partner move. CONFIRMED ONLY — no inferences or estimates.",
+      "source": "short source with date. e.g. 'Economic Times, Jun-25'."
     }
   ],
-  "_incumbency_map_NOTE": "2-5 rows. For EVERY major AI/commerce/data platform the prospect runs, name the external SI/agency behind it AND the internal owner. This is the competitive-incumbency map — it decides where NOT to fight: a space already owned by a strong SI is a reason to AVOID it, not attack it. The wedge is the GREENFIELD lane no incumbent owns (often B2B / distribution / reseller ordering). Renders as a 'Who owns what' table and directly feeds product_route.",
-  "what_they_have": [
-    {"dimension": "Funding status", "what_we_know": "Listed / PE-backed / VC-funded (round, year, lead) / bootstrapped; profitable or loss-making", "confidence": "Confirmed|Public estimate|Inferred|Unknown", "source": "short source"},
-    {"dimension": "Top brands", "what_we_know": "3-5 recognisable brands", "confidence": "...", "source": "..."},
-    {"dimension": "Top competitors", "what_we_know": "2-3 competitors", "confidence": "...", "source": "..."},
-    {"dimension": "Founded / IPO", "what_we_know": "founding year + key inflection (IPO, major acquisition, rebrand)", "confidence": "...", "source": "..."}
-  ],
-  "_what_they_have_NOTE": "TRIMMED to 4-6 NON-OPERATIONAL background rows ONLY: Funding status, Top brands, Top competitors, Founded/IPO, Business model (if not captured in Exec Summary). Operational dimensions (Scale, Channel structure, Tech stack, External-facing agents, AI maturity) have MOVED into situation_and_opportunity rows. Renders as a small 'Background' callout in the appendix, not the main brief.",
-  "recent_news": ["MAX 2 bullets, the most material events in the last 12 months. With inline citation."],
-  "what_missing": ["Gap phrased as a question or honest gap statement.", "..."],
-  "product_route": "All-e / Knowledge Graph / Layered — 2-3 lines. Pick the wedge where there is real pain AND no entrenched incumbent (cross-check incumbency_map). Explicitly AVOID any space already owned by a strong SI/agency — NAME the incumbent you're side-stepping. Prefer the GREENFIELD lane (often B2B / distribution / reseller ordering) even when the loudest pain sits in a contested B2C / eCommerce space. State the call plainly: 'don't fight in X (owned by Y) — plant the flag in Z.' Name wedge vs expansion.",
-  "_persona_map_REMOVED": "The persona_map field is DEPRECATED — do not output it.",
-  "_pain_capability_cfo_REMOVED": "DEPRECATED — merged into situation_and_opportunity. Do not output pain_capability_cfo unless an operational pain genuinely doesn't fit the merged shape (rare).",
-  "metric_that_matters": "The metric this moves for [CFO or decision-maker name, role] is [single literal metric].",
-  "discovery_must_haves": [
-    "5 questions — operational only (flows, metrics, integrations, budgets). These run FIRST at the meeting and must not be dropped. e.g. 'Walk me through one order end-to-end', 'Who owns the budget for a digital pilot?', 'Current conversion rate + AOV on the live channel?'",
-    "...", "...", "...", "..."
-  ],
-  "discovery_nice_to_haves": [
-    "5 questions — operational, asked only if time permits. Same rules as must-haves.",
-    "...", "...", "...", "..."
-  ],
-  "_discovery_RULES": "BOTH lists are EXACTLY 5 entries each (10 total). OPERATIONAL questions only — never ask about an attendee's role/background (that's already in people_path_in as 'Unknown' which IS the ask). Each question ≤20 words. Drop anything generic or already-confirmed elsewhere in the brief.",
-  "people_path_in": [
-    {"name": "...", "role": "...", "why_matter": "1-line relevance AND how to play them — include stance where it matters, e.g. 'owns the Devoteam/Google relationship — landmine on eCom, ally on the data layer' or 'who actually signs — aim GT numbers at him'.", "type": "Champion | Economic buyer (signs) | Tech owner (CTO / Head of Tech) | Platform-relationship owner | Meeting attendee", "linkedin": "ONE optional line (background + prior companies). Omit field if no useful info.", "lead_with": "ONE phrase, 8-20 words — for THIS person specifically, which product/section to lead with and ONE reason grounded in their LinkedIn signal. e.g. 'Lead with hoppr + cite SOC2/PDPA up front — he's a Certified Ethical Hacker.' Only populate for meeting attendees; omit field for non-attendees."}
-  ],
-  "_people_path_in_NOTE": "Map the whole BUYING GROUP, not just who's in the meeting. Surface — even if NOT attending — the economic buyer (who actually signs), the technology owner (CTO / Head of Tech), and the internal owner of each incumbent platform from incumbency_map. Tag each via type + a how-to-play stance in why_matter (champion / signer / landmine defending an incumbent / ally). A brief that lists only the meeting attendee has missed the org.",
-  "why_now": [
-    "2-4 phrases — the macro / regulatory / segment-momentum reasons this prospect should act NOW (not in 6 months). e.g. 'IDR depreciation + softer consumer = 2026 is an efficiency year, not a growth year — hoppr/All-e attack cost-to-serve directly.'",
-    "'Health Law 17/2023 mandates pharmacy distribution digitalisation — EMOS is their response; Graas accelerates the mandate.'",
-    "'Distribution +21% YoY is their fastest-growing segment — the segment most exposed to manual ordering leakage.'"
-  ],
-  "meeting_game_plan": [
-    {"minute": "0-5", "segment": "Open on their growth signal", "talking_point": "Lead with the sharpest data point or quote — e.g. 'Distribution is +21% YoY in a tough macro — that's where intelligence pays back fastest.' Name the attendee who'll resonate most."},
-    {"minute": "5-15", "segment": "Asset map / strategic frame", "talking_point": "Walk the asset_graas_map: 'You've built X + Y + Z. Graas adds the layer on top — without ripping anything out.' (lead attendee name)"},
-    {"minute": "15-30", "segment": "Product-fit-1 + proof point", "talking_point": "Deep on the first Graas product fit, with the relevant graas_proof_points customer as proof. (lead attendee name)"},
-    {"minute": "30-45", "segment": "Product-fit-2 + proof point", "talking_point": "Second product fit, second proof point. (lead attendee name)"},
-    {"minute": "45-55", "segment": "Discovery + objection handle", "talking_point": "Run 3-5 of the sharpest discovery questions live; anticipate top 1-2 objections from objection_handling."},
-    {"minute": "55-60", "segment": "Close on next step", "talking_point": "Propose the next_step.action explicitly, name a follow-up date."}
-  ],
-  "graas_proof_points": [
-    {
-      "customer": "Customer name + 1-3 word context. MUST be from the KNOWN GRAAS WINS list in the prompt — do NOT invent customers. e.g. 'Tata 1mg (e-pharmacy)' or 'PI Industries (ag inputs)'",
-      "result": "ONE phrase, 6-15 words. The measurable outcome with figures. e.g. '78% prescription→product accuracy; cart time 4-6 min → <2 min'",
-      "applies_here": "ONE phrase, 8-18 words. WHY this win is relevant for THIS prospect specifically — tie it to one of their assets or pains. e.g. 'Drop-in for KlikDokter — same telemedicine + e-pharmacy pattern, PDP-Law compliant'"
-    }
-  ],
-  "objection_handling": [
-    {"objection": "likely objection in their words, e.g. 'We already built EMOS / KALCare / KlikDokter.'", "response": "Graas response — 1-2 phrases, lead with the reframe. e.g. 'Exactly why this is low-risk. Graas is the intelligence layer ON TOP — we integrate with your systems of record, we don't replace them.'"}
-  ],
-  "entry_wedge": "lowest-friction way in",
-  "next_step": {"action": "another discovery call | demo | POC scoping | solutioning | park", "why": "one-line rationale", "gate_met": false, "still_open": "what's missing (motion / route / customer-confirmed CFO metric / data / DM)"},
-  "opening_hook": "one or two lines grounded in their actual numbers — phrase as a question, no quote marks (we add them).",
-  "conflicts_unknowns": {
-    "conflicting": "conflicting figures, both numbers shown",
-    "unverified": "load-bearing unverified facts",
-    "key_fact": "the one fact that would most change the recommendation"
-  }
+  "_appendix_research_NOTE": "APPENDIX. 0-6 rows. Overflow bucket for CONFIRMED research that didn't earn a spot on the main page. Every row must be verifiable against a real source — if it's only inferred or estimated, DROP it. Keep the main two-pager clean; park the confirmed rest here."
 }"""
 
 
@@ -849,195 +782,87 @@ def _build_new_brief_prompt(
             meeting_block += f"External attendees from the invite (research LinkedIn for each):\n{attendees.strip()}\n"
 
     return (
-        f"Build a pre-call Prospect Research Brief for **{company or '<NAME>'}**.\n"
-        f"Today is {today}. Set status = *Pre-call draft*. Header.date_prepared = {today}"
-        f"{f'. Header.meeting_date = {meeting_date}' if meeting_date else ''}.\n\n"
-        f"**You have the `web_search` tool. Use it.** Before filling the brief, run the "
-        f"searches a junior analyst would run: company website + investor pages, recent "
-        f"news (last 12 months), LinkedIn for the attendees (when provided), funding "
-        f"history (Crunchbase / Tracxn / DealStreetAsia), industry coverage (Economic "
-        f"Times, Mint, Reuters, Tech in Asia). Apply the source hierarchy from the skill: "
-        f"company filings/website = Confirmed; news = Confirmed for the event reported; "
-        f"aggregators (LeadIQ/Lusha/Euromonitor) = Public estimate. Cite sources inline.\n"
-        f"Geography: start with India; if the company isn't there, check South East Asia "
-        f"and state the actual market in header.market.\n\n"
-        f"**Return a single JSON object** matching the schema below. Every cell must be a "
-        f"PHRASE, 5-15 words, not a sentence — the rendered brief is a tight 2-pager. "
-        f"Compress lists with commas and semicolons. Strip filler ('the company', 'they "
-        f"also have', 'is a leading').\n\n"
-        f"**STAT BAND CELLS ARE TIGHTER STILL — 3-8 WORDS MAX EACH.** The stat band is a "
-        f"header strip, not a paragraph. Put the figure + unit + maybe one qualifier — "
-        f"nothing more. Source attribution belongs in the *What they have* ledger's "
-        f"Source column, NEVER in stat band cells. Long-form prose in stat band cells "
-        f"stretches the table row height in Google Docs and squishes other columns — "
-        f"the table renders scrambled. Right: '~IDR 35T FY25'. Wrong: '~IDR 35.3T (~$2.2B "
-        f"USD) FY2025 (Kalbe consolidated, per Yahoo Finance TTM); Enseval standalone "
-        f"~IDR 33.0T FY2025 (per enseval.com)'. Put the source detail in the ledger "
-        f"row instead.\n\n"
-        f"**AUTO-DETECT PAST MEETINGS IN THE RESEARCH INPUT.** The user may "
-        f"have pasted email trails, call notes, or meeting summaries into "
-        f"the research/notes input field even while picking 'New brief (pre-"
-        f"call)' mode. Read the research input carefully for past-meeting "
-        f"indicators: phrases like 'we met', 'in our call', 'X said', 'last "
-        f"week's meeting', dated past meeting references, named attendees "
-        f"who clearly spoke, action items that were committed. If you find "
-        f"clear evidence that a meeting has already happened, you MUST:\n"
-        f"  1. Populate post_call_log with a Call 1 entry capturing what "
-        f"that meeting surfaced (what_we_learned, now_confirmed, "
-        f"newly_surfaced, still_open, route_or_next_step_change).\n"
-        f"  2. Set the meeting date from the input if mentioned (e.g. 'we "
-        f"met in Singapore on Apr 12' → date='2026-04-12'); otherwise use "
-        f"today's date.\n"
-        f"  3. Set header.status to 'Pre-call draft → Post call-1 — [that "
-        f"date]' so the brief renders with the Post-call analysis section "
-        f"at the top.\n"
-        f"  4. Populate _changed_rows for any rows the call confirmed/"
-        f"updated, so they render with yellow highlighting.\n"
-        f"The user picked pre-call mode but the content is post-meeting — "
-        f"the brief should reflect the ACTUAL state of the relationship, "
-        f"not the radio they happened to click. If the research input is "
-        f"truly desk-research only (no meeting evidence), leave post_call_log "
-        f"empty and status='Pre-call draft' as normal.\n\n"
-        f"**SALES ↔ SOLUTIONING BALANCE.** This is a SALES brief that ALSO "
-        f"contains solutioning + discovery — NOT a solutioning doc with a sales "
-        f"intro. Target ratio: ~35% sales (strategic_hook, asset_graas_map, "
-        f"why_now, graas_proof_points, meeting_game_plan, objection_handling, "
-        f"opening_hook, lead_with per attendee) / ~65% solutioning + discovery "
-        f"(what_they_have, persona_map, pain_capability_cfo, discovery, "
-        f"conflicts_unknowns). Keep solutioning sections DENSE — phrases not "
-        f"paragraphs — so the sales sections carry visual weight. A meeting-"
-        f"ready brief reads like a play-script, not an analyst report.\n\n"
-        f"**STRICT FACT DEDUP — each load-bearing fact appears in EXACTLY ONE "
-        f"section.** Other sections REFERENCE it shorthand without restating "
-        f"the full fact. The brief's sections are different VIEWS of the same "
-        f"underlying data, not copies of it. Examples:\n"
-        f"  ✗ BAD: '60% online; in-house OMS; 3 data engineers' appears in "
-        f"Exec Summary Maturity AND What they have Scale AND Pain table AND "
-        f"Asset map AND People row.\n"
-        f"  ✓ GOOD: full fact in ONE section (e.g. What they have Scale row); "
-        f"other sections reference shorthand ('the in-house OMS team' or 'the "
-        f"60% online split'). Each fact lands once; the reader assembles the "
-        f"picture from one place per topic.\n"
-        f"Apply this rigorously across asset_graas_map, executive_summary, "
-        f"what_they_have, pain_capability_cfo, people_path_in.lead_with, "
-        f"meeting_game_plan, and post_call_log.now_confirmed. If you find "
-        f"yourself typing the same phrase twice, the second mention should "
-        f"be a 3-4 word reference, not a restate.\n\n"
-        f"**DISCOVERY IS FORWARD-LOOKING.** discovery_must_haves and "
-        f"discovery_nice_to_haves are the agenda for the NEXT call — they "
-        f"must NOT include questions that were ALREADY answered. On a post-"
-        f"call update: walk through post_call_log[0] (the latest call's) "
-        f"now_confirmed list; for each item there, REMOVE the corresponding "
-        f"question from the discovery lists. Replace with new questions "
-        f"surfaced by this call's newly_surfaced items, or by gaps in the "
-        f"new info. Discovery shrinks (answered) AND grows (new gaps) "
-        f"between calls — it's never a static restate.\n\n"
-        f"**RESEARCH DEPTH RULES — apply these before filling the brief:**\n"
-        f"1. **Per-segment / per-division growth.** For any multi-segment / "
-        f"multi-division company (pharma w/ Rx+OTC+Nutrition+Distribution; "
-        f"conglomerate; multi-vertical group), find revenue + YoY growth PER "
-        f"segment. The fastest-growing segment is usually the meeting opener "
-        f"(e.g. 'Distribution is your fastest-growing segment +21% YoY' is far "
-        f"sharper than 'group revenue +8%'). Surface this in the Scale row of "
-        f"what_they_have AND in the opening_hook.\n"
-        f"2. **Enumerate ALL digital surfaces.** Pharma / distribution / retail "
-        f"prospects usually run 3+ digital products: B2C eCom (their own store + "
-        f"each marketplace presence), B2B ordering platforms, telemedicine/health "
-        f"apps, DTC web, mobile apps, field-force apps, marketplace seller "
-        f"centres. Don't stop at one or two. Each digital surface is a potential "
-        f"Graas entry point and MUST be enumerated in asset_graas_map.\n"
-        f"3. **Who built / owns each platform (incumbency).** For EVERY named AI / "
-        f"commerce / data platform (Salesforce/Agentforce, Google Vertex, a CDP, a "
-        f"search or chatbot stack), research the external SI / agency / vendor that "
-        f"built or runs it AND the internal owner of that relationship — put them in "
-        f"incumbency_map. These SIs are the real competition: a space an entrenched "
-        f"SI already owns is where you must NOT wedge.\n"
-        f"4. **Map the whole buying group, not just the attendee.** Surface the "
-        f"economic buyer (who signs), the technology owner (CTO / Head of Tech), and "
-        f"each incumbent-platform owner — even if not in the meeting — into "
-        f"people_path_in, each tagged with how to play them (champion / signer / "
-        f"landmine / ally). A single-name people table is a research miss.\n"
-        f"5. **Wedge = pain x no incumbent.** Set product_route to the lane with real "
-        f"pain AND no entrenched SI; name the contested space you're avoiding and who "
-        f"owns it. Don't default to the loudest B2C pain if an SI already owns it — "
-        f"the greenfield B2B / distribution lane usually wins.\n\n"
-        f"**AVAILABLE GRAAS PROOF POINTS — STRICT RULE.** You may cite ONLY "
-        f"customers/POCs from the list below (these are the proposals we have on "
-        f"file in the Reference Proposals folder — every name + outcome here is "
-        f"verified). NEVER invent or guess customer names, results, or figures. "
-        f"If a fact about a customer isn't in the snippet below, do not state "
-        f"it. If no proposal maps cleanly to this prospect's pains, leave "
-        f"graas_proof_points empty — better than fabricating. 'Working with' "
-        f"includes POCs and pilots, not just live customers.\n\n"
+        f"Build a two-page pre-call Prospect Brief for **{company or '<NAME>'}**.\n"
+        f"Today is {today}. header.date_prepared = {today}"
+        f"{f'. header.meeting_date = {meeting_date}' if meeting_date else ''}.\n\n"
+        f"This is a TWO-PAGER a rep reads in the 5 minutes before a call. It is a "
+        f"sharp point of view, not an analyst report. Fewer, truer, harder-hitting "
+        f"beats comprehensive. Every cell is a PHRASE (5-15 words), never a "
+        f"paragraph. Compress with commas/semicolons; strip filler ('the company', "
+        f"'is a leading', 'they also have').\n\n"
+        f"**YOU HAVE THE `web_search` TOOL. USE IT HARD — this brief lives or dies on "
+        f"research.** Run the searches a sharp analyst would: company site + investor "
+        f"pages, recent news (12 mo), LinkedIn for named people, funding "
+        f"(Crunchbase/Tracxn/DealStreetAsia), industry press. Source hierarchy: "
+        f"filings/website = Confirmed; news = Confirmed for the event; aggregators "
+        f"(LeadIQ/Lusha/Euromonitor) = Public estimate. Geography: start India, else "
+        f"check SEA and state the real market in header.market.\n\n"
+        f"**RULE 1 — HUNT THE ACTUAL LIVE STACK. NEVER ASSUME GREENFIELD.** Before you "
+        f"write a single `stack` row, go find what they actually run: open their live "
+        f"site and look for the real chatbot / search bar / product-finder / agent; "
+        f"read their job posts (they name SAP, Salesforce, Vertex, Algolia, etc.); "
+        f"find press releases and vendor case studies naming the SI who built it. For "
+        f"EVERY named AI / commerce / data / search / chatbot system, identify the "
+        f"external SI/agency behind it AND the internal owner. 'Greenfield' is a "
+        f"verdict you EARN after looking — a wrong 'greenfield' call is the #1 way "
+        f"this brief embarrasses the rep. The `stack` table MUST include rows for "
+        f"ERP, CRM, and the AI/Agents layer at minimum, plus whatever else is "
+        f"load-bearing (search, storefront, B2B ordering, CDP).\n\n"
+        f"**RULE 2 — GRAAS FIT IS A QUESTION, NOT A CLAIM.** The old brief force-fit "
+        f"Graas into every section; that's the failure we're fixing. In `graas_fit`, "
+        f"phrase each hypothesis as 'could Graas product X fit layer Y?' and give the "
+        f"ONE thing to verify in the meeting. 2-4 hypotheses MAX, each hanging off a "
+        f"real `stack` row. If the fit is thin, have FEWER — and let the "
+        f"`wedges_worth_exploring` line carry a question mark rather than a false "
+        f"promise. A speculative fit stated as fact is worse than an honest "
+        f"'unclear until we ask'.\n\n"
+        f"**RULE 3 — LANDMINES (`do_not`).** The single most useful thing for a rep "
+        f"walking in cold. 2-4 things NOT to pitch or fight: contested lanes an SI "
+        f"owns (from `stack`), and — critically — products the PROSPECT THEMSELVES "
+        f"SELLS. Cross-check the prospect's customer/logo wall and their own product "
+        f"catalog against Graas's offering: never pitch someone a capability they "
+        f"resell to their own customers. Name the landmine plainly.\n\n"
+        f"**RULE 4 — STAY HONEST BY DEFAULT.** There is no confessional 'honesty' "
+        f"section any more — honesty lives in the TONE. Keep graas_fit "
+        f"question-framed; let wedges_worth_exploring carry question marks; and only "
+        f"put a fact in `appendix_research` if it is 100% CONFIRMED against a real "
+        f"source. Never state an inference as fact. A brief that quietly oversells "
+        f"gets the rep caught flat in the room.\n\n"
+        f"**RULE 5 — NO REPETITION.** Each load-bearing fact appears in EXACTLY ONE "
+        f"place. summary_boxes = the factual header (revenue/comps/industry/scale). "
+        f"stack = systems + vendors + owners. appendix_research = CONFIRMED overflow "
+        f"facts that didn't make the main page. key_people = the only people list. If "
+        f"you're about to restate a number, reference it in 3 words instead.\n\n"
+        f"**RULE 6 — PEOPLE.** `key_people` maps the buying group (economic buyer who "
+        f"signs, tech owner, champion, incumbent-platform owner), not just the "
+        f"meeting attendee. Put a FULL LinkedIn URL in the `linkedin` field when you "
+        f"find one (the renderer hyperlinks the name); omit the field rather than "
+        f"fabricate a slug. Each `play` encodes the stance (champion/signer/landmine/"
+        f"ally) + how to work them.\n\n"
+        f"**SUMMARY BOXES ARE 100% FACTUAL AND TIGHT (3-10 words each).** Figure + "
+        f"unit + qualifier, nothing more. No Graas angle, no opinion — these must "
+        f"survive a fact-check. Right: '~₹6,500 Cr FY25 (GMV)'. Wrong: a stacked "
+        f"'~₹6,500 Cr (~$780M; consolidated; per AR FY25, Tracxn TTM differs)'.\n\n"
+        f"**PROOF POINTS (for `do_not` cross-check + your own grounding).** The list "
+        f"below is every Graas customer/POC we have a proposal on file for — the ONLY "
+        f"customers you may ever name. NEVER invent customer names, results, or "
+        f"figures. Use this to sanity-check the logo-wall landmine (are we already "
+        f"live with one of their competitors?) and to keep any Graas claim honest.\n\n"
         f"{proof_points_block}\n\n"
-        f"**DO NOT DROP MANDATORY FIELDS.** Every brief must include: "
-        f"strategic_hook (one-line X→Y frame at the top — what they've already "
-        f"built mapped to the Graas layer that sits on top; MUST reference real "
-        f"assets surfaced in research, not generic claims), "
-        f"asset_graas_map (enumerate ALL their digital surfaces — 3+ rows "
-        f"typical — each mapped to the Graas layer that fits; this is the "
-        f"structured unpack of strategic_hook), "
-        f"why_now (2-4 phrases on macro/regulatory/segment-momentum reasons "
-        f"this prospect should act THIS quarter, not later — sales weight), "
-        f"graas_proof_points (2-4 entries chosen from AVAILABLE GRAAS PROOF "
-        f"POINTS list above, each tied to one of this prospect's assets or "
-        f"pains; NEVER fabricate — leave empty if no proposal maps cleanly), "
-        f"meeting_game_plan (6-row minute-by-minute run-sheet for the meeting, "
-        f"each row naming the lead attendee and a concrete talking point — "
-        f"sales weight), "
-        f"executive_summary (6 fields rendered as two stacked box rows: "
-        f"category/type/motion on row 1, comps/history/maturity on row 2 — NOT a "
-        f"paragraph, NOT labelled lines), stat_band (all 5), "
-        f"situation_and_opportunity (**4-6 rows**, the merged main-brief table — "
-        f"one row per operational area where Graas slots in; columns "
-        f"operational_area / what_they_have_today / pain_or_gap / graas_fit "
-        f"(≤5 words, product + 1-3 word descriptor) / cfo_metric (≤5 words). "
-        f"This REPLACES the old separate pain_capability_cfo table.), "
-        f"incumbency_map (**2-5 rows** — for each major platform: built-by (SI/agency) · "
-        f"internal owner · verdict [contested / greenfield / ally-able]; decides where "
-        f"NOT to fight and feeds product_route), "
-        f"what_they_have (**TRIMMED to 4-6 non-operational background rows**: "
-        f"Funding status · Top brands · Top competitors · Founded/IPO · Business "
-        f"model. Operational dimensions moved to situation_and_opportunity.), "
-        f"recent_news (**MAX 2 bullets**, the most material; or "
-        f"one honest 'Nothing material in the last 12 months from public sources'), "
-        f"what_missing, product_route, "
-        f"metric_that_matters, discovery_must_haves (**EXACTLY 5 questions** — "
-        f"operational only, no role-clarification, each ≤20 words), "
-        f"discovery_nice_to_haves (**EXACTLY 5 questions** — same rules), "
-        f"people_path_in (merge meeting attendees here; use type='Meeting attendee' + "
-        f"the optional linkedin field for any attendees the user provided; for each "
-        f"Meeting attendee, ALSO populate lead_with — the product/section to lead "
-        f"with for that person and ONE reason grounded in their LinkedIn signal), "
-        f"objection_handling (**TOP 3 ONLY** — the most likely objections the room "
-        f"will raise; responses ≤2 sentences each), entry_wedge, "
-        f"meeting_game_plan (**EXACTLY 3 rows** — Open / Pitch / Close — talking "
-        f"points ≤1 sentence each; this is a 3-bullet meeting plan, not a 6-row "
-        f"minute-by-minute), "
-        f"next_step, opening_hook, conflicts_unknowns (appendix at the end — keep it "
-        f"terse). If a fact is genuinely not findable, set the value to *\"Info not "
-        f"publicly available\"* and confidence to *\"Unknown\"* — **never drop the "
-        f"row**.\n\n"
-        f"**REMOVED FIELDS (do not include):** order_flow (now rolled into persona_map "
-        f"as a column per persona), other_signals (dropped — promote material findings to "
-        f"recent_news or what_missing), meeting_attendees (merged into people_path_in "
-        f"with type='Meeting attendee'), discovery (the old 4-bucket discovery dict "
-        f"has been REPLACED by discovery_must_haves + discovery_nice_to_haves — do "
-        f"not output the old `discovery` field), persona_map (REMOVED — operational "
-        f"detail now lives in situation_and_opportunity), pain_capability_cfo "
-        f"(REMOVED — merged into situation_and_opportunity).\n\n"
-        f"**APPENDIX LAYOUT NOTE.** The renderer splits the brief into a MAIN section "
-        f"(strategic_hook, exec_summary, stat_band, why_now, meeting_game_plan, "
-        f"situation_and_opportunity, incumbency_map, people_path_in, objection_handling, "
-        f"next_step, opening_hook) and an APPENDIX section (asset_graas_map, "
-        f"product_route, graas_proof_points, discovery_must_haves, "
-        f"discovery_nice_to_haves, Meeting Notes (blank for the salesperson), "
-        f"what_they_have (background facts), recent_news, conflicts_unknowns). "
-        f"You don't control the placement — just return the fields; the renderer "
-        f"handles the order.\n\n"
+        f"**MANDATORY FIELDS — return every one, populated:** company, header "
+        f"(with meeting_context), summary_boxes (all 5, factual), key_people (3-6, "
+        f"real names + LinkedIn URLs where found), stack (4-8 rows incl. ERP/CRM/AI — "
+        f"system + vendor/SI + owner + verdict + source + confidence; HUNT the real "
+        f"systems), graas_fit (2-4 QUESTION-framed hypotheses off stack rows), "
+        f"do_not (2-4 landmines), wedges_worth_exploring (1-3 SHORT exploratory "
+        f"angles, question marks welcome — NOT a confident recommendation), "
+        f"discovery (≤5 operational questions — appendix), appendix_research (0-6 "
+        f"CONFIRMED-only overflow facts w/ source — appendix; drop anything merely "
+        f"inferred). If a load-bearing fact is genuinely unfindable, write "
+        f"'Info not publicly available' + confidence 'Unknown' — never invent it.\n\n"
         f"=== INPUTS — INTERNAL RESEARCH / CONTEXT ===\n{research or '(no internal notes pasted — research the company from public sources using web_search)'}\n"
         f"{crm_block}{meeting_block}\n\n"
-        f"=== JSON SCHEMA (fill exactly this shape) ===\n{BRIEF_JSON_SCHEMA}\n\n"
+        f"=== JSON SCHEMA (fill exactly this shape; keys starting with _ are guidance, do NOT output them) ===\n{BRIEF_JSON_SCHEMA}\n\n"
         f"Return ONLY the JSON object as your final message. No prose before or after, "
         f"no markdown code fences. Must parse with json.loads()."
     )
@@ -1537,19 +1362,10 @@ with right:
                 )
                 st.stop()
 
-            # Sanity-check mandatory fields are populated
-            required_keys = ["strategic_hook", "asset_graas_map", "why_now",
-                             "executive_summary", "stat_band",
-                             "situation_and_opportunity",
-                             "what_they_have", "product_route",
-                             "graas_proof_points", "meeting_game_plan",
-                             "objection_handling", "opening_hook",
-                             "discovery_must_haves", "discovery_nice_to_haves"]
-            # Post-call updates MUST surface what the call added. Without a
-            # populated post_call_log, the brief renders as a "looks like a
-            # pre-call draft" which is the exact silent-failure we hit earlier.
-            if mode.startswith("🔁"):
-                required_keys.append("post_call_log")
+            # Sanity-check mandatory fields are populated (two-pager schema)
+            required_keys = ["company", "summary_boxes", "key_people",
+                             "stack", "graas_fit", "do_not",
+                             "wedges_worth_exploring", "discovery"]
             missing_required = [k for k in required_keys if not brief_data.get(k)]
             if missing_required:
                 st.warning(
