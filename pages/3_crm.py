@@ -1217,79 +1217,89 @@ with tab_compose, _tab_guard("Email Composer"):
 
     st.markdown("### ✉️ Compose Outreach Email")
 
-    # ── Step 1: Select recipients ─────────────────────────────────────────────
-    st.markdown("#### 1. Select Recipients")
+    # ── Step 1: Mode + recipients ─────────────────────────────────────────────
+    compose_mode = st.radio(
+        "Who are you emailing?",
+        ["✍️ 1:1 — one person", "📣 Segment campaign — many"],
+        key="compose_mode", horizontal=True,
+        help="1:1 → a clean personal (Minimal) email to one contact. "
+             "Segment campaign → the branded Newsletter to an AI segment.",
+    )
+    is_1to1 = compose_mode.startswith("✍️")
+    # Design is implied by mode — no separate toggle. 1:1 = minimal, campaign = branded.
+    email_layout = "minimal" if is_1to1 else "branded"
 
-    rc1, rc2, rc3, rc4 = st.columns(4)
-    with rc1:
-        comp_seg = st.selectbox("Segment", ["Active", "Dropped", "All"], key="comp_seg")
-    with rc2:
-        recency_opts = ["All", "🔥 Hot (<30d)", "☀️ Warm (30-90d)", "❄️ Cool (90-180d)", "🧊 Cold (180+d)", "⚫ No date"]
-        comp_recency = st.selectbox("Recency", recency_opts, key="comp_recency")
-    with rc3:
-        comp_statuses = sorted([s for s in contacts['lead_status'].unique() if s])
-        comp_status = st.selectbox("Status", ["All"] + comp_statuses, key="comp_status")
-    with rc4:
-        comp_owners = sorted([o for o in contacts['outreach_owner'].unique() if o and o not in ('nan', 'Not needed', '')])
-        comp_owner = st.selectbox("Owner", ["All"] + comp_owners, key="comp_owner")
+    overrides = st.session_state.setdefault("crm_name_overrides", {})
+    _pool = contacts[contacts['has_email']].copy()
+    _pool['person_name'] = _pool.apply(
+        lambda r: overrides.get(r['email'], r['person_name']), axis=1)
 
-    # Filter recipients
-    recipients = contacts[contacts['has_email']].copy()
-    if comp_seg != "All":
-        recipients = recipients[recipients['segment'] == comp_seg]
-    if comp_recency != "All":
-        recipients = recipients[recipients['recency'] == comp_recency]
-    if comp_status != "All":
-        recipients = recipients[recipients['lead_status'] == comp_status]
-    if comp_owner != "All":
-        recipients = recipients[recipients['outreach_owner'] == comp_owner]
+    st.markdown("#### 1. " + ("Pick the person" if is_1to1 else "Pick the segment"))
 
-    st.caption(f"📬 {len(recipients)} contacts across {recipients['company'].nunique()} companies")
+    if is_1to1:
+        _pool['_label'] = _pool.apply(
+            lambda r: f"{r['company']} — {r['person_name']} <{r['email']}>", axis=1)
+        _opts = _pool.sort_values(['company', 'person_name'])['_label'].tolist()
+        if not _opts:
+            st.warning("No contacts with an email address found.")
+            st.stop()
+        _pick = st.selectbox("Contact", _opts, key="one_to_one_pick")
+        recipients = _pool[_pool['_label'] == _pick].copy()
+        st.caption("✍️ Sends a clean **personal** email (Minimal design).")
+    else:
+        _sc1, _sc2 = st.columns([2, 3])
+        with _sc1:
+            comp_ai_seg = st.selectbox(
+                "AI Segment", AI_SEGMENTS, key="comp_ai_seg",
+                help="Set per company via the 'AI Segment' column in the pipeline sheet.",
+            )
+        with _sc2:
+            with st.expander("Refine (optional) — recency · owner", expanded=False):
+                recency_opts = ["All", "🔥 Hot (<30d)", "☀️ Warm (30-90d)",
+                                "❄️ Cool (90-180d)", "🧊 Cold (180+d)", "⚫ No date"]
+                comp_recency = st.selectbox("Recency", recency_opts, key="comp_recency")
+                _owners = sorted([o for o in contacts['outreach_owner'].unique()
+                                  if o and o not in ('nan', 'Not needed', '')])
+                comp_owner = st.selectbox("Owner", ["All"] + _owners, key="comp_owner")
+        recipients = _pool[_pool['ai_segment'] == comp_ai_seg].copy()
+        if comp_recency != "All":
+            recipients = recipients[recipients['recency'] == comp_recency]
+        if comp_owner != "All":
+            recipients = recipients[recipients['outreach_owner'] == comp_owner]
+        if recipients.empty:
+            _uncl = int((_pool['ai_segment'] == 'Unclassified').sum())
+            st.warning(
+                f"No contacts tagged **{comp_ai_seg}** yet. Add an **AI Segment** column to "
+                f"the pipeline sheet and tag companies (values: {', '.join(AI_SEGMENTS)}). "
+                f"{_uncl} contacts are currently Unclassified."
+            )
+        st.caption(
+            f"📣 {len(recipients)} contacts across "
+            f"{recipients['company'].nunique() if not recipients.empty else 0} companies "
+            "(Newsletter design)."
+        )
 
-    # Suggest a framework based on the dominant playbook bucket in the filtered set
-    # (real per-recipient suggestion happens in step 4 next to the recipient dropdown)
-    suggested_template = None
-    if not recipients.empty and "playbook_bucket" in recipients.columns:
-        bucket_counts = recipients["playbook_bucket"].value_counts()
-        bucket_counts = bucket_counts[bucket_counts.index.isin(BUCKET_TO_FRAMEWORK.keys())]
-        if not bucket_counts.empty:
-            top_bucket = bucket_counts.index[0]
-            suggested_template = BUCKET_TO_FRAMEWORK.get(top_bucket)
-            if suggested_template:
-                st.info(f"💡 Most contacts here are in **{top_bucket}** → suggested framework: **{suggested_template}**")
-
-    # Names are guessed from the email prefix (e.g. dsp@voltas.com -> "Dsp"),
-    # so let the user correct them. Overrides are keyed by email and persist
-    # across filter/template changes, and feed both the preview and sends.
-    if "crm_name_overrides" not in st.session_state:
-        st.session_state["crm_name_overrides"] = {}
-    overrides = st.session_state["crm_name_overrides"]
-    if not recipients.empty:
-        recipients['person_name'] = recipients.apply(
-            lambda r: overrides.get(r['email'], r['person_name']), axis=1)
-
-    with st.expander(f"View / edit {len(recipients)} recipients", expanded=False):
+    # View / edit recipient greeting names — feeds {name} in sends.
+    with st.expander(f"View / edit recipient name(s) ({len(recipients)})", expanded=False):
         if not recipients.empty:
             st.caption(
-                "✏️ Edit the **Name** column to fix how each contact is greeted in `{name}`. "
-                "Names are guessed from the email address and usually need correcting — "
-                "edits stick as you change filters or templates and apply to sends."
+                "✏️ Edit **Name** to fix how each contact is greeted in `{name}`. "
+                "Names are guessed from the email address and usually need correcting; "
+                "edits stick as you change mode/segment and apply to sends."
             )
-            editor_df = recipients[['company', 'person_name', 'email', 'designation', 'last_contact']].copy()
-            editor_df = editor_df.reset_index(drop=True)
+            editor_df = recipients[['company', 'person_name', 'email', 'designation',
+                                    'last_contact']].copy().reset_index(drop=True)
             editor_df['last_contact'] = editor_df['last_contact'].apply(
                 lambda x: x.strftime('%d %b %Y') if pd.notna(x) else '—')
             editor_df = editor_df.rename(columns={
                 'company': 'Company', 'person_name': 'Name', 'email': 'Email',
-                'designation': 'Title', 'last_contact': 'Last Contact',
-            })
+                'designation': 'Title', 'last_contact': 'Last Contact'})
             ed_key = f"recipient_editor_{hash(tuple(sorted(recipients['email'])))}"
             edited = st.data_editor(
-                editor_df, use_container_width=True, hide_index=True, height=300, key=ed_key,
-                column_config={
-                    'Name': st.column_config.TextColumn(
-                        'Name ✏️', help="How this contact is greeted in the email — editable"),
-                },
+                editor_df, use_container_width=True, hide_index=True,
+                height=min(320, 80 + 35 * len(editor_df)), key=ed_key,
+                column_config={'Name': st.column_config.TextColumn(
+                    'Name ✏️', help="How this contact is greeted in the email — editable")},
                 disabled=['Company', 'Email', 'Title', 'Last Contact'],
             )
             for _, erow in edited.iterrows():
@@ -1306,16 +1316,16 @@ with tab_compose, _tab_guard("Email Composer"):
 
     tc1, tc2 = st.columns([1, 2])
     with tc1:
-        template_name = st.radio("Template", list(EMAIL_TEMPLATES.keys()), key="template_sel")
-        email_style = st.radio(
-            "Email design",
-            ["Minimal — 1:1", "Branded — segment"],
-            key="email_style",
-            help="Minimal = clean white, tiny graas chip + unsubscribe — reads like a "
-                 "personal note (best for cold 1:1). Branded = dark graas header bar + "
-                 "footer (best for segment / newsletter sends).",
+        template_name = st.radio(
+            "Start from a template" if is_1to1 else "Template (segment starter)",
+            list(EMAIL_TEMPLATES.keys()), key="template_sel",
+            help="1:1 → an optional starting point (pick 'Custom' to write from scratch). "
+                 "Segment → the angle for this campaign.",
         )
-        email_layout = "minimal" if email_style.startswith("Minimal") else "branded"
+        st.caption(
+            ("✍️ **1:1** · Minimal design" if is_1to1
+             else "📣 **Segment** · Newsletter design") + " — set by the mode above."
+        )
 
     template = EMAIL_TEMPLATES[template_name]
 
@@ -1452,6 +1462,11 @@ with tab_compose, _tab_guard("Email Composer"):
 
         # Single-recipient send (preview row drives this)
         st.markdown("##### Send the previewed email")
+        if not is_1to1:
+            st.caption(
+                "📣 You're in a **segment campaign** — the main action is **Bulk send** "
+                "below. This single send is handy for a test to yourself first."
+            )
 
         if not recipients.empty:
             # Build recipient list for the dropdown — one row per (company, contact)
@@ -1712,9 +1727,14 @@ with tab_compose, _tab_guard("Email Composer"):
 
         # ── Bulk send to filtered set ─────────────────────────────────────────
         st.markdown("---")
-        st.markdown("##### 📨 Bulk send to all in current filter")
+        st.markdown("##### 📨 Bulk send to everyone in this segment")
+        if is_1to1:
+            st.caption(
+                "✍️ You're in **1:1** mode — use **Send the previewed email** above; "
+                "bulk isn't needed for one person."
+            )
         st.caption(
-            "Sends the **same template + body** to every recipient in the current Step 1 filter, "
+            "Sends the **same template + body** to every recipient in the current segment, "
             "with `{name}`, `{company}`, `{vertical}` substituted per-person. "
             "If you've added personal lines to the body (e.g. \"Hope golf is going well\"), reset to "
             "the framework template first — they'll go to everyone otherwise."
