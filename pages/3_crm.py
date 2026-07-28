@@ -81,6 +81,8 @@ def _standardize_columns(df: pd.DataFrame) -> pd.DataFrame:
             col_map[col] = 'comments'
         elif 'entity' in cl:
             col_map[col] = 'entity_type'
+        elif 'ai segment' in cl or 'ai maturity' in cl or 'ai-segment' in cl:
+            col_map[col] = 'ai_segment'
         elif 'email' in cl and 'personnel' in cl:
             col_map[col] = 'contacts'
         elif 'who will own' in cl or ('email' in cl and 'outreach' in cl):
@@ -104,6 +106,27 @@ def _safe(row, col):
     return str(val).strip() if pd.notna(val) else ''
 
 
+# AI-maturity segmentation (the 1-to-many campaign axis). Populated from an
+# "AI Segment" column in the pipeline sheet, one value per company. Blank →
+# "Unclassified" (kept out of the campaign picker).
+AI_SEGMENTS = ["AI Laggard", "AI Explorer", "AI Mature"]
+
+
+def _normalize_ai_segment(v: str) -> str:
+    """Map whatever the sheet has to a canonical AI segment (tolerant of
+    'laggard', 'Explorer', 'AI-Mature', etc.). Blank/unknown → 'Unclassified'."""
+    s = (v or "").strip().lower()
+    if not s:
+        return "Unclassified"
+    if "laggard" in s:
+        return "AI Laggard"
+    if "explor" in s:
+        return "AI Explorer"
+    if "matur" in s:
+        return "AI Mature"
+    return "Unclassified"
+
+
 def _parse_contacts(df: pd.DataFrame, segment: str) -> pd.DataFrame:
     """Parse 'contacts' (Email of Key Personnel) into individual contact rows."""
     rows = []
@@ -124,6 +147,7 @@ def _parse_contacts(df: pd.DataFrame, segment: str) -> pd.DataFrame:
             'conv_details': _safe(row, 'conv_details'),
             'outreach_owner': _safe(row, 'outreach_owner'),
             'source': _safe(row, 'source'),
+            'ai_segment': _normalize_ai_segment(_safe(row, 'ai_segment')),
         }
         # Parse last contact — fall back to first_conv if latest_conv is missing
         lc = row['latest_conv'] if 'latest_conv' in row.index and pd.notna(row['latest_conv']) else None
@@ -189,6 +213,7 @@ def _load_overlay():
             "entity_type": entry.get("entity_type", ""),
             "lead_status": entry.get("lead_status", ""),
             "segment": entry.get("segment", "Active"),
+            "ai_segment": _normalize_ai_segment(entry.get("ai_segment", "")),
             "agents": entry.get("agents", ""),
             "source": entry.get("source", ""),
             "outreach_owner": entry.get("outreach_owner", ""),
