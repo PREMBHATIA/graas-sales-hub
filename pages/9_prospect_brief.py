@@ -1467,6 +1467,9 @@ with right:
                 )
                 target_folder = drive_folder or DEFAULT_DRIVE_FOLDER
                 existing_doc_id = ""
+                # Normalised company key — stamped into Drive appProperties so
+                # the Recent-briefs tile can dedup/group by company.
+                _co_key = _normalize_company_key(company_name)
 
                 # Shared dedup-and-trash helper. Always pick the latest
                 # SalesHub match for this company; trash older duplicates
