@@ -32,8 +32,12 @@ from email.mime.image import MIMEImage
 _LOGO_PATH = os.path.join(os.path.dirname(__file__), "assets", "graas_logo.png")
 _LOGO_CID = "graaslogo"
 
-_FONT = ("'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', "
-         "'Helvetica Neue', Arial, sans-serif")
+# NOTE: font names are DOUBLE-quoted. Every style attribute below is
+# single-quoted, so single-quoted font names ('Outfit') would terminate the
+# attribute early and silently drop font-family + everything after it in that
+# attribute (the bug that made emails render in the client's default serif).
+_FONT = ('"Outfit", -apple-system, BlinkMacSystemFont, "Segoe UI", '
+         '"Helvetica Neue", Arial, sans-serif')
 _URL_RE = re.compile(r'(https?://[^\s<>"]+)')
 
 
