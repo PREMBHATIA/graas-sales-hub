@@ -1461,476 +1461,475 @@ with tab_compose, _tab_guard("Email Composer"):
         with cap_cols[1]:
             st.caption("Cap counts all successful sends in the trailing 7 days, across all senders.")
 
-        # Single-recipient send (preview row drives this)
-        st.markdown("##### Send the previewed email")
-        if not is_1to1:
-            st.caption(
-                "📣 You're in a **segment campaign** — the main action is **Bulk send** "
-                "below. This single send is handy for a test to yourself first."
-            )
+        # 1:1 → the send. Segment → a collapsible test-to-yourself (bulk is the real action).
+        _one_send = st.container() if is_1to1 else st.expander(
+            "🧪 Send a test to yourself first", expanded=False)
+        with _one_send:
+            if is_1to1:
+                st.markdown("##### Send")
+            if not recipients.empty:
+                # Build recipient list for the dropdown — one row per (company, contact)
+                contact_options = []
+                for _, row in recipients.iterrows():
+                    if row.get("email") and "@" in str(row["email"]):
+                        label = f"{row['person_name']} <{row['email']}> · {row['company']}"
+                        contact_options.append((label, row.to_dict()))
 
-        if not recipients.empty:
-            # Build recipient list for the dropdown — one row per (company, contact)
-            contact_options = []
-            for _, row in recipients.iterrows():
-                if row.get("email") and "@" in str(row["email"]):
-                    label = f"{row['person_name']} <{row['email']}> · {row['company']}"
-                    contact_options.append((label, row.to_dict()))
-
-            if not contact_options:
-                st.warning("No valid recipient emails in the current segment.")
-            else:
-                # Default to first contact of preview_co if available
-                default_idx = 0
-                default_label_for_preview = None
-                for i, (lbl, r) in enumerate(contact_options):
-                    if r["company"] == preview_co:
-                        default_idx = i
-                        default_label_for_preview = lbl
-                        break
-
-                # Force the recipient dropdown to follow the previewed company.
-                # Streamlit's selectbox ignores `index=` once it has a session-state
-                # value for `key`, so without this the dropdown gets stuck on whatever
-                # company was last selected — even if "Preview for" was changed.
-                # That divergence caused a previewed-for-Samsung email to be sent
-                # with HUL substituted, because send_target came from the stale row.
-                _last_pc_key = "_send_recipient_last_preview_co"
-                if (default_label_for_preview is not None
-                        and st.session_state.get(_last_pc_key) != preview_co):
-                    st.session_state["send_recipient"] = default_label_for_preview
-                    st.session_state[_last_pc_key] = preview_co
-
-                # Test-mode toggle goes FIRST so we can disable the recipient
-                # dropdown when test mode is on (cleaner UX: you're picking
-                # ONE thing — real send target OR test address, not both).
-                test_mode = st.checkbox(
-                    "🧪 Send to test address instead (override recipient email)",
-                    key="send_test_mode",
-                    help="When on: the real-recipient dropdown is locked, and the "
-                         "email is sent to the chosen test address. Personalization "
-                         "(Hi {name}, ... at {company}) still uses the recipient "
-                         "previewed above, so the test email matches what the real "
-                         "recipient would have received."
-                )
-
-                send_label = st.selectbox(
-                    "Recipient",
-                    [c[0] for c in contact_options],
-                    index=default_idx,
-                    key="send_recipient",
-                    disabled=test_mode,
-                    help="Locked in test mode — uncheck the test box above to send to a real recipient."
-                         if test_mode else None,
-                )
-                send_target = dict(contact_options[[c[0] for c in contact_options].index(send_label)][1])
-
-                # Defensive guard: if the chosen recipient's company doesn't match
-                # the previewed company, refuse to send. Prevents the preview/send
-                # divergence from ever shipping a wrong-company email.
-                preview_send_mismatch = (send_target["company"] != preview_co)
-                if preview_send_mismatch:
-                    st.error(
-                        f"⚠️ **Recipient mismatch:** preview shows **{preview_co}** "
-                        f"but the selected recipient is at **{send_target['company']}**. "
-                        f"Pick a {preview_co} contact, or change 'Preview for' to "
-                        f"{send_target['company']} so the substituted body matches who you're sending to."
-                    )
-
-                # Show the playbook bucket(s) for this contact + suggest the right framework
-                target_buckets = send_target.get("playbook_buckets_all") or []
-                if not isinstance(target_buckets, list):
-                    target_buckets = []
-                target_no_touch = send_target.get("playbook_no_touch")
-                target_note = send_target.get("playbook_note", "")
-
-                if target_buckets:
-                    suggested_for_recipient = BUCKET_TO_FRAMEWORK.get(target_buckets[0])
-                    bucket_str = " · ".join(target_buckets)
-                    if suggested_for_recipient and suggested_for_recipient != template_name:
-                        st.info(
-                            f"📋 **{send_target['company']}** is in playbook bucket(s): **{bucket_str}** → "
-                            f"suggested framework: **{suggested_for_recipient}** "
-                            f"(currently using {template_name})"
-                        )
-                    else:
-                        st.caption(f"📋 Playbook bucket(s): **{bucket_str}**")
-
-                # NaN is truthy in Python, so a plain `if target_note:` would
-                # render the string "nan" for accounts without a playbook note.
-                if isinstance(target_note, str) and target_note.strip() and target_note.strip().lower() != "nan":
-                    st.warning(target_note)
-
-                test_email = ""
-                if test_mode:
-                    # Known internal testers — extend this list as needed.
-                    TEST_RECIPIENTS = {
-                        "Prem (prem@graas.ai)":                     "prem@graas.ai",
-                        "Dhanashree (dhanashree.mohite@graas.ai)":  "dhanashree.mohite@graas.ai",
-                        "Amruta (amruta@graas.ai)":                 "amruta@graas.ai",
-                        "Gaurav (gaurav@graas.ai)":                 "gaurav@graas.ai",
-                        "Insights (insights@graas.ai)":             "insights@graas.ai",
-                        "Custom…":                                  "",
-                    }
-                    tcol1, tcol2 = st.columns([1, 1])
-                    with tcol1:
-                        test_choice = st.selectbox(
-                            "Test recipient",
-                            list(TEST_RECIPIENTS.keys()),
-                            key="send_test_choice",
-                        )
-                    if test_choice == "Custom…":
-                        with tcol2:
-                            test_email = st.text_input(
-                                "Custom email",
-                                value="",
-                                placeholder="someone@example.com",
-                                key="send_test_email_custom",
-                            ).strip()
-                    else:
-                        test_email = TEST_RECIPIENTS[test_choice]
-                        with tcol2:
-                            st.markdown(f"**→** `{test_email}`")
-
-                # Render personalized subject + body for the chosen contact
-                # (personalization always uses the dropdown contact, even in test mode)
-                # {name} → first name only (matches how cold outreach is actually written)
-                # {full_name} → full name, kept as a backup for templates that need it
-                _full_name = str(send_target.get("person_name", "")).strip()
-                _first_name = _full_name.split()[0] if _full_name else _full_name
-
-                _send_subs = {
-                    "company":    send_target["company"],
-                    "name":       _first_name,
-                    "full_name":  _full_name,
-                    "vertical":   send_target["vertical"],
-                    "sender":     sender_name,
-                    "designation": send_target.get("designation", ""),
-                }
-                rendered_subject_send = _substitute(subject, _send_subs)
-                rendered_body_send = _substitute(body, _send_subs)
-                rendered_headline_send = _substitute(headline, _send_subs)
-                rendered_deck_send = _substitute(deck, _send_subs)
-
-                # Resolve the actual To: address (test override or real recipient)
-                effective_to_email = test_email if (test_mode and test_email) else send_target["email"]
-                effective_to_name = "Test (Prem)" if (test_mode and test_email) else send_target["person_name"]
-
-                # Two-step confirm to avoid misclicks
-                confirm_key = "send_confirm_armed"
-                if confirm_key not in st.session_state:
-                    st.session_state[confirm_key] = False
-
-                # No-Touch enforcement — block real sends to companies on Amruta's
-                # No-Touch list. Test mode is allowed because it goes to internal
-                # addresses, never to the real (no-touch) recipient.
-                no_touch_block = False
-                if target_no_touch and not test_mode:
-                    no_touch_block = True
-                    st.error(
-                        f"🚫 **Cannot send to {send_target['company']}** — listed in playbook **No-Touch** "
-                        f"({target_no_touch.get('category', '')}).\n\n"
-                        f"**Reason:** _{target_no_touch.get('reason', '')}_\n\n"
-                        f"Override only by switching to test mode (which sends to an internal address, "
-                        f"never to {send_target['email']})."
-                    )
-
-                # Dedup check — warn if this recipient was emailed within DEDUP_DAYS.
-                # Test mode bypasses (test addresses are hit repeatedly during testing).
-                dedup_override = False
-                dedup_days = get_dedup_days()
-                if not test_mode:
-                    _last_sent, _days_ago = last_sent_to(effective_to_email)
-                    if _last_sent and _days_ago is not None and _days_ago < dedup_days:
-                        st.warning(
-                            f"⚠️ **{effective_to_email}** was last emailed **{_days_ago} day(s) ago** "
-                            f"(dedup window = {dedup_days} days). Sending again is blocked unless you override."
-                        )
-                        dedup_override = st.checkbox(
-                            f"Send anyway (override {dedup_days}-day dedup)",
-                            key="dedup_override_box",
-                            help="Use sparingly — repeat sends inside the dedup window often feel spammy."
-                        )
-
-                cols = st.columns([2, 1, 1])
-                with cols[0]:
-                    test_badge = " 🧪 **TEST MODE**" if (test_mode and test_email) else ""
-                    st.markdown(
-                        f"**Will send to:** `{effective_to_email}`{test_badge}  \n"
-                        f"**From:** Graas Insights `<insights@graas.ai>`  \n"
-                        f"**Reply-To:** {sender_display_name} `<{sender_reply_to}>`"
-                    )
-                with cols[1]:
-                    # Disable Send if cap reached, or test-mode-without-email, or
-                    # No-Touch-blocked, or recipient is in dedup window without override.
-                    _last_sent_check, _days_check = last_sent_to(effective_to_email)
-                    in_dedup_window = (not test_mode and _last_sent_check is not None
-                                       and _days_check is not None and _days_check < dedup_days)
-                    send_disabled = (
-                        (left <= 0)
-                        or (test_mode and not test_email)
-                        or no_touch_block
-                        or (in_dedup_window and not dedup_override)
-                        or preview_send_mismatch
-                    )
-                    if not st.session_state[confirm_key]:
-                        if st.button("📧 Send email", type="primary", disabled=send_disabled,
-                                     use_container_width=True, key="send_arm"):
-                            st.session_state[confirm_key] = True
-                            st.rerun()
-                    else:
-                        if st.button("✅ Confirm send", type="primary",
-                                     use_container_width=True, key="send_confirm"):
-                            with st.spinner(f"📨 Sending to {effective_to_email}…"):
-                                ok, msg = send_email(
-                                    sender_label=sender_label,
-                                    to_email=effective_to_email,
-                                    to_name=effective_to_name,
-                                    company=send_target["company"] + (" [TEST]" if test_mode else ""),
-                                    subject=rendered_subject_send,
-                                    body=rendered_body_send,
-                                    bucket=str(send_target.get("playbook_bucket", "")) or str(send_target.get("recency", "")),
-                                    template=template_name + (" (test)" if test_mode else ""),
-                                    bypass_dedup=test_mode or dedup_override,
-                                    layout=email_layout,
-                                    headline=rendered_headline_send,
-                                    deck=rendered_deck_send,
-                                )
-                            st.session_state[confirm_key] = False
-                            # Stash result so we can show it after the rerun
-                            st.session_state["last_send_result"] = ("ok" if ok else "err", effective_to_email, msg)
-                            st.rerun()
-                with cols[2]:
-                    if st.session_state[confirm_key]:
-                        if st.button("Cancel", use_container_width=True, key="send_cancel"):
-                            st.session_state[confirm_key] = False
-                            st.rerun()
-
-                if left <= 0:
-                    st.warning(f"Weekly cap of {cap} reached. New sends blocked until older sends roll out of the 7-day window.")
-
-        # Bulk-copy fallback (kept for manual / Gmail-direct workflows)
-        with st.expander("📋 Copy emails for manual sending (Gmail BCC, etc.)"):
-            ac1, ac2 = st.columns(2)
-            with ac1:
-                st.markdown("**All recipient emails**")
-                all_emails = ', '.join(recipients['email'].unique().tolist())
-                st.code(all_emails, language=None)
-            with ac2:
-                st.markdown("**Emails by company**")
-                for co in recipients['company'].unique()[:20]:
-                    co_emails = recipients[recipients['company'] == co]['email'].tolist()
-                    co_names = recipients[recipients['company'] == co]['person_name'].tolist()
-                    st.markdown(f"**{co}** ({', '.join(co_names)})")
-                    st.code(', '.join(co_emails), language=None)
-                if len(recipients['company'].unique()) > 20:
-                    st.caption(f"... and {len(recipients['company'].unique()) - 20} more companies")
-
-        # ── Bulk send to filtered set ─────────────────────────────────────────
-        st.markdown("---")
-        st.markdown("##### 📨 Bulk send to everyone in this segment")
-        if is_1to1:
-            st.caption(
-                "✍️ You're in **1:1** mode — use **Send the previewed email** above; "
-                "bulk isn't needed for one person."
-            )
-        st.caption(
-            "Same body to everyone in the segment, `{name}`/`{company}`/`{vertical}` filled "
-            "per person. Keep the body generic — one-off personal lines go to all."
-        )
-
-        if recipients.empty or not contact_options:
-            st.caption("No recipients in current filter. Adjust filters in Step 1 above.")
-        else:
-            # ── Pre-flight: build filter pipeline ─────────────────────────
-            bulk_pool = recipients[recipients["email"].apply(lambda e: bool(e) and "@" in str(e))].copy()
-            bulk_pool["_email_norm"] = bulk_pool["email"].str.lower().str.strip()
-
-            # Stage 1: total
-            stage_total = len(bulk_pool)
-
-            # Stage 2: remove No-Touch companies
-            # bool() wrap is critical: v.get("category") returns the category STRING
-            # when truthy, not True. Without the wrap, .apply() returns a Series of
-            # mixed str/False values; pandas then treats it as label-indexing and
-            # crashes with KeyError. Symptom is the whole page failing to render
-            # (Streamlit runs every tab body regardless of which tab is visible),
-            # so the Analytics tab dies too. Hit when the new unified pipeline tab
-            # contains any NO_TOUCH company (Hindware, Growsari, etc.).
-            def _is_no_touch(v):
-                return bool(isinstance(v, dict) and v.get("category"))
-            no_touch_mask = bulk_pool.get("playbook_no_touch", pd.Series([False]*len(bulk_pool))).apply(_is_no_touch)
-            bulk_no_touch = bulk_pool[no_touch_mask]
-            after_no_touch = bulk_pool[~no_touch_mask]
-            stage_after_nt = len(after_no_touch)
-
-            # Stage 3: remove suppressed
-            with st.spinner("Loading suppression + recent-send data…"):
-                supp_set = suppressed_emails()
-                recent_set = recent_sent_emails(get_dedup_days())
-            sup_mask = after_no_touch["_email_norm"].isin(supp_set)
-            bulk_supp = after_no_touch[sup_mask]
-            after_supp = after_no_touch[~sup_mask]
-            stage_after_supp = len(after_supp)
-
-            # Stage 4: remove recently-sent (dedup window)
-            dedup_mask = after_supp["_email_norm"].isin(recent_set)
-            bulk_dedup = after_supp[dedup_mask]
-            after_dedup = after_supp[~dedup_mask]
-            stage_final = len(after_dedup)
-
-            # Headline count + a one-line skip summary (full breakdown is in the
-            # "filtered out" expander below — no need for the 5-line pipeline).
-            st.markdown(f"### → Will send to **{stage_final}** of {stage_total}")
-            _skipped = stage_total - stage_final
-            if _skipped:
-                st.caption(
-                    f"{_skipped} skipped — "
-                    f"{stage_total - stage_after_nt} no-touch · "
-                    f"{stage_after_nt - stage_after_supp} suppressed · "
-                    f"{stage_after_supp - stage_final} emailed in last {get_dedup_days()}d "
-                    "· details below."
-                )
-
-            # Cap check
-            bulk_blocked_reason = None
-            if stage_final == 0:
-                bulk_blocked_reason = "No recipients left after filters."
-            elif stage_final > left:
-                bulk_blocked_reason = (
-                    f"{stage_final} sends would exceed the weekly cap "
-                    f"({used} used, {left} remaining of {cap}). "
-                    f"Reduce the filter or wait for cap to roll over."
-                )
-
-            # Drilldown of who's being filtered out (for transparency)
-            if stage_total > stage_final:
-                with st.expander(f"🔍 See who's being filtered out ({stage_total - stage_final} contacts)"):
-                    if not bulk_no_touch.empty:
-                        st.markdown(f"**🚫 No-Touch ({len(bulk_no_touch)}):**")
-                        st.dataframe(
-                            bulk_no_touch[["company", "person_name", "email"]].rename(
-                                columns={"company": "Company", "person_name": "Name", "email": "Email"}),
-                            use_container_width=True, hide_index=True, height=140)
-                    if not bulk_supp.empty:
-                        st.markdown(f"**🚷 Suppressed ({len(bulk_supp)}):**")
-                        st.dataframe(
-                            bulk_supp[["company", "person_name", "email"]].rename(
-                                columns={"company": "Company", "person_name": "Name", "email": "Email"}),
-                            use_container_width=True, hide_index=True, height=140)
-                    if not bulk_dedup.empty:
-                        st.markdown(f"**⏱️ Recently emailed ({len(bulk_dedup)}, within {get_dedup_days()}d):**")
-                        st.dataframe(
-                            bulk_dedup[["company", "person_name", "email"]].rename(
-                                columns={"company": "Company", "person_name": "Name", "email": "Email"}),
-                            use_container_width=True, hide_index=True, height=140)
-
-            # Preview of who WILL be sent to
-            if stage_final > 0:
-                with st.expander(f"📋 Preview the {stage_final} recipient(s) who WILL be sent to"):
-                    st.dataframe(
-                        after_dedup[["company", "person_name", "email", "playbook_bucket"]].rename(
-                            columns={"company": "Company", "person_name": "Name",
-                                     "email": "Email", "playbook_bucket": "Bucket"}),
-                        use_container_width=True, hide_index=True, height=300)
-
-            # Bulk send button — two-step confirm
-            bulk_confirm_key = "bulk_confirm_armed"
-            if bulk_confirm_key not in st.session_state:
-                st.session_state[bulk_confirm_key] = False
-
-            if bulk_blocked_reason:
-                st.error(f"⚠️ {bulk_blocked_reason}")
-
-            bcols = st.columns([2, 1, 1])
-            with bcols[0]:
-                if not bulk_blocked_reason:
-                    st.markdown(
-                        f"**Will send {stage_final} email(s) via:** {sender_display_name} `<{sender_reply_to}>`  \n"
-                        f"**Framework:** {template_name}  \n"
-                        f"**Cap impact:** {used}/{cap} → **{used + stage_final}/{cap}**"
-                    )
-            with bcols[1]:
-                if not st.session_state[bulk_confirm_key]:
-                    if st.button(f"📨 Send to all {stage_final}",
-                                 type="primary",
-                                 disabled=bool(bulk_blocked_reason),
-                                 use_container_width=True,
-                                 key="bulk_arm"):
-                        st.session_state[bulk_confirm_key] = True
-                        st.rerun()
+                if not contact_options:
+                    st.warning("No valid recipient emails in the current segment.")
                 else:
-                    if st.button(f"✅ Confirm send to {stage_final}",
-                                 type="primary",
-                                 use_container_width=True,
-                                 key="bulk_confirm"):
-                        # Run the send loop
-                        progress_bar = st.progress(0.0, text=f"Sending 0 of {stage_final}…")
-                        sent_n, failed_n = 0, 0
-                        failures = []
-                        for i, (_, row) in enumerate(after_dedup.iterrows(), start=1):
-                            r_full = str(row.get("person_name", "")).strip()
-                            r_first = r_full.split()[0] if r_full else r_full
-                            _r_subs = {
-                                "company":    row["company"],
-                                "name":       r_first,
-                                "full_name":  r_full,
-                                "vertical":   row["vertical"],
-                                "sender":     sender_name,
-                                "designation": row.get("designation", ""),
-                            }
-                            r_subj = _substitute(subject, _r_subs)
-                            r_body = _substitute(body, _r_subs)
-                            r_headline = _substitute(headline, _r_subs)
-                            r_deck = _substitute(deck, _r_subs)
+                    # Default to first contact of preview_co if available
+                    default_idx = 0
+                    default_label_for_preview = None
+                    for i, (lbl, r) in enumerate(contact_options):
+                        if r["company"] == preview_co:
+                            default_idx = i
+                            default_label_for_preview = lbl
+                            break
 
-                            ok_b, msg_b = send_email(
-                                sender_label=sender_label,
-                                to_email=row["email"],
-                                to_name=r_full,
-                                company=row["company"],
-                                subject=r_subj,
-                                body=r_body,
-                                bucket=str(row.get("playbook_bucket", "")) or str(row.get("recency", "")),
-                                template=template_name,
-                                bypass_dedup=False,  # already pre-filtered, but keep guard active
-                                layout=email_layout,
-                                headline=r_headline,
-                                deck=r_deck,
+                    # Force the recipient dropdown to follow the previewed company.
+                    # Streamlit's selectbox ignores `index=` once it has a session-state
+                    # value for `key`, so without this the dropdown gets stuck on whatever
+                    # company was last selected — even if "Preview for" was changed.
+                    # That divergence caused a previewed-for-Samsung email to be sent
+                    # with HUL substituted, because send_target came from the stale row.
+                    _last_pc_key = "_send_recipient_last_preview_co"
+                    if (default_label_for_preview is not None
+                            and st.session_state.get(_last_pc_key) != preview_co):
+                        st.session_state["send_recipient"] = default_label_for_preview
+                        st.session_state[_last_pc_key] = preview_co
+
+                    # Test-mode toggle goes FIRST so we can disable the recipient
+                    # dropdown when test mode is on (cleaner UX: you're picking
+                    # ONE thing — real send target OR test address, not both).
+                    test_mode = st.checkbox(
+                        "🧪 Send to test address instead (override recipient email)",
+                        key="send_test_mode",
+                        help="When on: the real-recipient dropdown is locked, and the "
+                             "email is sent to the chosen test address. Personalization "
+                             "(Hi {name}, ... at {company}) still uses the recipient "
+                             "previewed above, so the test email matches what the real "
+                             "recipient would have received."
+                    )
+
+                    send_label = st.selectbox(
+                        "Recipient",
+                        [c[0] for c in contact_options],
+                        index=default_idx,
+                        key="send_recipient",
+                        disabled=test_mode,
+                        help="Locked in test mode — uncheck the test box above to send to a real recipient."
+                             if test_mode else None,
+                    )
+                    send_target = dict(contact_options[[c[0] for c in contact_options].index(send_label)][1])
+
+                    # Defensive guard: if the chosen recipient's company doesn't match
+                    # the previewed company, refuse to send. Prevents the preview/send
+                    # divergence from ever shipping a wrong-company email.
+                    preview_send_mismatch = (send_target["company"] != preview_co)
+                    if preview_send_mismatch:
+                        st.error(
+                            f"⚠️ **Recipient mismatch:** preview shows **{preview_co}** "
+                            f"but the selected recipient is at **{send_target['company']}**. "
+                            f"Pick a {preview_co} contact, or change 'Preview for' to "
+                            f"{send_target['company']} so the substituted body matches who you're sending to."
+                        )
+
+                    # Show the playbook bucket(s) for this contact + suggest the right framework
+                    target_buckets = send_target.get("playbook_buckets_all") or []
+                    if not isinstance(target_buckets, list):
+                        target_buckets = []
+                    target_no_touch = send_target.get("playbook_no_touch")
+                    target_note = send_target.get("playbook_note", "")
+
+                    if target_buckets:
+                        suggested_for_recipient = BUCKET_TO_FRAMEWORK.get(target_buckets[0])
+                        bucket_str = " · ".join(target_buckets)
+                        if suggested_for_recipient and suggested_for_recipient != template_name:
+                            st.info(
+                                f"📋 **{send_target['company']}** is in playbook bucket(s): **{bucket_str}** → "
+                                f"suggested framework: **{suggested_for_recipient}** "
+                                f"(currently using {template_name})"
                             )
-                            if ok_b:
-                                sent_n += 1
-                            else:
-                                failed_n += 1
-                                failures.append((row["email"], msg_b))
-                            progress_bar.progress(i / stage_final, text=f"Sending {i} of {stage_final}…")
+                        else:
+                            st.caption(f"📋 Playbook bucket(s): **{bucket_str}**")
 
-                        progress_bar.empty()
-                        st.session_state[bulk_confirm_key] = False
-                        # Stash result for persistent banner
-                        st.session_state["last_bulk_result"] = (sent_n, failed_n, failures)
+                    # NaN is truthy in Python, so a plain `if target_note:` would
+                    # render the string "nan" for accounts without a playbook note.
+                    if isinstance(target_note, str) and target_note.strip() and target_note.strip().lower() != "nan":
+                        st.warning(target_note)
+
+                    test_email = ""
+                    if test_mode:
+                        # Known internal testers — extend this list as needed.
+                        TEST_RECIPIENTS = {
+                            "Prem (prem@graas.ai)":                     "prem@graas.ai",
+                            "Dhanashree (dhanashree.mohite@graas.ai)":  "dhanashree.mohite@graas.ai",
+                            "Amruta (amruta@graas.ai)":                 "amruta@graas.ai",
+                            "Gaurav (gaurav@graas.ai)":                 "gaurav@graas.ai",
+                            "Insights (insights@graas.ai)":             "insights@graas.ai",
+                            "Custom…":                                  "",
+                        }
+                        tcol1, tcol2 = st.columns([1, 1])
+                        with tcol1:
+                            test_choice = st.selectbox(
+                                "Test recipient",
+                                list(TEST_RECIPIENTS.keys()),
+                                key="send_test_choice",
+                            )
+                        if test_choice == "Custom…":
+                            with tcol2:
+                                test_email = st.text_input(
+                                    "Custom email",
+                                    value="",
+                                    placeholder="someone@example.com",
+                                    key="send_test_email_custom",
+                                ).strip()
+                        else:
+                            test_email = TEST_RECIPIENTS[test_choice]
+                            with tcol2:
+                                st.markdown(f"**→** `{test_email}`")
+
+                    # Render personalized subject + body for the chosen contact
+                    # (personalization always uses the dropdown contact, even in test mode)
+                    # {name} → first name only (matches how cold outreach is actually written)
+                    # {full_name} → full name, kept as a backup for templates that need it
+                    _full_name = str(send_target.get("person_name", "")).strip()
+                    _first_name = _full_name.split()[0] if _full_name else _full_name
+
+                    _send_subs = {
+                        "company":    send_target["company"],
+                        "name":       _first_name,
+                        "full_name":  _full_name,
+                        "vertical":   send_target["vertical"],
+                        "sender":     sender_name,
+                        "designation": send_target.get("designation", ""),
+                    }
+                    rendered_subject_send = _substitute(subject, _send_subs)
+                    rendered_body_send = _substitute(body, _send_subs)
+                    rendered_headline_send = _substitute(headline, _send_subs)
+                    rendered_deck_send = _substitute(deck, _send_subs)
+
+                    # Resolve the actual To: address (test override or real recipient)
+                    effective_to_email = test_email if (test_mode and test_email) else send_target["email"]
+                    effective_to_name = "Test (Prem)" if (test_mode and test_email) else send_target["person_name"]
+
+                    # Two-step confirm to avoid misclicks
+                    confirm_key = "send_confirm_armed"
+                    if confirm_key not in st.session_state:
+                        st.session_state[confirm_key] = False
+
+                    # No-Touch enforcement — block real sends to companies on Amruta's
+                    # No-Touch list. Test mode is allowed because it goes to internal
+                    # addresses, never to the real (no-touch) recipient.
+                    no_touch_block = False
+                    if target_no_touch and not test_mode:
+                        no_touch_block = True
+                        st.error(
+                            f"🚫 **Cannot send to {send_target['company']}** — listed in playbook **No-Touch** "
+                            f"({target_no_touch.get('category', '')}).\n\n"
+                            f"**Reason:** _{target_no_touch.get('reason', '')}_\n\n"
+                            f"Override only by switching to test mode (which sends to an internal address, "
+                            f"never to {send_target['email']})."
+                        )
+
+                    # Dedup check — warn if this recipient was emailed within DEDUP_DAYS.
+                    # Test mode bypasses (test addresses are hit repeatedly during testing).
+                    dedup_override = False
+                    dedup_days = get_dedup_days()
+                    if not test_mode:
+                        _last_sent, _days_ago = last_sent_to(effective_to_email)
+                        if _last_sent and _days_ago is not None and _days_ago < dedup_days:
+                            st.warning(
+                                f"⚠️ **{effective_to_email}** was last emailed **{_days_ago} day(s) ago** "
+                                f"(dedup window = {dedup_days} days). Sending again is blocked unless you override."
+                            )
+                            dedup_override = st.checkbox(
+                                f"Send anyway (override {dedup_days}-day dedup)",
+                                key="dedup_override_box",
+                                help="Use sparingly — repeat sends inside the dedup window often feel spammy."
+                            )
+
+                    cols = st.columns([2, 1, 1])
+                    with cols[0]:
+                        test_badge = " 🧪 **TEST MODE**" if (test_mode and test_email) else ""
+                        st.markdown(
+                            f"**Will send to:** `{effective_to_email}`{test_badge}  \n"
+                            f"**From:** Graas Insights `<insights@graas.ai>`  \n"
+                            f"**Reply-To:** {sender_display_name} `<{sender_reply_to}>`"
+                        )
+                    with cols[1]:
+                        # Disable Send if cap reached, or test-mode-without-email, or
+                        # No-Touch-blocked, or recipient is in dedup window without override.
+                        _last_sent_check, _days_check = last_sent_to(effective_to_email)
+                        in_dedup_window = (not test_mode and _last_sent_check is not None
+                                           and _days_check is not None and _days_check < dedup_days)
+                        send_disabled = (
+                            (left <= 0)
+                            or (test_mode and not test_email)
+                            or no_touch_block
+                            or (in_dedup_window and not dedup_override)
+                            or preview_send_mismatch
+                        )
+                        if not st.session_state[confirm_key]:
+                            if st.button("📧 Send email", type="primary", disabled=send_disabled,
+                                         use_container_width=True, key="send_arm"):
+                                st.session_state[confirm_key] = True
+                                st.rerun()
+                        else:
+                            if st.button("✅ Confirm send", type="primary",
+                                         use_container_width=True, key="send_confirm"):
+                                with st.spinner(f"📨 Sending to {effective_to_email}…"):
+                                    ok, msg = send_email(
+                                        sender_label=sender_label,
+                                        to_email=effective_to_email,
+                                        to_name=effective_to_name,
+                                        company=send_target["company"] + (" [TEST]" if test_mode else ""),
+                                        subject=rendered_subject_send,
+                                        body=rendered_body_send,
+                                        bucket=str(send_target.get("playbook_bucket", "")) or str(send_target.get("recency", "")),
+                                        template=template_name + (" (test)" if test_mode else ""),
+                                        bypass_dedup=test_mode or dedup_override,
+                                        layout=email_layout,
+                                        headline=rendered_headline_send,
+                                        deck=rendered_deck_send,
+                                    )
+                                st.session_state[confirm_key] = False
+                                # Stash result so we can show it after the rerun
+                                st.session_state["last_send_result"] = ("ok" if ok else "err", effective_to_email, msg)
+                                st.rerun()
+                    with cols[2]:
+                        if st.session_state[confirm_key]:
+                            if st.button("Cancel", use_container_width=True, key="send_cancel"):
+                                st.session_state[confirm_key] = False
+                                st.rerun()
+
+                    if left <= 0:
+                        st.warning(f"Weekly cap of {cap} reached. New sends blocked until older sends roll out of the 7-day window.")
+
+        if not is_1to1:  # bulk send is only for segment campaigns
+            # Bulk-copy fallback (kept for manual / Gmail-direct workflows)
+            with st.expander("📋 Copy emails for manual sending (Gmail BCC, etc.)"):
+                ac1, ac2 = st.columns(2)
+                with ac1:
+                    st.markdown("**All recipient emails**")
+                    all_emails = ', '.join(recipients['email'].unique().tolist())
+                    st.code(all_emails, language=None)
+                with ac2:
+                    st.markdown("**Emails by company**")
+                    for co in recipients['company'].unique()[:20]:
+                        co_emails = recipients[recipients['company'] == co]['email'].tolist()
+                        co_names = recipients[recipients['company'] == co]['person_name'].tolist()
+                        st.markdown(f"**{co}** ({', '.join(co_names)})")
+                        st.code(', '.join(co_emails), language=None)
+                    if len(recipients['company'].unique()) > 20:
+                        st.caption(f"... and {len(recipients['company'].unique()) - 20} more companies")
+
+            # ── Bulk send to filtered set ─────────────────────────────────────────
+            st.markdown("---")
+            st.markdown("##### 📨 Bulk send to everyone in this segment")
+            if is_1to1:
+                st.caption(
+                    "✍️ You're in **1:1** mode — use **Send the previewed email** above; "
+                    "bulk isn't needed for one person."
+                )
+            st.caption(
+                "Same body to everyone in the segment, `{name}`/`{company}`/`{vertical}` filled "
+                "per person. Keep the body generic — one-off personal lines go to all."
+            )
+
+            if recipients.empty or not contact_options:
+                st.caption("No recipients in current filter. Adjust filters in Step 1 above.")
+            else:
+                # ── Pre-flight: build filter pipeline ─────────────────────────
+                bulk_pool = recipients[recipients["email"].apply(lambda e: bool(e) and "@" in str(e))].copy()
+                bulk_pool["_email_norm"] = bulk_pool["email"].str.lower().str.strip()
+
+                # Stage 1: total
+                stage_total = len(bulk_pool)
+
+                # Stage 2: remove No-Touch companies
+                # bool() wrap is critical: v.get("category") returns the category STRING
+                # when truthy, not True. Without the wrap, .apply() returns a Series of
+                # mixed str/False values; pandas then treats it as label-indexing and
+                # crashes with KeyError. Symptom is the whole page failing to render
+                # (Streamlit runs every tab body regardless of which tab is visible),
+                # so the Analytics tab dies too. Hit when the new unified pipeline tab
+                # contains any NO_TOUCH company (Hindware, Growsari, etc.).
+                def _is_no_touch(v):
+                    return bool(isinstance(v, dict) and v.get("category"))
+                no_touch_mask = bulk_pool.get("playbook_no_touch", pd.Series([False]*len(bulk_pool))).apply(_is_no_touch)
+                bulk_no_touch = bulk_pool[no_touch_mask]
+                after_no_touch = bulk_pool[~no_touch_mask]
+                stage_after_nt = len(after_no_touch)
+
+                # Stage 3: remove suppressed
+                with st.spinner("Loading suppression + recent-send data…"):
+                    supp_set = suppressed_emails()
+                    recent_set = recent_sent_emails(get_dedup_days())
+                sup_mask = after_no_touch["_email_norm"].isin(supp_set)
+                bulk_supp = after_no_touch[sup_mask]
+                after_supp = after_no_touch[~sup_mask]
+                stage_after_supp = len(after_supp)
+
+                # Stage 4: remove recently-sent (dedup window)
+                dedup_mask = after_supp["_email_norm"].isin(recent_set)
+                bulk_dedup = after_supp[dedup_mask]
+                after_dedup = after_supp[~dedup_mask]
+                stage_final = len(after_dedup)
+
+                # Headline count + a one-line skip summary (full breakdown is in the
+                # "filtered out" expander below — no need for the 5-line pipeline).
+                st.markdown(f"### → Will send to **{stage_final}** of {stage_total}")
+                _skipped = stage_total - stage_final
+                if _skipped:
+                    st.caption(
+                        f"{_skipped} skipped — "
+                        f"{stage_total - stage_after_nt} no-touch · "
+                        f"{stage_after_nt - stage_after_supp} suppressed · "
+                        f"{stage_after_supp - stage_final} emailed in last {get_dedup_days()}d "
+                        "· details below."
+                    )
+
+                # Cap check
+                bulk_blocked_reason = None
+                if stage_final == 0:
+                    bulk_blocked_reason = "No recipients left after filters."
+                elif stage_final > left:
+                    bulk_blocked_reason = (
+                        f"{stage_final} sends would exceed the weekly cap "
+                        f"({used} used, {left} remaining of {cap}). "
+                        f"Reduce the filter or wait for cap to roll over."
+                    )
+
+                # Drilldown of who's being filtered out (for transparency)
+                if stage_total > stage_final:
+                    with st.expander(f"🔍 See who's being filtered out ({stage_total - stage_final} contacts)"):
+                        if not bulk_no_touch.empty:
+                            st.markdown(f"**🚫 No-Touch ({len(bulk_no_touch)}):**")
+                            st.dataframe(
+                                bulk_no_touch[["company", "person_name", "email"]].rename(
+                                    columns={"company": "Company", "person_name": "Name", "email": "Email"}),
+                                use_container_width=True, hide_index=True, height=140)
+                        if not bulk_supp.empty:
+                            st.markdown(f"**🚷 Suppressed ({len(bulk_supp)}):**")
+                            st.dataframe(
+                                bulk_supp[["company", "person_name", "email"]].rename(
+                                    columns={"company": "Company", "person_name": "Name", "email": "Email"}),
+                                use_container_width=True, hide_index=True, height=140)
+                        if not bulk_dedup.empty:
+                            st.markdown(f"**⏱️ Recently emailed ({len(bulk_dedup)}, within {get_dedup_days()}d):**")
+                            st.dataframe(
+                                bulk_dedup[["company", "person_name", "email"]].rename(
+                                    columns={"company": "Company", "person_name": "Name", "email": "Email"}),
+                                use_container_width=True, hide_index=True, height=140)
+
+                # Preview of who WILL be sent to
+                if stage_final > 0:
+                    with st.expander(f"📋 Preview the {stage_final} recipient(s) who WILL be sent to"):
+                        st.dataframe(
+                            after_dedup[["company", "person_name", "email", "playbook_bucket"]].rename(
+                                columns={"company": "Company", "person_name": "Name",
+                                         "email": "Email", "playbook_bucket": "Bucket"}),
+                            use_container_width=True, hide_index=True, height=300)
+
+                # Bulk send button — two-step confirm
+                bulk_confirm_key = "bulk_confirm_armed"
+                if bulk_confirm_key not in st.session_state:
+                    st.session_state[bulk_confirm_key] = False
+
+                if bulk_blocked_reason:
+                    st.error(f"⚠️ {bulk_blocked_reason}")
+
+                bcols = st.columns([2, 1, 1])
+                with bcols[0]:
+                    if not bulk_blocked_reason:
+                        st.markdown(
+                            f"**Will send {stage_final} email(s) via:** {sender_display_name} `<{sender_reply_to}>`  \n"
+                            f"**Framework:** {template_name}  \n"
+                            f"**Cap impact:** {used}/{cap} → **{used + stage_final}/{cap}**"
+                        )
+                with bcols[1]:
+                    if not st.session_state[bulk_confirm_key]:
+                        if st.button(f"📨 Send to all {stage_final}",
+                                     type="primary",
+                                     disabled=bool(bulk_blocked_reason),
+                                     use_container_width=True,
+                                     key="bulk_arm"):
+                            st.session_state[bulk_confirm_key] = True
+                            st.rerun()
+                    else:
+                        if st.button(f"✅ Confirm send to {stage_final}",
+                                     type="primary",
+                                     use_container_width=True,
+                                     key="bulk_confirm"):
+                            # Run the send loop
+                            progress_bar = st.progress(0.0, text=f"Sending 0 of {stage_final}…")
+                            sent_n, failed_n = 0, 0
+                            failures = []
+                            for i, (_, row) in enumerate(after_dedup.iterrows(), start=1):
+                                r_full = str(row.get("person_name", "")).strip()
+                                r_first = r_full.split()[0] if r_full else r_full
+                                _r_subs = {
+                                    "company":    row["company"],
+                                    "name":       r_first,
+                                    "full_name":  r_full,
+                                    "vertical":   row["vertical"],
+                                    "sender":     sender_name,
+                                    "designation": row.get("designation", ""),
+                                }
+                                r_subj = _substitute(subject, _r_subs)
+                                r_body = _substitute(body, _r_subs)
+                                r_headline = _substitute(headline, _r_subs)
+                                r_deck = _substitute(deck, _r_subs)
+
+                                ok_b, msg_b = send_email(
+                                    sender_label=sender_label,
+                                    to_email=row["email"],
+                                    to_name=r_full,
+                                    company=row["company"],
+                                    subject=r_subj,
+                                    body=r_body,
+                                    bucket=str(row.get("playbook_bucket", "")) or str(row.get("recency", "")),
+                                    template=template_name,
+                                    bypass_dedup=False,  # already pre-filtered, but keep guard active
+                                    layout=email_layout,
+                                    headline=r_headline,
+                                    deck=r_deck,
+                                )
+                                if ok_b:
+                                    sent_n += 1
+                                else:
+                                    failed_n += 1
+                                    failures.append((row["email"], msg_b))
+                                progress_bar.progress(i / stage_final, text=f"Sending {i} of {stage_final}…")
+
+                            progress_bar.empty()
+                            st.session_state[bulk_confirm_key] = False
+                            # Stash result for persistent banner
+                            st.session_state["last_bulk_result"] = (sent_n, failed_n, failures)
+                            st.rerun()
+
+                with bcols[2]:
+                    if st.session_state[bulk_confirm_key]:
+                        if st.button("Cancel", use_container_width=True, key="bulk_cancel"):
+                            st.session_state[bulk_confirm_key] = False
+                            st.rerun()
+
+                # Show last bulk result if any
+                last_bulk = st.session_state.get("last_bulk_result")
+                if last_bulk:
+                    bsent, bfail, bfailures = last_bulk
+                    if bfail == 0:
+                        st.success(f"✅ Bulk send complete — **{bsent} sent**, 0 failed.")
+                    else:
+                        st.warning(f"⚠️ Bulk send done — **{bsent} sent**, **{bfail} failed**.")
+                        with st.expander(f"View {bfail} failure(s)"):
+                            for em, why in bfailures:
+                                st.markdown(f"- `{em}` — {why}")
+                    if st.button("Dismiss bulk result", key="dismiss_bulk_result"):
+                        del st.session_state["last_bulk_result"]
                         st.rerun()
-
-            with bcols[2]:
-                if st.session_state[bulk_confirm_key]:
-                    if st.button("Cancel", use_container_width=True, key="bulk_cancel"):
-                        st.session_state[bulk_confirm_key] = False
-                        st.rerun()
-
-            # Show last bulk result if any
-            last_bulk = st.session_state.get("last_bulk_result")
-            if last_bulk:
-                bsent, bfail, bfailures = last_bulk
-                if bfail == 0:
-                    st.success(f"✅ Bulk send complete — **{bsent} sent**, 0 failed.")
-                else:
-                    st.warning(f"⚠️ Bulk send done — **{bsent} sent**, **{bfail} failed**.")
-                    with st.expander(f"View {bfail} failure(s)"):
-                        for em, why in bfailures:
-                            st.markdown(f"- `{em}` — {why}")
-                if st.button("Dismiss bulk result", key="dismiss_bulk_result"):
-                    del st.session_state["last_bulk_result"]
-                    st.rerun()
 
         st.caption("📊 Open the **Analytics** tab to see send history, volume by sender, and outreach metrics.")
 
