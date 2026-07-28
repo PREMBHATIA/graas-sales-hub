@@ -2,7 +2,6 @@
 
 import re as _re
 import streamlit as st
-import pandas as pd
 import json
 import os
 from pathlib import Path
@@ -751,9 +750,7 @@ st.markdown("---")
 
 
 # ── Single surface (Pipeline Analytics) ──────────────────────────────────────
-# The 'Solutions Architect' tab was moved out to its own page under All-e
-# ('🏗️ Architect a Soln') — see app.py nav. Ask Graas now focuses on
-# cross-product pipeline + data Q&A.
+# Ask Graas focuses on cross-product pipeline + data Q&A.
 
 
 def _render_chat(

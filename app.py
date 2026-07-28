@@ -22,8 +22,6 @@ pg = st.navigation(
             st.Page("pages/2_alle.py",            title="📊 Pipeline",                url_path="alle"),
             st.Page("pages/3_crm.py",             title="📧 Emails & Segments",        url_path="crm"),
             st.Page("pages/9_prospect_brief.py",  title="📋 Create Prospect Brief  ✨ NEW",   url_path="prospect-brief"),
-            st.Page("pages/A_architect_soln.py",  title="🏗️ Architect a Soln",         url_path="architect"),
-            st.Page("pages/6_proposal.py",        title="📝 Create Proposal",         url_path="proposal"),
         ],
         "Hoppr": [
             st.Page("pages/7_hoppr.py",      title="📊 Hoppr",      url_path="hoppr"),

@@ -62,19 +62,19 @@ with c1:
     st.page_link("pages/2_alle.py", label="Open All-e →")
 
 with c2:
+    st.markdown("### 📋 Prospect Brief")
+    st.markdown("Pre-call two-pager research")
+    st.page_link("pages/9_prospect_brief.py", label="Create Brief →")
+
+with c3:
     st.markdown("### 📧 CRM")
     st.markdown("Contacts & email outreach")
     st.page_link("pages/3_crm.py", label="Open CRM →")
 
-with c3:
+with c4:
     st.markdown("### 📚 Resources")
     st.markdown("Key decks & docs")
     st.page_link("pages/5_resources.py", label="Open Resources →")
-
-with c4:
-    st.markdown("### 📝 Proposal")
-    st.markdown("Build a customer proposal")
-    st.page_link("pages/6_proposal.py", label="Open Proposal →")
 
 st.markdown("---")
 
