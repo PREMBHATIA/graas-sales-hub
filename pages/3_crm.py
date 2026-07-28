@@ -1306,6 +1306,21 @@ with tab_compose, _tab_guard("Email Composer"):
         sender_display_name, sender_reply_to = _SENDERS[sender_label]
         sender_name = sender_display_name.split()[0]  # for {sender} substitution
         subject = st.text_input("Subject", value=template["subject"], key="email_subject")
+        if email_layout == "branded":
+            headline = st.text_input(
+                "Headline (big, on the newsletter)",
+                value=subject, key="email_headline",
+                help="The large bold headline at the top of the segment newsletter. "
+                     "Defaults to the subject; edit it to be punchier. Supports "
+                     "{name}/{company}/{vertical} like the body.",
+            )
+            deck = st.text_area(
+                "Deck / sub-headline (optional)", value="", key="email_deck", height=68,
+                help="One or two lines under the headline that set up the story. "
+                     "Leave blank to skip.",
+            )
+        else:
+            headline, deck = "", ""
         body = st.text_area("Body", value=template["body"], height=300, key="email_body")
 
     st.markdown("---")
@@ -1338,14 +1353,23 @@ with tab_compose, _tab_guard("Email Composer"):
 
             to_list = ', '.join(preview_contacts['email'].tolist())
 
-            st.markdown(f"""
-<div class="email-preview">
-    <div class="to">To: {to_list}</div>
-    <div class="subject">Subject: {rendered_subject}</div>
-    <hr style="border-color: #334155; margin: 10px 0;">
-    <div class="body">{rendered_body}</div>
-</div>
-""", unsafe_allow_html=True)
+            # Render the ACTUAL email shell (minimal or branded newsletter) so
+            # the preview matches what lands in the inbox. CID logo is swapped
+            # for a data: URI so it shows in the in-app iframe.
+            from services.email_layout import (
+                wrap_email, body_to_paragraphs, preview_html,
+            )
+            import streamlit.components.v1 as _components
+            _pv_headline = _substitute(headline, _pv_subs) if email_layout == "branded" else ""
+            _pv_deck = _substitute(deck, _pv_subs) if email_layout == "branded" else ""
+            _pv_shell = wrap_email(
+                email_layout,
+                body_to_paragraphs(rendered_body),
+                headline=_pv_headline, deck=_pv_deck,
+                date_str=datetime.now().strftime("%B %-d, %Y"),
+            )
+            st.caption(f"To: {to_list}  ·  Subject: {rendered_subject}")
+            _components.html(preview_html(_pv_shell), height=760, scrolling=True)
 
     st.markdown("---")
 
@@ -1544,6 +1568,8 @@ with tab_compose, _tab_guard("Email Composer"):
                 }
                 rendered_subject_send = _substitute(subject, _send_subs)
                 rendered_body_send = _substitute(body, _send_subs)
+                rendered_headline_send = _substitute(headline, _send_subs)
+                rendered_deck_send = _substitute(deck, _send_subs)
 
                 # Resolve the actual To: address (test override or real recipient)
                 effective_to_email = test_email if (test_mode and test_email) else send_target["email"]
@@ -1626,6 +1652,8 @@ with tab_compose, _tab_guard("Email Composer"):
                                     template=template_name + (" (test)" if test_mode else ""),
                                     bypass_dedup=test_mode or dedup_override,
                                     layout=email_layout,
+                                    headline=rendered_headline_send,
+                                    deck=rendered_deck_send,
                                 )
                             st.session_state[confirm_key] = False
                             # Stash result so we can show it after the rerun
@@ -1806,6 +1834,8 @@ with tab_compose, _tab_guard("Email Composer"):
                             }
                             r_subj = _substitute(subject, _r_subs)
                             r_body = _substitute(body, _r_subs)
+                            r_headline = _substitute(headline, _r_subs)
+                            r_deck = _substitute(deck, _r_subs)
 
                             ok_b, msg_b = send_email(
                                 sender_label=sender_label,
@@ -1818,6 +1848,8 @@ with tab_compose, _tab_guard("Email Composer"):
                                 template=template_name,
                                 bypass_dedup=False,  # already pre-filtered, but keep guard active
                                 layout=email_layout,
+                                headline=r_headline,
+                                deck=r_deck,
                             )
                             if ok_b:
                                 sent_n += 1

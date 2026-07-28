@@ -248,6 +248,8 @@ def send_email(
     template: str = "",
     bypass_dedup: bool = False,
     layout: str = "minimal",
+    headline: str = "",
+    deck: str = "",
 ) -> tuple[bool, str]:
     """Send a single email + log the result.
 
@@ -327,6 +329,8 @@ def send_email(
     html_full = wrap_email(
         layout if layout in ("branded", "minimal") else "minimal",
         body_html, sender_name=sender_name, unsubscribe_href=unsub_href,
+        headline=headline, deck=deck,
+        date_str=datetime.now().strftime("%B %-d, %Y"),
     )
     alt.attach(MIMEText(html_full, "html", "utf-8"))
     msg.attach(logo_mime_part())

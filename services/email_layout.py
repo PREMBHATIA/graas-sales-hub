@@ -24,6 +24,7 @@ Email-client realities baked in here:
 
 from __future__ import annotations
 
+import base64
 import html as _html
 import os
 import re
@@ -44,6 +45,18 @@ _URL_RE = re.compile(r'(https?://[^\s<>"]+)')
 def load_logo_bytes() -> bytes:
     with open(_LOGO_PATH, "rb") as f:
         return f.read()
+
+
+def logo_data_uri() -> str:
+    """Base64 data: URI of the logo — for the IN-APP preview only. Real emails
+    use the CID attachment (Gmail/Outlook strip data: URIs)."""
+    return "data:image/png;base64," + base64.b64encode(load_logo_bytes()).decode()
+
+
+def preview_html(html: str) -> str:
+    """Swap the cid: logo reference for a data: URI so wrap_email output renders
+    in a browser / Streamlit components.html preview."""
+    return html.replace(f"cid:{_LOGO_CID}", logo_data_uri())
 
 
 def logo_mime_part() -> MIMEImage:
@@ -94,11 +107,16 @@ _TAGLINE_STYLE = (f"font-family:{_FONT};font-weight:700;font-size:13.5px;"
 
 
 def wrap_email(variant: str, body_html: str, *, sender_name: str = "",
-               unsubscribe_href: str = "mailto:insights@graas.ai?subject=Unsubscribe") -> str:
-    """Wrap already-rendered body HTML in the chosen branded shell."""
+               unsubscribe_href: str = "mailto:insights@graas.ai?subject=Unsubscribe",
+               headline: str = "", deck: str = "", date_str: str = "") -> str:
+    """Wrap already-rendered body HTML in the chosen shell.
+
+    minimal — clean 1:1 note (no masthead; footer chip + tagline + links).
+    branded — segment newsletter: dark graas masthead (logo + tagline),
+              gradient rule, date, a large headline + optional deck, then body.
+    """
     logo = f"<img src='cid:{_LOGO_CID}' alt='graas' style='display:block;border:0;'"
-    base_td = (f"font-family:{_FONT};font-size:14.5px;line-height:1.6;"
-               f"color:#2b2b38;")
+    base_td = f"font-family:{_FONT};font-size:14.5px;line-height:1.6;color:#2b2b38;"
 
     # Small dark chip carries the white wordmark on light footers (shared).
     chip = (
@@ -109,24 +127,49 @@ def wrap_email(variant: str, body_html: str, *, sender_name: str = "",
     )
 
     if variant == "branded":
-        # Understated: a single cyan→blue→violet hairline is the only top cue
-        # (no dark header bar), and the footer stays light.
-        header = (
-            "<tr><td bgcolor='#2742FF' height='3' style='height:3px;line-height:3px;"
-            "font-size:0;background:linear-gradient(90deg,#08C1FF,#2742FF 55%,#7C5CFF);'>"
-            "&nbsp;</td></tr>"
-            "<tr><td bgcolor='#ffffff' style='padding:18px 30px 2px;'>" + chip + "</td></tr>"
+        container_w, radius, page_bg = 620, 12, "#eceef3"
+        # Masthead: logo left, tagline right, on a dark band.
+        masthead = (
+            "<tr><td bgcolor='#0D0D11' style='padding:17px 30px;'>"
+            "<table role='presentation' width='100%' cellpadding='0' cellspacing='0' "
+            "border='0'><tr>"
+            f"<td valign='middle'>{logo} height='22'></td>"
+            "<td valign='middle' align='right' style='font-family:" + _FONT +
+            ";font-size:12px;font-weight:600;color:#c7ccd6;letter-spacing:.1px;'>"
+            + _TAGLINE + "</td></tr></table></td></tr>"
         )
+        rule = ("<tr><td height='3' style='height:3px;line-height:3px;font-size:0;"
+                "background:linear-gradient(90deg,#08C1FF,#2742FF 55%,#7C5CFF);'>"
+                "&nbsp;</td></tr>")
+        date_row = (
+            "<tr><td align='right' style='padding:16px 34px 0;font-family:" + _FONT +
+            ";font-size:12.5px;color:#8a92a1;'>" + _html.escape(date_str) + "</td></tr>"
+        ) if date_str else ""
+        headline_block = ""
+        if headline:
+            deck_div = (
+                "<div style='font-family:" + _FONT + ";font-size:15.5px;line-height:1.5;"
+                "color:#4b5563;margin-top:14px;'>" + _html.escape(deck) + "</div>"
+            ) if deck else ""
+            headline_block = (
+                "<tr><td style='padding:8px 34px 0;'>"
+                "<div style='font-family:" + _FONT + ";font-weight:800;font-size:30px;"
+                "line-height:1.12;color:#0D0D11;letter-spacing:-0.5px;'>"
+                + _html.escape(headline) + "</div>" + deck_div +
+                "<div style='height:1px;background:#eceef3;margin:22px 0 4px;'></div>"
+                "</td></tr>"
+            )
+        header = masthead + rule + date_row + headline_block
+        body_pad = "14px 34px 8px"
         footer = (
-            "<tr><td style='padding:16px 30px 22px;border-top:1px solid #eef0f4;"
+            "<tr><td style='padding:16px 34px 24px;border-top:1px solid #eef0f4;"
             "font-family:" + _FONT + ";font-size:12px;line-height:1.7;color:#9aa1ad;'>"
-            "<div style='" + _TAGLINE_STYLE + "margin-bottom:6px;'>" + _TAGLINE + "</div>"
-            f"{_footer_links(unsubscribe_href, dark=False)}"
-            "</td></tr>"
+            + _footer_links(unsubscribe_href, dark=False) + "</td></tr>"
         )
-        page_bg = "#eceef3"
     else:  # minimal
+        container_w, radius, page_bg = 600, 10, "#f4f5f7"
         header = "<tr><td style='height:22px;line-height:22px;font-size:0;'>&nbsp;</td></tr>"
+        body_pad = "26px 30px 6px"
         footer = (
             "<tr><td style='padding:14px 30px 22px;border-top:1px solid #eef0f4;"
             "font-family:" + _FONT + ";font-size:12px;line-height:1.7;color:#9aa1ad;'>"
@@ -135,7 +178,6 @@ def wrap_email(variant: str, body_html: str, *, sender_name: str = "",
             f"{_footer_links(unsubscribe_href, include_linkedin=False)}"
             "</td></tr>"
         )
-        page_bg = "#f4f5f7"
 
     return (
         "<!doctype html><html><head><meta charset='utf-8'>"
@@ -143,11 +185,11 @@ def wrap_email(variant: str, body_html: str, *, sender_name: str = "",
         f"<body style='margin:0;padding:0;background:{page_bg};'>"
         f"<table role='presentation' width='100%' cellpadding='0' cellspacing='0' "
         f"border='0' bgcolor='{page_bg}'><tr><td align='center' style='padding:20px 12px;'>"
-        "<table role='presentation' width='600' cellpadding='0' cellspacing='0' border='0' "
-        "style='width:600px;max-width:600px;background:#ffffff;border-radius:10px;"
-        "overflow:hidden;border:1px solid #e2e6ee;'>"
+        f"<table role='presentation' width='{container_w}' cellpadding='0' cellspacing='0' "
+        f"border='0' style='width:{container_w}px;max-width:{container_w}px;"
+        f"background:#ffffff;border-radius:{radius}px;overflow:hidden;border:1px solid #e2e6ee;'>"
         f"{header}"
-        f"<tr><td bgcolor='#ffffff' style='padding:26px 30px 6px;{base_td}'>{body_html}</td></tr>"
+        f"<tr><td bgcolor='#ffffff' style='padding:{body_pad};{base_td}'>{body_html}</td></tr>"
         f"{footer}"
         "</table></td></tr></table></body></html>"
     )
