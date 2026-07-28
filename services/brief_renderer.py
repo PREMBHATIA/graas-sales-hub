@@ -471,12 +471,14 @@ def render_brief_docx(data: dict) -> bytes:
         for f in fit:
             if not isinstance(f, dict):
                 continue
-            rows.append([f.get("where", ""), f.get("fit", ""), f.get("verify", "")])
+            rows.append([f.get("where", ""), f.get("graas_offering", ""),
+                         f.get("fit", ""), f.get("verify", "")])
         _add_table(
             doc,
-            ["Where", "Could Graas fit? (hypothesis)", "Verify in the meeting"],
+            ["Where", "Graas offering", "Could Graas fit? (hypothesis)", "Verify in the meeting"],
             rows,
-            [3.0, 9.5, 5.5],
+            [2.6, 3.4, 7.0, 5.0],
+            col_styles={1: {"size": 9.0, "color": GRAAS_BLUE}},
         )
 
     # ── Landmines ─────────────────────────────────────────────────────────────
@@ -547,6 +549,7 @@ th { background: #eef1ff; font-weight: bold; }
 .person a { color: #2742FF; text-decoration: underline; font-weight: bold; }
 .play { color: #666; font-size: 9pt; margin: 0 0 3pt 12pt; }
 td.dim { font-size: 8pt; font-style: italic; color: #777; }
+td.offering { color: #2742FF; font-weight: bold; font-size: 9pt; }
 .landmine li { color: #7a1f1f; }
 .appx { border-top: 2px solid #2742FF; margin-top: 10pt; padding-top: 2pt; }
 </style></head><body>""")
@@ -618,13 +621,16 @@ td.dim { font-size: 8pt; font-style: italic; color: #777; }
     fit = data.get("graas_fit") or []
     if fit:
         parts.append("<h2>Where Graas might fit (to test, not assert)</h2><table>")
-        parts.append("<tr><th>Where</th><th>Could Graas fit? (hypothesis)</th>"
+        parts.append("<tr><th>Where</th><th>Graas offering</th>"
+                     "<th>Could Graas fit? (hypothesis)</th>"
                      "<th>Verify in the meeting</th></tr>")
         for f in fit:
             if not isinstance(f, dict):
                 continue
             parts.append(
-                f"<tr><td>{_esc(f.get('where'))}</td><td>{_esc(f.get('fit'))}</td>"
+                f"<tr><td>{_esc(f.get('where'))}</td>"
+                f"<td class='offering'>{_esc(f.get('graas_offering'))}</td>"
+                f"<td>{_esc(f.get('fit'))}</td>"
                 f"<td>{_esc(f.get('verify'))}</td></tr>"
             )
         parts.append("</table>")

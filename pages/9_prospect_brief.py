@@ -149,6 +149,13 @@ DEFAULT_DRIVE_FOLDER = os.getenv(
 # shared folder).
 BRIEF_SHARE_DOMAIN = os.getenv("PROSPECT_BRIEF_SHARE_DOMAIN", "")
 
+# Research model for brief generation — deliberately the strongest available
+# model (not the app-wide Sonnet), because the brief lives or dies on research
+# quality. Overridable: set PROSPECT_BRIEF_RESEARCH_MODEL if the API key doesn't
+# have this model enabled (e.g. flip to "claude-opus-5" to go newest, or back to
+# "claude-sonnet-4-6" if Opus access isn't provisioned).
+RESEARCH_MODEL = os.getenv("PROSPECT_BRIEF_RESEARCH_MODEL", "claude-opus-4-8")
+
 
 # ── CRM context lookup (so picking a known company auto-fills) ────────────────
 @st.cache_data(ttl=900)
@@ -492,11 +499,12 @@ BRIEF_JSON_SCHEMA = """{
   "graas_fit": [
     {
       "where": "which stack layer / operational area this hangs off. e.g. 'B2B ordering', 'Search / Discovery', 'Field-force app'.",
-      "fit": "QUESTION-FRAMED hypothesis, ≤20 words. Name the Graas product AND phrase it as a 'could this fit?'. e.g. 'Could All-e for Distributors sit on top of the reseller-ordering flow the SAP layer doesn't touch?' Do NOT assert fitment — hypothesize it.",
+      "graas_offering": "The specific Graas capability this maps to, as 'Pillar › Workflow' — chosen from the FOUR GRAAS OFFERINGS in the prompt. e.g. 'Sales & Ordering › Credit', 'Search & Discovery › Fitment', 'Decision Intelligence › Root Cause'. Every graas_fit row MUST name one — if you can't map a row to a real workflow, that row doesn't belong here.",
+      "fit": "QUESTION-FRAMED hypothesis, ≤20 words, grounded in the graas_offering. e.g. 'Could Sales & Ordering › Credit surface pre-approved limits inside their reseller-ordering flow?' Do NOT assert fitment — hypothesize it.",
       "verify": "the ONE thing to confirm in the meeting that would make/break this fit. ≤15 words. e.g. 'Is reseller ordering still on WhatsApp + manual, or already digitised?'"
     }
   ],
-  "_graas_fit_NOTE": "2-4 hypotheses MAX. Each hangs off a `stack` row. FIT IS A QUESTION, NOT A CLAIM — 'could fit X?' — because forced Graas fitment is the failure mode we're fixing. It's fine to have fewer, sharper hypotheses. If nothing fits cleanly, say so in `honesty.do_not_oversell`.",
+  "_graas_fit_NOTE": "0-4 hypotheses. Each hangs off a `stack` row AND maps to a real Graas offering (Pillar › Workflow). FIT IS A QUESTION, NOT A CLAIM. ONLY include a row where a specific Graas workflow genuinely fits — if nothing maps cleanly, return an EMPTY list (that's an honest, valid answer). Forced fitment is the exact failure we're killing.",
   "do_not": [
     "Landmine — ONE phrase each. Things NOT to pitch or fight. e.g. 'Don't pitch search — they resell Algolia to their own SME customers', 'Don't fight the SAP layer — Deloitte owns it, 3-yr contract', 'Don't lead B2C — the storefront is a cost centre they're winding down'.",
     "..."
@@ -808,14 +816,21 @@ def _build_new_brief_prompt(
         f"this brief embarrasses the rep. The `stack` table MUST include rows for "
         f"ERP, CRM, and the AI/Agents layer at minimum, plus whatever else is "
         f"load-bearing (search, storefront, B2B ordering, CDP).\n\n"
-        f"**RULE 2 — GRAAS FIT IS A QUESTION, NOT A CLAIM.** The old brief force-fit "
-        f"Graas into every section; that's the failure we're fixing. In `graas_fit`, "
-        f"phrase each hypothesis as 'could Graas product X fit layer Y?' and give the "
-        f"ONE thing to verify in the meeting. 2-4 hypotheses MAX, each hanging off a "
-        f"real `stack` row. If the fit is thin, have FEWER — and let the "
-        f"`wedges_worth_exploring` line carry a question mark rather than a false "
-        f"promise. A speculative fit stated as fact is worse than an honest "
-        f"'unclear until we ask'.\n\n"
+        f"**RULE 2 — GRAAS FIT IS A QUESTION, MAPPED TO A REAL OFFERING.** The old "
+        f"brief force-fit Graas into every section; that's the failure we're fixing. "
+        f"Graas has exactly FOUR offerings (below). Every `graas_fit` row MUST set "
+        f"`graas_offering` to a specific 'Pillar › Workflow', phrase `fit` as a "
+        f"'could this fit?' question, and give the ONE thing to verify. 0-4 "
+        f"hypotheses — include a row ONLY where a real workflow genuinely fits. If "
+        f"nothing maps cleanly, return an EMPTY graas_fit list and let "
+        f"`wedges_worth_exploring` carry the question; a speculative fit stated as "
+        f"fact is worse than an honest 'no clean fit yet'.\n"
+        f"THE FOUR GRAAS OFFERINGS — pick graas_offering as one 'Pillar › Workflow', "
+        f"all reasoning over one live commerce knowledge graph:\n"
+        f"  • Search & Discovery — Intent Understanding · Product Discovery · Fitment · Compare · Lead Qualification · Cross-Sell\n"
+        f"  • Sales & Ordering — SKU Recognition · Scheme Aware · Upsell · Credit · Pricing · Voice + Photo\n"
+        f"  • Channel Operations — OCR Capture · Push to ERP · Fraud Detection · First Contact · Auto-Triage · Escalation Intel\n"
+        f"  • Decision Intelligence — Unified Channel View · SKU Health · Root Cause · Scheme & Pricing · Demand Forecast · ROAS Tracer\n\n"
         f"**RULE 3 — LANDMINES (`do_not`).** The single most useful thing for a rep "
         f"walking in cold. 2-4 things NOT to pitch or fight: contested lanes an SI "
         f"owns (from `stack`), and — critically — products the PROSPECT THEMSELVES "
@@ -853,7 +868,8 @@ def _build_new_brief_prompt(
         f"(with meeting_context), summary_boxes (all 5, factual), key_people (3-6, "
         f"real names + LinkedIn URLs where found), stack (4-8 rows incl. ERP/CRM/AI — "
         f"system + vendor/SI + owner + verdict + source + confidence; HUNT the real "
-        f"systems), graas_fit (2-4 QUESTION-framed hypotheses off stack rows), "
+        f"systems), graas_fit (0-4 QUESTION-framed hypotheses off stack rows, each "
+        f"mapped to a real Graas 'Pillar › Workflow' — empty list if none fits), "
         f"do_not (2-4 landmines), wedges_worth_exploring (1-3 SHORT exploratory "
         f"angles, question marks welcome — NOT a confident recommendation), "
         f"discovery (≤5 operational questions — appendix), appendix_research (0-6 "
@@ -1195,10 +1211,9 @@ with right:
             client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
             system_prompt = SKILL_TEXT
             kwargs = dict(
-                model="claude-sonnet-4-6",
-                # Brief expanded to ~12 mandatory sections (game plan, asset map,
-                # proof points, etc.) — at 8K Claude was hitting max_tokens
-                # mid-JSON, leaving the parser with just an opening "{".
+                model=RESEARCH_MODEL,
+                # Two-pager schema is compact, but Opus + web research + JSON can
+                # still run long — keep headroom so we never truncate mid-JSON.
                 max_tokens=16000,
                 system=system_prompt,
                 messages=[{"role": "user", "content": user_prompt}],
