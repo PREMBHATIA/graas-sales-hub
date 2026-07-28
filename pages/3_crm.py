@@ -1735,10 +1735,8 @@ with tab_compose, _tab_guard("Email Composer"):
                 "bulk isn't needed for one person."
             )
         st.caption(
-            "Sends the **same template + body** to every recipient in the current segment, "
-            "with `{name}`, `{company}`, `{vertical}` substituted per-person. "
-            "If you've added personal lines to the body (e.g. \"Hope golf is going well\"), reset to "
-            "the framework template first — they'll go to everyone otherwise."
+            "Same body to everyone in the segment, `{name}`/`{company}`/`{vertical}` filled "
+            "per person. Keep the body generic — one-off personal lines go to all."
         )
 
         if recipients.empty or not contact_options:
@@ -1781,15 +1779,18 @@ with tab_compose, _tab_guard("Email Composer"):
             after_dedup = after_supp[~dedup_mask]
             stage_final = len(after_dedup)
 
-            # Show filter pipeline
-            st.markdown(
-                f"**Filter pipeline:**  \n"
-                f"• {stage_total} contacts in current filter  \n"
-                f"• −{stage_total - stage_after_nt} No-Touch companies → **{stage_after_nt}**  \n"
-                f"• −{stage_after_nt - stage_after_supp} on suppression list → **{stage_after_supp}**  \n"
-                f"• −{stage_after_supp - stage_final} sent within last {get_dedup_days()}d (dedup) → **{stage_final}**  \n"
-                f"### → Will send to **{stage_final}** recipient(s)"
-            )
+            # Headline count + a one-line skip summary (full breakdown is in the
+            # "filtered out" expander below — no need for the 5-line pipeline).
+            st.markdown(f"### → Will send to **{stage_final}** of {stage_total}")
+            _skipped = stage_total - stage_final
+            if _skipped:
+                st.caption(
+                    f"{_skipped} skipped — "
+                    f"{stage_total - stage_after_nt} no-touch · "
+                    f"{stage_after_nt - stage_after_supp} suppressed · "
+                    f"{stage_after_supp - stage_final} emailed in last {get_dedup_days()}d "
+                    "· details below."
+                )
 
             # Cap check
             bulk_blocked_reason = None
