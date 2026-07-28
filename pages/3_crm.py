@@ -1282,6 +1282,15 @@ with tab_compose, _tab_guard("Email Composer"):
     tc1, tc2 = st.columns([1, 2])
     with tc1:
         template_name = st.radio("Template", list(EMAIL_TEMPLATES.keys()), key="template_sel")
+        email_style = st.radio(
+            "Email design",
+            ["Minimal — 1:1", "Branded — segment"],
+            key="email_style",
+            help="Minimal = clean white, tiny graas chip + unsubscribe — reads like a "
+                 "personal note (best for cold 1:1). Branded = dark graas header bar + "
+                 "footer (best for segment / newsletter sends).",
+        )
+        email_layout = "minimal" if email_style.startswith("Minimal") else "branded"
 
     template = EMAIL_TEMPLATES[template_name]
 
@@ -1616,6 +1625,7 @@ with tab_compose, _tab_guard("Email Composer"):
                                     bucket=str(send_target.get("playbook_bucket", "")) or str(send_target.get("recency", "")),
                                     template=template_name + (" (test)" if test_mode else ""),
                                     bypass_dedup=test_mode or dedup_override,
+                                    layout=email_layout,
                                 )
                             st.session_state[confirm_key] = False
                             # Stash result so we can show it after the rerun
@@ -1807,6 +1817,7 @@ with tab_compose, _tab_guard("Email Composer"):
                                 bucket=str(row.get("playbook_bucket", "")) or str(row.get("recency", "")),
                                 template=template_name,
                                 bypass_dedup=False,  # already pre-filtered, but keep guard active
+                                layout=email_layout,
                             )
                             if ok_b:
                                 sent_n += 1

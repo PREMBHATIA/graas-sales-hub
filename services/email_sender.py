@@ -30,6 +30,7 @@ from email.utils import formataddr, make_msgid
 from typing import Optional
 
 from .sheets_client import append_log_row, fetch_log_rows
+from .email_layout import wrap_email, body_to_paragraphs, logo_mime_part
 
 
 # ── Configuration ────────────────────────────────────────────────────────────
@@ -246,6 +247,7 @@ def send_email(
     bucket: str = "",
     template: str = "",
     bypass_dedup: bool = False,
+    layout: str = "minimal",
 ) -> tuple[bool, str]:
     """Send a single email + log the result.
 
@@ -297,28 +299,37 @@ def send_email(
     sender_name, reply_to = SENDERS[sender_label]
     from_display = "Graas Insights"  # Visible From line — always insights@
 
-    msg = MIMEMultipart("alternative")
+    # Per-send token — ties the open/click beacons back to this log row.
+    tracking_id = uuid.uuid4().hex
+    unsub_href = f"mailto:insights@graas.ai?subject=Unsubscribe%20{to_email}"
+
+    # Root is "related" so the inline graas logo (cid:graaslogo) resolves; it
+    # holds an "alternative" part (plain + branded HTML) and the logo image.
+    msg = MIMEMultipart("related")
     msg["Subject"] = subject
     msg["From"] = formataddr((from_display, smtp_user))
     msg["To"] = formataddr((to_name or "", to_email))
     msg["Reply-To"] = formataddr((sender_name, reply_to))
     msg["Message-ID"] = make_msgid(domain="graas.ai")
+    # One-line-of-defence unsubscribe (helps deliverability; also gives Gmail a
+    # native unsubscribe affordance). Recipient lands in the Suppressions tab.
+    msg["List-Unsubscribe"] = f"<{unsub_href}>"
 
-    # Per-send token — ties the open/click beacons back to this log row.
-    tracking_id = uuid.uuid4().hex
+    alt = MIMEMultipart("alternative")
+    msg.attach(alt)
+    alt.attach(MIMEText(body, "plain", "utf-8"))
 
-    # Plain text + minimal HTML (just escapes the body and preserves line breaks)
-    msg.attach(MIMEText(body, "plain", "utf-8"))
-    _escaped = (body.replace("&", "&amp;").replace("<", "&lt;")
-                    .replace(">", "&gt;").replace("\n", "<br>"))
-    html_body = (
-        "<html><body style=\"font-family: -apple-system, system-ui, sans-serif; "
-        "color: #111; line-height: 1.5;\">"
-        + _linkify_with_tracking(_escaped, tracking_id)
-        + _tracking_pixel_html(tracking_id)
-        + "</body></html>"
+    # Header/footer-only: body paragraphs are the user's text verbatim, links
+    # rewritten through the tracking endpoint, plus the hidden open beacon.
+    body_html = body_to_paragraphs(
+        body, linkify=lambda h: _linkify_with_tracking(h, tracking_id)
+    ) + _tracking_pixel_html(tracking_id)
+    html_full = wrap_email(
+        layout if layout in ("branded", "minimal") else "minimal",
+        body_html, sender_name=sender_name, unsubscribe_href=unsub_href,
     )
-    msg.attach(MIMEText(html_body, "html", "utf-8"))
+    alt.attach(MIMEText(html_full, "html", "utf-8"))
+    msg.attach(logo_mime_part())
 
     status = "sent"
     error_msg = ""
