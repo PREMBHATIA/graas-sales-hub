@@ -109,19 +109,20 @@ def _safe(row, col):
 # AI-maturity segmentation (the 1-to-many campaign axis). Populated from an
 # "AI Segment" column in the pipeline sheet, one value per company. Blank →
 # "Unclassified" (kept out of the campaign picker).
-AI_SEGMENTS = ["AI Laggard", "AI Explorer", "AI Mature"]
+# Labels match the pipeline sheet's column O ("AI Maturity") vocabulary exactly.
+AI_SEGMENTS = ["AI Laggard", "AI Exploring", "AI Mature"]
 
 
 def _normalize_ai_segment(v: str) -> str:
-    """Map whatever the sheet has to a canonical AI segment (tolerant of
-    'laggard', 'Explorer', 'AI-Mature', etc.). Blank/unknown → 'Unclassified'."""
+    """Map column O values to a canonical AI segment — tolerant of casing and
+    the 'exploring'/'explorer' variants. Blank / 'TBD' / unknown → Unclassified."""
     s = (v or "").strip().lower()
     if not s:
         return "Unclassified"
     if "laggard" in s:
         return "AI Laggard"
     if "explor" in s:
-        return "AI Explorer"
+        return "AI Exploring"
     if "matur" in s:
         return "AI Mature"
     return "Unclassified"
