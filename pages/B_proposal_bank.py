@@ -40,6 +40,13 @@ _SURFACES = ["WhatsApp", "Website", "In-app", "Voice", "Email", "Marketplace"]
 # many parties; this is where we set the record straight (survives redeploys
 # because it's code). Prem flags a miss → add a line here.
 MANUAL_OVERRIDES = {
+    "PaidPOC": {
+        "brand": "Castrol · Voice",
+        "use_case": "Retailer",
+        "facing": "External",
+        "surfaces": ["Voice", "WhatsApp"],
+        "summary": "Voice + WhatsApp agent for 40K rural retailers — order-taking + scheme comms in Hindi/English, writes to Elevate DMS. Revenue-uplift play (~76.8K extra orders/yr).",
+    },
     "Castrol COPS": {
         "brand": "Castrol · COPs",
         "use_case": "RevOps (order processing)",
