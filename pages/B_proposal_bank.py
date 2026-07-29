@@ -33,13 +33,20 @@ REFERENCE_PROPOSALS_FOLDER_ID = os.getenv(
 )
 EXTRACT_MODEL = os.getenv("PROPOSAL_BANK_MODEL", "claude-sonnet-4-6")
 
-_SURFACES = ["WhatsApp", "Website", "In-app", "Voice", "Marketplace"]
+_SURFACES = ["WhatsApp", "Website", "In-app", "Voice", "Email", "Marketplace"]
 
 # Hand corrections that WIN over the LLM extraction — keyed by a distinctive
 # substring of the proposal's filename. The LLM over-tags when a doc mentions
 # many parties; this is where we set the record straight (survives redeploys
 # because it's code). Prem flags a miss → add a line here.
 MANUAL_OVERRIDES = {
+    "Castrol COPS": {
+        "brand": "Castrol · COPs",
+        "use_case": "RevOps (order processing)",
+        "facing": "Internal",
+        "surfaces": ["Email"],
+        "summary": "Internal RevOps agent — parses B2B/ILS order emails + POs, runs the 13-point validation against Keris/ODT, preps the COPS sheet for one-click human sign-off before ERP entry. TAT 45min → <10min.",
+    },
     "Canon": {
         "use_case": "Consumer",
         "facing": "External",
