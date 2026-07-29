@@ -35,9 +35,22 @@ EXTRACT_MODEL = os.getenv("PROPOSAL_BANK_MODEL", "claude-sonnet-4-6")
 
 _SURFACES = ["WhatsApp", "Website", "In-app", "Voice", "Marketplace"]
 
+# Hand corrections that WIN over the LLM extraction — keyed by a distinctive
+# substring of the proposal's filename. The LLM over-tags when a doc mentions
+# many parties; this is where we set the record straight (survives redeploys
+# because it's code). Prem flags a miss → add a line here.
+MANUAL_OVERRIDES = {
+    "Canon": {
+        "use_case": "Consumer",
+        "facing": "External",
+        "surfaces": ["Website", "Marketplace"],
+        "summary": "Ad/QR-led consumer agent — chat about products & promos, then route to Amazon or nearby stores.",
+    },
+}
+
 _SCHEMA = """{
   "brand": "the customer / brand the proposal is for (e.g. 'Nippon Paint', 'Tata 1mg', 'Castrol'). Strip 'Copy of', 'All-e', 'Proposal', dates.",
-  "use_case": "ONE of: 'Consumer' (end-shopper / D2C) | 'Retailer' | 'Distributor / Dealer' | 'Field agent' | 'Mixed' — who the agent ultimately serves.",
+  "use_case": "Who the agent ULTIMATELY serves in the live interaction — pick the SINGLE dominant one: 'Consumer' (end shopper / D2C) | 'Retailer' | 'Distributor / Dealer' | 'Field agent'. Use 'Mixed' ONLY if two are truly co-equal. Do NOT list every party the doc mentions — a consumer agent that happens to route to retailers is still 'Consumer'.",
   "facing": "ONE of: 'External' (customer/partner-facing agent) | 'Internal' (employee/ops-facing) | 'Both'.",
   "surfaces": "array from ['WhatsApp','Website','In-app','Voice','Marketplace'] — the channels the agent runs on. Empty if unclear.",
   "summary": "ONE line, <=18 words — what the proposal actually proposes.",
@@ -149,6 +162,11 @@ with st.spinner(f"Reading {len(docs)} proposals…"):
     rows = []
     for d in docs:
         p = _profile_proposal(d["id"], d["name"])
+        # Hand corrections win over the auto-extraction.
+        for _k, _ov in MANUAL_OVERRIDES.items():
+            if _k.lower() in d["name"].lower():
+                p = {**p, **_ov}
+                break
         rows.append({
             "Brand": p["brand"],
             "Use case": p["use_case"],
