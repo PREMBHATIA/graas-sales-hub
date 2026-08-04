@@ -51,6 +51,18 @@ def _load_questions_log():
                 df[c] = df[c].astype(str).str.strip()
             else:
                 df[c] = "ok" if c == "STATUS" else ""
+        # Schema shift: the log is now one row PER QUESTION with count columns
+        # (SQL_QUERIES, ERRORS, TOOL_CALLS, DURATION_SEC); it used to be one row
+        # per tool call (SQL_QUERY text, STATUS). Normalise both into _sql / _err
+        # so the KPIs/aggs downstream don't care which schema is live.
+        if "SQL_QUERIES" in df.columns:
+            df["_sql"] = pd.to_numeric(df["SQL_QUERIES"], errors="coerce").fillna(0).astype(int)
+        else:
+            df["_sql"] = (df["SQL_QUERY"].astype(str).str.strip() != "").astype(int)
+        if "ERRORS" in df.columns:
+            df["_err"] = pd.to_numeric(df["ERRORS"], errors="coerce").fillna(0).astype(int)
+        else:
+            df["_err"] = (df["STATUS"].astype(str).str.lower() != "ok").astype(int)
         df = df.dropna(subset=["_ts"]).reset_index(drop=True)
         return df, None
     except Exception as e:
@@ -151,13 +163,11 @@ def render() -> None:
     _VAL_STYLE = ("font-size:2rem;font-weight:600;color:#111827;line-height:1.1;")
 
     q_total = len(qsl)
-    sql_total = int((qsl.get("SQL_QUERY", pd.Series(dtype=str))
-                     .astype(str).str.strip() != "").sum())
+    sql_total = int(qsl.get("_sql", pd.Series(dtype=int)).sum())
     active_sellers = qsl["SELLER_ID"].dropna().astype(str).pipe(
         lambda s: s[(s != "") & (s != "nan")]
     ).nunique()
-    err_count = int((qsl.get("STATUS", pd.Series(dtype=str))
-                     .astype(str).str.lower() != "ok").sum())
+    err_count = int((qsl.get("_err", pd.Series(dtype=int)) > 0).sum())
     err_rate_str = f"{(err_count / q_total * 100):.0f}%" if q_total else "—"
 
     k = st.columns(4)
@@ -179,7 +189,7 @@ def render() -> None:
              .groupby("_d")
              .agg(questions=("QUESTION_TEXT", "count"),
                   sellers=("SELLER_ID", "nunique"),
-                  sql=("SQL_QUERY", lambda s: int((s.astype(str).str.strip() != "").sum())))
+                  sql=("_sql", "sum"))
              .reset_index())
 
     if not daily.empty:
@@ -253,8 +263,8 @@ def render() -> None:
                       email=("USER_EMAIL", lambda s: s.dropna().astype(str).iloc[0]
                              if not s.dropna().empty else ""),
                       questions=("QUESTION_TEXT", "count"),
-                      sql=("SQL_QUERY", lambda s: int((s.astype(str).str.strip() != "").sum())),
-                      errors=("STATUS", lambda s: int((s.astype(str).str.lower() != "ok").sum())),
+                      sql=("_sql", "sum"),
+                      errors=("_err", "sum"),
                       last_active=("_ts", "max"),
                   )
                   .reset_index()
