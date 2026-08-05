@@ -607,20 +607,27 @@ for _, r in prod_group.iterrows():
         "Pipeline <60": _names_lt60.get(r["Product Group"], ""),
     })
 
-# Totals row — sums counts + both GP columns; win rate is the overall rate.
-_t_won, _t_lost = int(prod_group["Won"].sum()), int(prod_group["Lost"].sum())
-prod_table.append({
-    "Product": "Total",
-    "Proposals Sent": int(prod_group["Sent"].sum()),
-    "Proposals Won": _t_won,
-    "Won GP": fmt(prod_group["Won_GP"].sum()),
-    "Lost Proposals": _t_lost,
-    "Open Proposals": int(prod_group["Open"].sum()),
-    "Win Rate": f"{(_t_won / (_t_won + _t_lost) * 100) if (_t_won + _t_lost) else 0:.0f}%",
-    "Pipeline GP": fmt(prod_group["Open_GP"].sum()),
-    "Pipeline >60": "",
-    "Pipeline <60": "",
-})
+# Summary rows — Total, then the New vs Existing split beneath it.
+def _summary_row(label, sub):
+    won = int((sub["Status"] == "Won").sum())
+    lost = int((sub["Status"] == "Lost").sum())
+    wr = won / (won + lost) * 100 if (won + lost) else 0
+    return {
+        "Product": label,
+        "Proposals Sent": len(sub),
+        "Proposals Won": won,
+        "Won GP": fmt(sub.loc[sub["Status"] == "Won", "GP"].sum()),
+        "Lost Proposals": lost,
+        "Open Proposals": int((sub["Status"] == "Open").sum()),
+        "Win Rate": f"{wr:.0f}%",
+        "Pipeline GP": fmt(sub.loc[sub["Status"] == "Open", "GP"].sum()),
+        "Pipeline >60": "",
+        "Pipeline <60": "",
+    }
+
+prod_table.append(_summary_row("Total", df))
+prod_table.append(_summary_row("New", df[df["Type"] == "New"]))
+prod_table.append(_summary_row("Existing", df[df["Type"] == "Existing"]))
 
 prod_df = pd.DataFrame(prod_table)
 
@@ -642,9 +649,11 @@ def red_cell(val):
 _PIPE_COLS = ["Pipeline GP", "Pipeline >60", "Pipeline <60"]
 
 def _bold_total(row):
-    # Bold + top rule on the Total row so it reads as a summary line.
+    # Total = bold summary line (top rule); New/Existing = muted sub-totals.
     if row["Product"] == "Total":
-        return ["font-weight: bold; border-top: 2px solid #9CA3AF"] * len(row)
+        return ["font-weight: bold; border-top: 2px solid #6B7280"] * len(row)
+    if row["Product"] in ("New", "Existing"):
+        return ["font-weight: 600; color: #6B7280"] * len(row)
     return [""] * len(row)
 
 styled_prod = (prod_df.style
@@ -657,8 +666,8 @@ styled_prod = (prod_df.style
     # Render as HTML (not the grid) so the multi-word headers WRAP to two lines
     # instead of truncating, and the customer-name columns show in full.
     .set_table_styles([
-        {"selector": "", "props": [("border-collapse", "collapse"), ("width", "100%"),
-                                   ("font-size", "0.86rem"), ("table-layout", "fixed")]},
+        {"selector": "", "props": [("border-collapse", "collapse"),
+                                   ("font-size", "0.85rem"), ("table-layout", "fixed")]},
         {"selector": "th", "props": [("white-space", "normal"), ("word-wrap", "break-word"),
                                      ("vertical-align", "bottom"), ("text-align", "left"),
                                      ("padding", "6px 9px"), ("background", "#F3F4F6"),
@@ -670,9 +679,18 @@ styled_prod = (prod_df.style
                                      ("white-space", "normal"), ("word-wrap", "break-word")]},
         # Give the two customer-name columns most of the width + a smaller font
         # so every name shows in full; the numeric columns share the rest.
-        {"selector": "th:nth-child(1)", "props": [("width", "9%")]},
-        {"selector": "th:nth-child(9)", "props": [("width", "17%")]},
-        {"selector": "th:nth-child(10)", "props": [("width", "17%")]},
+        # Tight fixed widths on the numeric columns so the table is compact for
+        # a screenshot; the two name columns carry the rest.
+        {"selector": "th:nth-child(1)", "props": [("width", "118px")]},   # Product
+        {"selector": "th:nth-child(2)", "props": [("width", "82px")]},    # Proposals Sent
+        {"selector": "th:nth-child(3)", "props": [("width", "82px")]},    # Proposals Won
+        {"selector": "th:nth-child(4)", "props": [("width", "72px")]},    # Won GP
+        {"selector": "th:nth-child(5)", "props": [("width", "82px")]},    # Lost Proposals
+        {"selector": "th:nth-child(6)", "props": [("width", "82px")]},    # Open Proposals
+        {"selector": "th:nth-child(7)", "props": [("width", "66px")]},    # Win Rate
+        {"selector": "th:nth-child(8)", "props": [("width", "78px")]},    # Pipeline GP
+        {"selector": "th:nth-child(9)", "props": [("width", "205px")]},   # Pipeline >60
+        {"selector": "th:nth-child(10)", "props": [("width", "205px")]},  # Pipeline <60
         {"selector": "td:nth-child(9), td:nth-child(10)",
          "props": [("font-size", "0.72rem"), ("line-height", "1.3")]},
     ])
