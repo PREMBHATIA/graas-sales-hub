@@ -667,11 +667,11 @@ styled_prod = (prod_df.style
                                      ("white-space", "normal"), ("word-wrap", "break-word")]},
         # Give the two customer-name columns most of the width + a smaller font
         # so every name shows in full; the numeric columns share the rest.
-        {"selector": "th:nth-child(1)", "props": [("width", "8%")]},
-        {"selector": "th:nth-child(9)", "props": [("width", "24%")]},
-        {"selector": "th:nth-child(10)", "props": [("width", "24%")]},
+        {"selector": "th:nth-child(1)", "props": [("width", "9%")]},
+        {"selector": "th:nth-child(9)", "props": [("width", "17%")]},
+        {"selector": "th:nth-child(10)", "props": [("width", "17%")]},
         {"selector": "td:nth-child(9), td:nth-child(10)",
-         "props": [("font-size", "0.74rem"), ("line-height", "1.3")]},
+         "props": [("font-size", "0.72rem"), ("line-height", "1.3")]},
     ])
     .hide(axis="index")
 )
