@@ -551,7 +551,9 @@ with e4:
 with e5:
     st.metric("Win Rate", f"{ewr:.0f}%")
 
-st.markdown("#### By Product")
+st.markdown("#### Proposals by Product")
+if months:
+    st.caption(f"*Proposals sent Jan 1 to {months[-1]} 2026*")
 
 # ── 60-day pipeline-age split (same cut used by the Kanban board below) ──────
 today = datetime.now()
