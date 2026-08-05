@@ -553,6 +553,31 @@ with e5:
 
 st.markdown("#### By Product")
 
+# ── 60-day pipeline-age split (same cut used by the Kanban board below) ──────
+today = datetime.now()
+cutoff = today - timedelta(days=60)
+MONTH_TO_DATE = {
+    "Jan": datetime(2026, 1, 15), "Feb": datetime(2026, 2, 15),
+    "Mar": datetime(2026, 3, 15), "Apr": datetime(2026, 4, 15),
+    "May": datetime(2026, 5, 15), "Jun": datetime(2026, 6, 15),
+    "Jul": datetime(2026, 7, 15), "Aug": datetime(2026, 8, 15),
+    "Sep": datetime(2026, 9, 15), "Oct": datetime(2026, 10, 15),
+    "Nov": datetime(2026, 11, 15), "Dec": datetime(2026, 12, 15),
+}
+_open = df[df["Status"] == "Open"].copy()
+_open["_age"] = _open["Month"].map(
+    lambda m: "<60" if MONTH_TO_DATE.get(m, today) >= cutoff else ">60")
+
+
+def _pipe_names(bucket):
+    sub = _open[_open["_age"] == bucket]
+    return (sub.groupby("Product Group")["Client"]
+            .apply(lambda s: ", ".join(sorted({x for x in s if x}))).to_dict())
+
+
+_names_gt60 = _pipe_names(">60")
+_names_lt60 = _pipe_names("<60")
+
 prod_group = df.groupby("Product Group").agg(
     Sent=("Client", "count"),
     Won=("Status", lambda x: (x == "Won").sum()),
@@ -574,8 +599,10 @@ for _, r in prod_group.iterrows():
         "Won GP": fmt(r["Won_GP"]),
         "Lost": int(r["Lost"]),
         "Open": int(r["Open"]),
-        "Pipeline GP": fmt(r["Open_GP"]),
         "Win Rate": f"{wr_p:.0f}%",
+        "Pipeline GP": fmt(r["Open_GP"]),
+        "Pipeline >60": _names_gt60.get(r["Product Group"], ""),
+        "Pipeline <60": _names_lt60.get(r["Product Group"], ""),
     })
 
 prod_df = pd.DataFrame(prod_table)
@@ -594,11 +621,16 @@ def red_cell(val):
     except: pass
     return ""
 
+# The three pipeline columns get a distinct tint so they read as one block.
+_PIPE_COLS = ["Pipeline GP", "Pipeline >60", "Pipeline <60"]
 styled_prod = (prod_df.style
     .map(green_cell, subset=["Won", "Won GP"])
     .map(red_cell, subset=["Lost"])
+    .set_properties(subset=_PIPE_COLS, **{"background-color": "#EEF1FF",
+                                          "color": "#3730A3"})
+    .set_properties(subset=["Pipeline >60"], **{"color": "#B45309"})  # aging = amber
 )
-st.dataframe(styled_prod, use_container_width=True, hide_index=True, height=240)
+st.dataframe(styled_prod, use_container_width=True, hide_index=True, height=260)
 
 st.markdown("---")
 
@@ -608,19 +640,8 @@ st.markdown("---")
 
 st.markdown("### Proposal Board")
 
-# Determine which open proposals are <60 days vs >60 days
-today = datetime.now()
-cutoff = today - timedelta(days=60)
-
-MONTH_TO_DATE = {
-    "Jan": datetime(2026, 1, 15), "Feb": datetime(2026, 2, 15),
-    "Mar": datetime(2026, 3, 15), "Apr": datetime(2026, 4, 15),
-    "May": datetime(2026, 5, 15), "Jun": datetime(2026, 6, 15),
-    "Jul": datetime(2026, 7, 15), "Aug": datetime(2026, 8, 15),
-    "Sep": datetime(2026, 9, 15), "Oct": datetime(2026, 10, 15),
-    "Nov": datetime(2026, 11, 15), "Dec": datetime(2026, 12, 15),
-}
-
+# today / cutoff / MONTH_TO_DATE are defined once up in the By Product section
+# (the <60 vs >60 pipeline-age split is shared with this Kanban board).
 def get_kanban_stage(row):
     if row["Status"] == "Won":
         return "Won New" if row["Type"] == "New" else "Won Existing"
