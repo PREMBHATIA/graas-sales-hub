@@ -594,11 +594,11 @@ for _, r in prod_group.iterrows():
     wr_p = r["Won"] / (r["Won"] + r["Lost"]) * 100 if (r["Won"] + r["Lost"]) > 0 else 0
     prod_table.append({
         "Product": r["Product Group"],
-        "Sent": int(r["Sent"]),
-        "Won": int(r["Won"]),
+        "Proposals Sent": int(r["Sent"]),
+        "Prop Won": int(r["Won"]),
         "Won GP": fmt(r["Won_GP"]),
-        "Lost": int(r["Lost"]),
-        "Open": int(r["Open"]),
+        "Lost Proposals": int(r["Lost"]),
+        "Open Proposals": int(r["Open"]),
         "Win Rate": f"{wr_p:.0f}%",
         "Pipeline GP": fmt(r["Open_GP"]),
         "Pipeline >60": _names_gt60.get(r["Product Group"], ""),
@@ -624,8 +624,8 @@ def red_cell(val):
 # The three pipeline columns get a distinct tint so they read as one block.
 _PIPE_COLS = ["Pipeline GP", "Pipeline >60", "Pipeline <60"]
 styled_prod = (prod_df.style
-    .map(green_cell, subset=["Won", "Won GP"])
-    .map(red_cell, subset=["Lost"])
+    .map(green_cell, subset=["Prop Won", "Won GP"])
+    .map(red_cell, subset=["Lost Proposals"])
     .set_properties(subset=_PIPE_COLS, **{"background-color": "#EEF1FF",
                                           "color": "#3730A3"})
     .set_properties(subset=["Pipeline >60"], **{"color": "#B45309"})  # aging = amber
