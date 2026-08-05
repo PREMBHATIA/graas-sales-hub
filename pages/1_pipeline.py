@@ -475,10 +475,10 @@ PRODUCT_GROUPS = {
     "All-e B2C": "All-e",
     "All-e": "All-e",
     "Replenishment Intelligence": "All-e",  # pharmacy/retail All-e play (e.g. Sunway MY)
+    "Agent Foundry": "All-e",  # Castrol COPS — Prem's call: sits under All-e
     # Integration / Execute
     "Execute": "Integration / Execute",
     "Integration": "Integration / Execute",
-    "Agent Foundry": "Integration / Execute",  # Castrol COPS — internal process automation (move if needed)
     # Hoppr + Extract (analytics)
     "Hoppr": "Hoppr/Extract",
     "Extract": "Hoppr/Extract",
