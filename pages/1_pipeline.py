@@ -597,7 +597,7 @@ for _, r in prod_group.iterrows():
     prod_table.append({
         "Product": r["Product Group"],
         "Proposals Sent": int(r["Sent"]),
-        "Prop Won": int(r["Won"]),
+        "Proposals Won": int(r["Won"]),
         "Won GP": fmt(r["Won_GP"]),
         "Lost Proposals": int(r["Lost"]),
         "Open Proposals": int(r["Open"]),
@@ -612,7 +612,7 @@ _t_won, _t_lost = int(prod_group["Won"].sum()), int(prod_group["Lost"].sum())
 prod_table.append({
     "Product": "Total",
     "Proposals Sent": int(prod_group["Sent"].sum()),
-    "Prop Won": _t_won,
+    "Proposals Won": _t_won,
     "Won GP": fmt(prod_group["Won_GP"].sum()),
     "Lost Proposals": _t_lost,
     "Open Proposals": int(prod_group["Open"].sum()),
@@ -648,7 +648,7 @@ def _bold_total(row):
     return [""] * len(row)
 
 styled_prod = (prod_df.style
-    .map(green_cell, subset=["Prop Won", "Won GP"])
+    .map(green_cell, subset=["Proposals Won", "Won GP"])
     .map(red_cell, subset=["Lost Proposals"])
     .set_properties(subset=_PIPE_COLS, **{"background-color": "#EEF1FF",
                                           "color": "#3730A3"})
