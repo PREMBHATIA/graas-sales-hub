@@ -416,18 +416,23 @@ def normalise_month(s):
          "dec": "Dec", "december": "Dec"}
     return m.get(s.lower().strip(), None)
 
-def classify(s):
-    s = str(s).strip().lower()
-    # "Lost" takes priority — catches "Won; ... Lost in Apr" scenarios
-    if "lost" in s:
+def classify(status, conclusion=""):
+    # The Status column (col 0) is authoritative. Conclusion (col 6) is free
+    # text that often still says "Proposal sent" after a deal is decided —
+    # e.g. Unicharm MY (the biggest MP Enablement deal) was "Lost" in col 0 but
+    # "Proposal sent" in Conclusion, so classifying off Conclusion alone counted
+    # it as Open. Scan both; "Lost" takes priority over "Won".
+    blob = (str(status) + " " + str(conclusion)).strip().lower()
+    if "lost" in blob:
         return "Lost"
-    if "won" in s:
+    if "won" in blob:
         return "Won"
     return "Open"
 
 proposals = []
 for i in range(len(raw)):
     row = raw.iloc[i]
+    status_col = str(row.iloc[0]).strip() if len(row) > 0 else ""
     month = normalise_month(str(row.iloc[1]).strip()) if len(row) > 1 else None
     ctype = str(row.iloc[2]).strip() if len(row) > 2 else ""
     client = str(row.iloc[3]).strip() if len(row) > 3 else ""
@@ -441,7 +446,7 @@ for i in range(len(raw)):
     proposals.append({
         "Month": month, "Type": ctype, "Client": client,
         "Product": product, "GP": gp, "Conclusion": conclusion,
-        "Status": classify(conclusion), "PIC": pic,
+        "Status": classify(status_col, conclusion), "PIC": pic,
     })
 
 if not proposals:
@@ -465,18 +470,25 @@ st.caption("By product | Source: Weekly Revenue Call Sheet — Proposals tab")
 
 # ── Product grouping (used by KPI rows, By-Product table, Kanban, bar chart) ─
 PRODUCT_GROUPS = {
+    # All-e family
     "All-e B2B": "All-e",
     "All-e B2C": "All-e",
     "All-e": "All-e",
     "Replenishment Intelligence": "All-e",  # pharmacy/retail All-e play (e.g. Sunway MY)
-    "Execute": "Execute",
-    "Integration": "Execute",
-    "Hoppr": "Hoppr",
-    "Extract": "Extract",
-    "Extract ": "Extract",
-    "Analysis/Extract": "Extract",
+    # Integration / Execute
+    "Execute": "Integration / Execute",
+    "Integration": "Integration / Execute",
+    "Agent Foundry": "Integration / Execute",  # Castrol COPS — internal process automation (move if needed)
+    # Hoppr + Extract (analytics)
+    "Hoppr": "Hoppr/Extract",
+    "Extract": "Hoppr/Extract",
+    "Extract ": "Hoppr/Extract",
+    "Analysis/Extract": "Hoppr/Extract",
+    # standalone lines
     "MP Enablement": "MP Enablement",
     "MP": "MP Enablement",  # abbreviated in the sheet
+    "WMS": "WMS",
+    "ABU": "ABU",
 }
 df["Product Group"] = df["Product"].map(PRODUCT_GROUPS).fillna("Other")
 
