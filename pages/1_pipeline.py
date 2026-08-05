@@ -662,10 +662,11 @@ styled_prod = (prod_df.style
         {"selector": "th", "props": [("white-space", "normal"), ("word-wrap", "break-word"),
                                      ("vertical-align", "bottom"), ("text-align", "left"),
                                      ("padding", "6px 9px"), ("background", "#F3F4F6"),
-                                     ("border-bottom", "2px solid #E5E7EB"),
+                                     ("border", "1px solid #9CA3AF"),
+                                     ("border-bottom", "2px solid #6B7280"),
                                      ("font-weight", "600"), ("color", "#374151")]},
         {"selector": "td", "props": [("padding", "6px 9px"), ("vertical-align", "top"),
-                                     ("border-bottom", "1px solid #EFEFEF"),
+                                     ("border", "1px solid #9CA3AF"),
                                      ("white-space", "normal"), ("word-wrap", "break-word")]},
         # Give the two customer-name columns most of the width + a smaller font
         # so every name shows in full; the numeric columns share the rest.
