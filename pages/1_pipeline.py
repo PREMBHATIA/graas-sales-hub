@@ -605,6 +605,21 @@ for _, r in prod_group.iterrows():
         "Pipeline <60": _names_lt60.get(r["Product Group"], ""),
     })
 
+# Totals row — sums counts + both GP columns; win rate is the overall rate.
+_t_won, _t_lost = int(prod_group["Won"].sum()), int(prod_group["Lost"].sum())
+prod_table.append({
+    "Product": "Total",
+    "Proposals Sent": int(prod_group["Sent"].sum()),
+    "Prop Won": _t_won,
+    "Won GP": fmt(prod_group["Won_GP"].sum()),
+    "Lost Proposals": _t_lost,
+    "Open Proposals": int(prod_group["Open"].sum()),
+    "Win Rate": f"{(_t_won / (_t_won + _t_lost) * 100) if (_t_won + _t_lost) else 0:.0f}%",
+    "Pipeline GP": fmt(prod_group["Open_GP"].sum()),
+    "Pipeline >60": "",
+    "Pipeline <60": "",
+})
+
 prod_df = pd.DataFrame(prod_table)
 
 def green_cell(val):
@@ -623,12 +638,20 @@ def red_cell(val):
 
 # The three pipeline columns get a distinct tint so they read as one block.
 _PIPE_COLS = ["Pipeline GP", "Pipeline >60", "Pipeline <60"]
+
+def _bold_total(row):
+    # Bold + top rule on the Total row so it reads as a summary line.
+    if row["Product"] == "Total":
+        return ["font-weight: bold; border-top: 2px solid #9CA3AF"] * len(row)
+    return [""] * len(row)
+
 styled_prod = (prod_df.style
     .map(green_cell, subset=["Prop Won", "Won GP"])
     .map(red_cell, subset=["Lost Proposals"])
     .set_properties(subset=_PIPE_COLS, **{"background-color": "#EEF1FF",
                                           "color": "#3730A3"})
     .set_properties(subset=["Pipeline >60"], **{"color": "#B45309"})  # aging = amber
+    .apply(_bold_total, axis=1)
 )
 st.dataframe(styled_prod, use_container_width=True, hide_index=True, height=260)
 
