@@ -652,8 +652,30 @@ styled_prod = (prod_df.style
                                           "color": "#3730A3"})
     .set_properties(subset=["Pipeline >60"], **{"color": "#B45309"})  # aging = amber
     .apply(_bold_total, axis=1)
+    # Render as HTML (not the grid) so the multi-word headers WRAP to two lines
+    # instead of truncating, and the customer-name columns show in full.
+    .set_table_styles([
+        {"selector": "", "props": [("border-collapse", "collapse"), ("width", "100%"),
+                                   ("font-size", "0.86rem"), ("table-layout", "fixed")]},
+        {"selector": "th", "props": [("white-space", "normal"), ("word-wrap", "break-word"),
+                                     ("vertical-align", "bottom"), ("text-align", "left"),
+                                     ("padding", "6px 9px"), ("background", "#F3F4F6"),
+                                     ("border-bottom", "2px solid #E5E7EB"),
+                                     ("font-weight", "600"), ("color", "#374151")]},
+        {"selector": "td", "props": [("padding", "6px 9px"), ("vertical-align", "top"),
+                                     ("border-bottom", "1px solid #EFEFEF"),
+                                     ("white-space", "normal"), ("word-wrap", "break-word")]},
+        # Give the two customer-name columns most of the width + a smaller font
+        # so every name shows in full; the numeric columns share the rest.
+        {"selector": "th:nth-child(1)", "props": [("width", "8%")]},
+        {"selector": "th:nth-child(9)", "props": [("width", "24%")]},
+        {"selector": "th:nth-child(10)", "props": [("width", "24%")]},
+        {"selector": "td:nth-child(9), td:nth-child(10)",
+         "props": [("font-size", "0.74rem"), ("line-height", "1.3")]},
+    ])
+    .hide(axis="index")
 )
-st.dataframe(styled_prod, use_container_width=True, hide_index=True, height=260)
+st.markdown(styled_prod.to_html(), unsafe_allow_html=True)
 
 st.markdown("---")
 
