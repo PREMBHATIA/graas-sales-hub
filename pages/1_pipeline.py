@@ -596,11 +596,11 @@ for _, r in prod_group.iterrows():
     wr_p = r["Won"] / (r["Won"] + r["Lost"]) * 100 if (r["Won"] + r["Lost"]) > 0 else 0
     prod_table.append({
         "Product": r["Product Group"],
-        "Proposals Sent": int(r["Sent"]),
-        "Proposals Won": int(r["Won"]),
+        "Prop Sent": int(r["Sent"]),
+        "Prop Won": int(r["Won"]),
         "Won GP": fmt(r["Won_GP"]),
-        "Lost Proposals": int(r["Lost"]),
-        "Open Proposals": int(r["Open"]),
+        "Prop Lost": int(r["Lost"]),
+        "Prop Open": int(r["Open"]),
         "Win Rate": f"{wr_p:.0f}%",
         "Pipeline GP": fmt(r["Open_GP"]),
         "Pipeline >60": _names_gt60.get(r["Product Group"], ""),
@@ -614,11 +614,11 @@ def _summary_row(label, sub):
     wr = won / (won + lost) * 100 if (won + lost) else 0
     return {
         "Product": label,
-        "Proposals Sent": len(sub),
-        "Proposals Won": won,
+        "Prop Sent": len(sub),
+        "Prop Won": won,
         "Won GP": fmt(sub.loc[sub["Status"] == "Won", "GP"].sum()),
-        "Lost Proposals": lost,
-        "Open Proposals": int((sub["Status"] == "Open").sum()),
+        "Prop Lost": lost,
+        "Prop Open": int((sub["Status"] == "Open").sum()),
         "Win Rate": f"{wr:.0f}%",
         "Pipeline GP": fmt(sub.loc[sub["Status"] == "Open", "GP"].sum()),
         "Pipeline >60": "",
@@ -657,8 +657,8 @@ def _bold_total(row):
     return [""] * len(row)
 
 styled_prod = (prod_df.style
-    .map(green_cell, subset=["Proposals Won", "Won GP"])
-    .map(red_cell, subset=["Lost Proposals"])
+    .map(green_cell, subset=["Prop Won", "Won GP"])
+    .map(red_cell, subset=["Prop Lost"])
     .set_properties(subset=_PIPE_COLS, **{"background-color": "#EEF1FF",
                                           "color": "#3730A3"})
     .set_properties(subset=["Pipeline >60"], **{"color": "#B45309"})  # aging = amber
