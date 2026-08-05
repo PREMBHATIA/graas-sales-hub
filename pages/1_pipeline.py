@@ -405,10 +405,15 @@ def normalise_month(s):
     if not s or s == "Date sent":
         return None
     s = s.replace("'26", "").replace("'25", "").strip()
-    m = {"jan": "Jan", "feb": "Feb", "mar": "Mar", "march": "Mar",
-         "apr": "Apr", "april": "Apr", "may": "May", "jun": "Jun",
-         "jul": "Jul", "aug": "Aug", "sep": "Sep", "oct": "Oct",
-         "nov": "Nov", "dec": "Dec"}
+    # Accept both abbreviated AND full month names — the sheet mixes them
+    # ("Jan'26" but "June'26"/"July'26"). Missing full names silently dropped
+    # every June/July proposal from the whole dashboard.
+    m = {"jan": "Jan", "january": "Jan", "feb": "Feb", "february": "Feb",
+         "mar": "Mar", "march": "Mar", "apr": "Apr", "april": "Apr", "may": "May",
+         "jun": "Jun", "june": "Jun", "jul": "Jul", "july": "Jul",
+         "aug": "Aug", "august": "Aug", "sep": "Sep", "sept": "Sep", "september": "Sep",
+         "oct": "Oct", "october": "Oct", "nov": "Nov", "november": "Nov",
+         "dec": "Dec", "december": "Dec"}
     return m.get(s.lower().strip(), None)
 
 def classify(s):
@@ -471,6 +476,7 @@ PRODUCT_GROUPS = {
     "Extract ": "Extract",
     "Analysis/Extract": "Extract",
     "MP Enablement": "MP Enablement",
+    "MP": "MP Enablement",  # abbreviated in the sheet
 }
 df["Product Group"] = df["Product"].map(PRODUCT_GROUPS).fillna("Other")
 
