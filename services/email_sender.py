@@ -22,6 +22,7 @@ import os
 import re
 import smtplib
 import uuid
+from html import unescape as _html_unescape
 from urllib.parse import quote
 from datetime import datetime, timezone, timedelta
 from email.mime.multipart import MIMEMultipart
@@ -108,6 +109,87 @@ def _linkify_with_tracking(html: str, tracking_id: str) -> str:
         return f'<a href="{href}">{raw}</a>{trail}'
 
     return _URL_RE.sub(_sub, html)
+
+
+# ── Raw (bring-your-own) HTML mode ───────────────────────────────────────────
+# When the composer is in "Paste my own HTML" mode, `body` is already a fully
+# authored HTML email. We must NOT escape it, paragraphise it, or wrap it in a
+# Graas shell — it renders as-authored. Two things still happen:
+#   1. bare URLs in loose text become tracked links (her own <a> tags are left
+#      completely alone, so her CTAs keep their exact destinations);
+#   2. the open-tracking pixel is appended.
+# The CID logo is NOT attached in this mode — her HTML brings its own imagery.
+
+_TAG_SPLIT_RE = re.compile(r"(<[^>]+>)")
+# Elements whose *text content* must not be linkified: existing links, and any
+# style/script blocks (a bare-looking URL inside CSS `url(...)` is not a link).
+_SKIP_OPEN_RE = re.compile(r"<\s*(a|style|script)\b", re.I)
+_SKIP_CLOSE_RE = re.compile(r"<\s*/\s*(a|style|script)\s*>", re.I)
+
+
+def _linkify_bare_text(text: str, tracking_id: str, base: str) -> str:
+    """Turn bare URLs in a loose-text fragment into tracked anchors."""
+
+    def _sub(m: "re.Match") -> str:
+        raw = m.group(1)
+        trail = ""
+        while raw and raw[-1] in ".,);:":       # don't swallow trailing punctuation
+            trail, raw = raw[-1] + trail, raw[:-1]
+        dest = raw.replace("&amp;", "&")
+        if base and tracking_id:
+            href = f'{base}?t={tracking_id}&e=click&u={quote(dest, safe="")}'
+        else:
+            href = raw
+        return f'<a href="{href}">{raw}</a>{trail}'
+
+    return _URL_RE.sub(_sub, text)
+
+
+def _linkify_raw_html(html: str, tracking_id: str) -> str:
+    """Linkify ONLY bare URLs in author-supplied HTML, leaving markup intact.
+
+    Unlike `_linkify_with_tracking` (which assumes we escaped plain text into
+    HTML and so there are no real tags), this walks the HTML tag-by-tag and only
+    rewrites URLs sitting in loose text OUTSIDE any tag and outside
+    <a>/<style>/<script>. Tags pass through verbatim, so existing href/src
+    attributes are never touched and the author's links keep their exact URLs.
+    """
+    base = _tracking_base()
+    skip_depth = 0
+    out = []
+    for tok in _TAG_SPLIT_RE.split(html):
+        if not tok:
+            continue
+        if tok.startswith("<") and tok.endswith(">"):
+            if _SKIP_CLOSE_RE.match(tok):
+                skip_depth = max(0, skip_depth - 1)
+            elif _SKIP_OPEN_RE.match(tok) and not tok.rstrip().endswith("/>"):
+                skip_depth += 1
+            out.append(tok)                      # tag verbatim — attrs safe
+            continue
+        if skip_depth > 0:
+            out.append(tok)                      # text inside <a>/<style>/<script>
+            continue
+        out.append(_linkify_bare_text(tok, tracking_id, base))
+    return "".join(out)
+
+
+def _html_to_text(html: str) -> str:
+    """Small HTML→text reduction for the text/plain alternative of a raw send.
+
+    Not a renderer — strips tags, turns <br>/</p> into line breaks, decodes
+    entities, collapses whitespace. The HTML part is the real payload; this is
+    just the fallback for text-only clients (and helps spam scoring, which
+    dislikes an HTML part with no text alternative).
+    """
+    text = re.sub(r"(?is)<(script|style)\b.*?</\1>", "", html)
+    text = re.sub(r"(?i)<\s*br\s*/?>", "\n", text)
+    text = re.sub(r"(?i)</\s*(p|div|tr|h[1-6]|li)\s*>", "\n", text)
+    text = re.sub(r"<[^>]+>", "", text)
+    text = _html_unescape(text)
+    text = re.sub(r"[ \t]+", " ", text)
+    text = re.sub(r"\n[ \t]*\n[ \t]*\n+", "\n\n", text)
+    return text.strip()
 
 
 # ── Public API ───────────────────────────────────────────────────────────────
@@ -319,21 +401,31 @@ def send_email(
 
     alt = MIMEMultipart("alternative")
     msg.attach(alt)
-    alt.attach(MIMEText(body, "plain", "utf-8"))
 
-    # Header/footer-only: body paragraphs are the user's text verbatim, links
-    # rewritten through the tracking endpoint, plus the hidden open beacon.
-    body_html = body_to_paragraphs(
-        body, linkify=lambda h: _linkify_with_tracking(h, tracking_id)
-    ) + _tracking_pixel_html(tracking_id)
-    html_full = wrap_email(
-        layout if layout in ("branded", "minimal") else "minimal",
-        body_html, sender_name=sender_name, unsubscribe_href=unsub_href,
-        headline=headline, deck=deck,
-        date_str=datetime.now().strftime("%B %-d, %Y"),
-    )
-    alt.attach(MIMEText(html_full, "html", "utf-8"))
-    msg.attach(logo_mime_part())
+    if layout == "raw":
+        # Bring-your-own HTML: render exactly as authored — no escaping, no
+        # paragraphising, no Graas shell, no CID logo. Only bare URLs in loose
+        # text get tracked links (her <a> tags are left intact), and the open
+        # beacon is appended. text/plain is a tag-stripped fallback.
+        alt.attach(MIMEText(_html_to_text(body), "plain", "utf-8"))
+        html_full = _linkify_raw_html(body, tracking_id) + _tracking_pixel_html(tracking_id)
+        alt.attach(MIMEText(html_full, "html", "utf-8"))
+        # No logo_mime_part() — her HTML carries its own imagery.
+    else:
+        alt.attach(MIMEText(body, "plain", "utf-8"))
+        # Header/footer-only: body paragraphs are the user's text verbatim, links
+        # rewritten through the tracking endpoint, plus the hidden open beacon.
+        body_html = body_to_paragraphs(
+            body, linkify=lambda h: _linkify_with_tracking(h, tracking_id)
+        ) + _tracking_pixel_html(tracking_id)
+        html_full = wrap_email(
+            layout if layout in ("branded", "minimal") else "minimal",
+            body_html, sender_name=sender_name, unsubscribe_href=unsub_href,
+            headline=headline, deck=deck,
+            date_str=datetime.now().strftime("%B %-d, %Y"),
+        )
+        alt.attach(MIMEText(html_full, "html", "utf-8"))
+        msg.attach(logo_mime_part())
 
     status = "sent"
     error_msg = ""

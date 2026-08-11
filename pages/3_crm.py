@@ -16,15 +16,99 @@ from dotenv import load_dotenv
 _env_path = str(Path(__file__).resolve().parent.parent / ".env")
 load_dotenv(_env_path, override=True)
 
+
+# ── Per-segment email suggestions (item 5) ───────────────────────────────────
+# Replaces the static "playbook Google Doc" link. Suggestions live in a
+# "Segment Suggestions" tab of the Outreach Log sheet that Dhanashree edits
+# directly (columns tolerated: segment · account (optional) · subject (optional)
+# · suggestion). Read via the pre-existing cached fetch_sheet_tab — no new
+# service symbol (avoids the Streamlit-Cloud stale-module ImportError), and an
+# empty frame if the tab isn't set up yet so callers fall back gracefully.
+SEGMENT_SUGGESTIONS_TAB = "Segment Suggestions"
+
+
+def _load_segment_suggestions() -> pd.DataFrame:
+    from services.sheets_client import fetch_sheet_tab as _ft
+    sid = os.getenv("EMAIL_LOG_SHEET_ID", "")
+    if not sid:
+        return pd.DataFrame()
+    try:
+        df = _ft(sid, SEGMENT_SUGGESTIONS_TAB)
+    except Exception:
+        return pd.DataFrame()
+    if df is None or df.empty:
+        return pd.DataFrame()
+    ren = {}
+    for c in df.columns:
+        cl = str(c).strip().lower()
+        if "segment" in cl or "bucket" in cl:
+            ren[c] = "segment"
+        elif "account" in cl or "company" in cl:
+            ren[c] = "account"
+        elif "subject" in cl:
+            ren[c] = "subject"
+        elif any(w in cl for w in ("suggest", "angle", "copy", "idea", "note")):
+            ren[c] = "suggestion"
+    df = df.rename(columns=ren)
+    if "suggestion" not in df.columns:
+        return pd.DataFrame()
+    df = df[df["suggestion"].astype(str).str.strip() != ""].copy()
+    for col in ("segment", "account", "subject"):
+        if col not in df.columns:
+            df[col] = ""
+    return df.reset_index(drop=True)
+
+
+def _seg_suggestion_line(r) -> str:
+    acct = str(r.get("account", "") or "").strip()
+    subj = str(r.get("subject", "") or "").strip()
+    sug = str(r.get("suggestion", "") or "").strip()
+    pre = (f"**{acct}** — " if acct else "") + (f"*{subj}* — " if subj else "")
+    return f"{pre}{sug}"
+
+
+def _render_segment_suggestions(segment: str) -> bool:
+    """Show suggestions for one segment inline. Returns False if no tab exists."""
+    df = _load_segment_suggestions()
+    if df.empty:
+        return False
+    s = df["segment"].astype(str).str.strip().str.lower()
+    seg = (segment or "").strip().lower()
+    # Rows tagged for this segment + rows left blank / 'all' (apply to every segment).
+    sub = df[(s == seg) | s.isin(["", "all", "any"])]
+    if sub.empty:
+        st.caption(f"No suggestions listed for **{segment}** yet — add rows to the "
+                   f"'{SEGMENT_SUGGESTIONS_TAB}' tab.")
+        return True
+    for _, r in sub.iterrows():
+        st.markdown(f"- {_seg_suggestion_line(r)}")
+    return True
+
+
 st.set_page_config(page_title="CRM & Outreach | Graas", page_icon="📧", layout="wide")
 st.markdown("## 📧 CRM & Email Outreach")
 st.caption("All-e Active + Dropped leads (team sheet, read-only) + local overlay (Prem's personal adds) — merged view")
 
-st.info(
-    "📖 **Email playbook** — Amruta & team's reference for segments + content. "
-    "[Open Google Doc ↗](https://docs.google.com/document/d/1kbDEjVTpVpFdrdtxhhEomdtss1f05O2Fm8ph4Y1TY1Y/edit?tab=t.0)",
-    icon="📖",
-)
+_seg_sugg_hdr = _load_segment_suggestions()
+if _seg_sugg_hdr.empty:
+    # Tab not set up yet — keep Amruta's playbook Doc as the fallback reference.
+    st.info(
+        "📖 **Email suggestions by segment** — set these up in the **'Segment Suggestions'** "
+        "tab of the Outreach Log sheet (columns: *segment · account · suggestion*) and they'll "
+        "show here and in the composer. Until then, see Amruta's "
+        "[playbook Google Doc ↗](https://docs.google.com/document/d/1kbDEjVTpVpFdrdtxhhEomdtss1f05O2Fm8ph4Y1TY1Y/edit?tab=t.0).",
+        icon="📖",
+    )
+else:
+    with st.expander(
+        f"📖 Email suggestions by segment ({len(_seg_sugg_hdr)}) — from the Outreach Log "
+        f"'{SEGMENT_SUGGESTIONS_TAB}' tab", expanded=False):
+        _g = _seg_sugg_hdr.copy()
+        _g["segment"] = _g["segment"].astype(str).str.strip().replace({"": "(all segments)"})
+        for _seg, _grp in _g.groupby("segment"):
+            st.markdown(f"**{_seg}**")
+            for _, _r in _grp.iterrows():
+                st.markdown(f"- {_seg_suggestion_line(_r)}")
 
 # ── Styling ──────────────────────────────────────────────────────────────────
 
@@ -1176,6 +1260,54 @@ def _substitute(text: str, subs: dict) -> str:
     return re.sub(r"\{([a-zA-Z_]+)\}", _repl, text)
 
 
+# ── Personalisation validation (item 4) ──────────────────────────────────────
+# Tokens the composer substitutes per recipient. {sender} always resolves, so
+# it's excluded — a "missing personalisation field" is one of these coming up
+# blank for a recipient, which we must catch BEFORE a broken {Company} ships to
+# a named enterprise contact.
+_RECIPIENT_TOKENS = {"name", "full_name", "company", "vertical", "designation"}
+
+
+def _used_tokens(*texts) -> set:
+    """Lowercased recipient-token names used across the given texts.
+
+    Works on both plain-text bodies and pasted HTML (it just scans for {token}),
+    so raw-HTML sends get validated too. Ignores {sender} and unknown tokens.
+    """
+    found = set()
+    for t in texts:
+        if not t:
+            continue
+        for m in re.finditer(r"\{([a-zA-Z_]+)\}", str(t)):
+            k = m.group(1).lower()
+            if k in _RECIPIENT_TOKENS:
+                found.add(k)
+    return found
+
+
+def _row_subs(row, sender_first: str) -> dict:
+    """Build the substitution dict for one recipient row (mirrors the send path)."""
+    _full = str(row.get("person_name", "") or "").strip()
+    return {
+        "company":     row.get("company", "") or "",
+        "name":        _full.split()[0] if _full else _full,
+        "full_name":   _full,
+        "vertical":    row.get("vertical", "") or "",
+        "sender":      sender_first,
+        "designation": row.get("designation", "") or "",
+    }
+
+
+def _missing_tokens(subs: dict, used: set) -> list:
+    """Which of the used recipient-tokens resolve to blank/'nan' for this row."""
+    out = []
+    for k in used:
+        v = str(subs.get(k, "") or "").strip()
+        if not v or v.lower() == "nan":
+            out.append(k)
+    return sorted(out)
+
+
 # Bucket → framework auto-mapping (from Amruta's playbook).
 # Ghost Accounts split: E1 (distributor ordering) is the default since most
 # ghost accounts in the tracker are B2B distribution; pick E2 manually for
@@ -1204,8 +1336,11 @@ with tab_compose, _tab_guard("Email Composer"):
     #   Custom preserves whatever the user is currently working on.
     _prev_template = st.session_state.get("_last_template_name")
     _curr_template = st.session_state.get("template_sel")
+    # In "Paste my own HTML" mode the template starter doesn't apply — never let
+    # a template change overwrite hand-pasted HTML in the body field.
+    _raw_now = str(st.session_state.get("body_design", "")).startswith("📄")
 
-    if _curr_template and _curr_template in EMAIL_TEMPLATES:
+    if not _raw_now and _curr_template and _curr_template in EMAIL_TEMPLATES:
         _tmpl = EMAIL_TEMPLATES[_curr_template]
         if _prev_template is not None and _prev_template != _curr_template:
             # Only reset to non-empty defaults — empty defaults (Custom) would
@@ -1279,6 +1414,14 @@ with tab_compose, _tab_guard("Email Composer"):
             f"{recipients['company'].nunique() if not recipients.empty else 0} companies "
             "(Newsletter design)."
         )
+        # Item 5: contextual per-segment email suggestions for the chosen segment.
+        with st.expander(f"💡 Email suggestions for {comp_ai_seg}", expanded=False):
+            if not _render_segment_suggestions(comp_ai_seg):
+                st.caption(
+                    f"No **'{SEGMENT_SUGGESTIONS_TAB}'** tab in the Outreach Log sheet yet. "
+                    "Add one (columns: *segment · account · suggestion*) and suggestions "
+                    "for each segment show up here."
+                )
 
     # View / edit recipient greeting names — feeds {name} in sends.
     with st.expander(f"View / edit recipient name(s) ({len(recipients)})", expanded=False):
@@ -1315,20 +1458,48 @@ with tab_compose, _tab_guard("Email Composer"):
     # ── Step 2: Choose template ───────────────────────────────────────────────
     st.markdown("#### 2. Choose Template & Compose")
 
+    # Body-design axis — orthogonal to the 1:1/Segment "who" axis above.
+    # "Use a Graas design"  → today's Minimal (1:1) / Newsletter (Segment) shell.
+    # "Paste my own HTML"   → raw: her HTML is sent exactly as authored, no shell,
+    #                          no reformatting, no CID logo (email_layout="raw").
+    _graas_shell_name = "Minimal note" if is_1to1 else "Newsletter"
+    body_design = st.radio(
+        "Body design",
+        ["🎨 Use a Graas design", "📄 Paste my own HTML"],
+        key="body_design", horizontal=True,
+        help=f"🎨 Graas design → your text is wrapped in the {_graas_shell_name} shell. "
+             "📄 Paste my own HTML → your HTML is sent exactly as written — no shell, "
+             "no reformatting — for designed newsletters, images, etc. "
+             "Personalisation ({name}/{company}/{vertical}) still works in both.",
+    )
+    use_raw = body_design.startswith("📄")
+    if use_raw:
+        # Override the mode-derived shell. Raw works in BOTH 1:1 and Segment.
+        email_layout = "raw"
+
     tc1, tc2 = st.columns([1, 2])
     with tc1:
-        template_name = st.radio(
-            "Start from a template" if is_1to1 else "Template (segment starter)",
-            list(EMAIL_TEMPLATES.keys()), key="template_sel",
-            help="1:1 → an optional starting point (pick 'Custom' to write from scratch). "
-                 "Segment → the angle for this campaign.",
-        )
-        st.caption(
-            ("✍️ **1:1** · Minimal design" if is_1to1
-             else "📣 **Segment** · Newsletter design") + " — set by the mode above."
-        )
+        if use_raw:
+            st.markdown("**📄 Paste your own HTML**")
+            st.caption(
+                "Sent as-authored — no Graas shell. Tokens like `{name}`/`{company}` "
+                "still substitute; bare URLs get tracked links, your `<a>` tags are "
+                "left intact."
+            )
+            template_name = "Custom"
+        else:
+            template_name = st.radio(
+                "Start from a template" if is_1to1 else "Template (segment starter)",
+                list(EMAIL_TEMPLATES.keys()), key="template_sel",
+                help="1:1 → an optional starting point (pick 'Custom' to write from scratch). "
+                     "Segment → the angle for this campaign.",
+            )
+            st.caption(
+                ("✍️ **1:1** · Minimal design" if is_1to1
+                 else "📣 **Segment** · Newsletter design") + " — set by the mode above."
+            )
 
-    template = EMAIL_TEMPLATES[template_name]
+    template = EMAIL_TEMPLATES.get(template_name, EMAIL_TEMPLATES["Custom"])
 
     with tc2:
         from services.email_sender import SENDERS as _SENDERS
@@ -1357,7 +1528,37 @@ with tab_compose, _tab_guard("Email Composer"):
             )
         else:
             headline, deck = "", ""
-        body = st.text_area("Body", value=template["body"], height=300, key="email_body")
+
+        if use_raw:
+            # Optional .html upload — read BEFORE the text_area so a new file can
+            # seed the body field (Streamlit can't push into a widget's state
+            # after it's instantiated on the same run). Guarded by file identity
+            # so re-runs don't clobber hand-edits.
+            _up = st.file_uploader(
+                "Upload an .html file (optional)", type=["html", "htm"],
+                key="raw_html_upload",
+                help="Loads the file into the box below. You can still edit it after.",
+            )
+            if _up is not None:
+                _uid = f"{_up.name}:{_up.size}"
+                if st.session_state.get("_raw_html_uploaded_id") != _uid:
+                    try:
+                        st.session_state["email_body"] = _up.getvalue().decode(
+                            "utf-8", errors="replace")
+                        st.session_state["_raw_html_uploaded_id"] = _uid
+                    except Exception as _e:
+                        st.warning(f"Couldn't read that file: {_e}")
+            body = st.text_area(
+                "HTML body — renders as-authored", height=340, key="email_body",
+                help="Paste your full email HTML. It's sent exactly as written: no "
+                     "Graas shell, no markdown, no reformatting. `{name}`/`{company}`/"
+                     "`{vertical}` tokens still substitute per recipient; bare URLs get "
+                     "tracking links; your `<a>` tags are untouched. "
+                     "⚠️ Images must be hosted at absolute https:// URLs — Gmail/Outlook "
+                     "strip `data:` URIs, so pasted base64 images won't show.",
+            )
+        else:
+            body = st.text_area("Body", value=template["body"], height=300, key="email_body")
 
     st.markdown("---")
 
@@ -1396,16 +1597,25 @@ with tab_compose, _tab_guard("Email Composer"):
                 wrap_email, body_to_paragraphs, preview_html,
             )
             import streamlit.components.v1 as _components
-            _pv_headline = _substitute(headline, _pv_subs) if email_layout == "branded" else ""
-            _pv_deck = _substitute(deck, _pv_subs) if email_layout == "branded" else ""
-            _pv_shell = wrap_email(
-                email_layout,
-                body_to_paragraphs(rendered_body),
-                headline=_pv_headline, deck=_pv_deck,
-                date_str=datetime.now().strftime("%B %-d, %Y"),
-            )
             st.caption(f"To: {to_list}  ·  Subject: {rendered_subject}")
-            _components.html(preview_html(_pv_shell), height=760, scrolling=True)
+            if email_layout == "raw":
+                # Bring-your-own HTML: render EXACTLY as authored (after token
+                # substitution) — no shell, matching what the recipient gets.
+                if rendered_body.strip():
+                    st.caption("📄 Your HTML, personalised for this recipient — sent as-authored (no Graas shell).")
+                    _components.html(rendered_body, height=760, scrolling=True)
+                else:
+                    st.info("Paste your HTML in the box above to see the preview.")
+            else:
+                _pv_headline = _substitute(headline, _pv_subs) if email_layout == "branded" else ""
+                _pv_deck = _substitute(deck, _pv_subs) if email_layout == "branded" else ""
+                _pv_shell = wrap_email(
+                    email_layout,
+                    body_to_paragraphs(rendered_body),
+                    headline=_pv_headline, deck=_pv_deck,
+                    date_str=datetime.now().strftime("%B %-d, %Y"),
+                )
+                _components.html(preview_html(_pv_shell), height=760, scrolling=True)
 
     st.markdown("---")
 
@@ -1610,6 +1820,21 @@ with tab_compose, _tab_guard("Email Composer"):
                     rendered_headline_send = _substitute(headline, _send_subs)
                     rendered_deck_send = _substitute(deck, _send_subs)
 
+                    # Item 4: warn (don't hard-block a 1:1) if this recipient is missing
+                    # a personalisation field used in the email — the preview above shows
+                    # the gap, but call it out explicitly so a broken "{Company}" doesn't
+                    # slip to a named contact.
+                    _single_missing = _missing_tokens(
+                        _send_subs, _used_tokens(subject, body, headline, deck))
+                    if _single_missing and not (test_mode and test_email):
+                        st.warning(
+                            "⚠️ **Missing personalisation for "
+                            f"{send_target['company']}:** "
+                            + ", ".join("`{"+t+"}`" for t in _single_missing)
+                            + " is blank for this contact, so it'll render empty. "
+                            "Fix the Name/field above or edit the copy before sending."
+                        )
+
                     # Resolve the actual To: address (test override or real recipient)
                     effective_to_email = test_email if (test_mode and test_email) else send_target["email"]
                     effective_to_name = "Test (Prem)" if (test_mode and test_email) else send_target["person_name"]
@@ -1776,6 +2001,22 @@ with tab_compose, _tab_guard("Email Composer"):
                 dedup_mask = after_supp["_email_norm"].isin(recent_set)
                 bulk_dedup = after_supp[dedup_mask]
                 after_dedup = after_supp[~dedup_mask]
+                stage_after_dedup = len(after_dedup)
+
+                # Stage 5: remove recipients missing a personalisation field used in
+                # this email (item 4). Rather than ship "Hi , ... at " to a named
+                # enterprise contact, we EXCLUDE the row — surfaced below so she can
+                # fix the data or edit the copy. Only tokens actually used are checked.
+                used_tokens = _used_tokens(subject, body, headline, deck)
+                if used_tokens:
+                    _miss_mask = after_dedup.apply(
+                        lambda r: bool(_missing_tokens(_row_subs(r, sender_name), used_tokens)),
+                        axis=1,
+                    )
+                    bulk_missing = after_dedup[_miss_mask]
+                    after_dedup = after_dedup[~_miss_mask]
+                else:
+                    bulk_missing = after_dedup.iloc[0:0]
                 stage_final = len(after_dedup)
 
                 # Headline count + a one-line skip summary (full breakdown is in the
@@ -1783,12 +2024,15 @@ with tab_compose, _tab_guard("Email Composer"):
                 st.markdown(f"### → Will send to **{stage_final}** of {stage_total}")
                 _skipped = stage_total - stage_final
                 if _skipped:
+                    _miss_bit = (f" · {len(bulk_missing)} missing "
+                                 f"{'/'.join('{'+t+'}' for t in sorted(used_tokens))}"
+                                 if len(bulk_missing) else "")
                     st.caption(
                         f"{_skipped} skipped — "
                         f"{stage_total - stage_after_nt} no-touch · "
                         f"{stage_after_nt - stage_after_supp} suppressed · "
-                        f"{stage_after_supp - stage_final} emailed in last {get_dedup_days()}d "
-                        "· details below."
+                        f"{stage_after_supp - stage_after_dedup} emailed in last {get_dedup_days()}d"
+                        f"{_miss_bit} · details below."
                     )
 
                 # Cap check
@@ -1823,15 +2067,37 @@ with tab_compose, _tab_guard("Email Composer"):
                                 bulk_dedup[["company", "person_name", "email"]].rename(
                                     columns={"company": "Company", "person_name": "Name", "email": "Email"}),
                                 use_container_width=True, hide_index=True, height=140)
+                        if not bulk_missing.empty:
+                            _tok_str = ", ".join("{"+t+"}" for t in sorted(used_tokens))
+                            st.markdown(
+                                f"**⚠️ Missing personalisation field ({len(bulk_missing)}):** "
+                                f"excluded because a token used in this email ({_tok_str}) is "
+                                f"blank for them. Fix the sheet or edit the copy, then re-check.")
+                            _miss_df = bulk_missing.copy()
+                            _miss_df["Missing"] = _miss_df.apply(
+                                lambda r: ", ".join("{"+t+"}" for t in
+                                    _missing_tokens(_row_subs(r, sender_name), used_tokens)),
+                                axis=1)
+                            st.dataframe(
+                                _miss_df[["company", "person_name", "email", "Missing"]].rename(
+                                    columns={"company": "Company", "person_name": "Name", "email": "Email"}),
+                                use_container_width=True, hide_index=True, height=140)
 
-                # Preview of who WILL be sent to
+                # Preview of who WILL be sent to — with each used token resolved per
+                # recipient (item 4: validate the substitution BEFORE the batch sends).
                 if stage_final > 0:
                     with st.expander(f"📋 Preview the {stage_final} recipient(s) who WILL be sent to"):
-                        st.dataframe(
-                            after_dedup[["company", "person_name", "email", "playbook_bucket"]].rename(
-                                columns={"company": "Company", "person_name": "Name",
-                                         "email": "Email", "playbook_bucket": "Bucket"}),
-                            use_container_width=True, hide_index=True, height=300)
+                        _prev_df = after_dedup[["company", "person_name", "email", "playbook_bucket"]].rename(
+                            columns={"company": "Company", "person_name": "Name",
+                                     "email": "Email", "playbook_bucket": "Bucket"})
+                        if used_tokens:
+                            for _t in sorted(used_tokens):
+                                _prev_df[f"{{{_t}}}"] = after_dedup.apply(
+                                    lambda r: _row_subs(r, sender_name).get(_t, ""), axis=1).values
+                            st.caption(
+                                "Columns `{name}`/`{company}`/… show exactly what each recipient "
+                                "will see substituted in. (Anyone with a blank was already excluded above.)")
+                        st.dataframe(_prev_df, use_container_width=True, hide_index=True, height=300)
 
                 # Bulk send button — two-step confirm
                 bulk_confirm_key = "bulk_confirm_armed"
