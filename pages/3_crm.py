@@ -68,17 +68,23 @@ def _seg_suggestion_line(r) -> str:
 
 
 def _render_segment_suggestions(segment: str) -> bool:
-    """Show suggestions for one segment inline. Returns False if no tab exists."""
+    """Show suggestions for one AI segment inline. Returns False if no tab exists.
+
+    Matching is tolerant: the sheet's segment label is run through
+    _normalize_ai_segment, so 'AI Explorers' / 'explorer' / 'Exploring' all map to
+    the same canonical segment as the composer dropdown. Rows with a blank / 'all'
+    segment apply to every segment.
+    """
     df = _load_segment_suggestions()
     if df.empty:
         return False
-    s = df["segment"].astype(str).str.strip().str.lower()
-    seg = (segment or "").strip().lower()
-    # Rows tagged for this segment + rows left blank / 'all' (apply to every segment).
-    sub = df[(s == seg) | s.isin(["", "all", "any"])]
+    raw = df["segment"].astype(str).str.strip()
+    is_wild = raw.str.lower().isin(["", "all", "any", "all segments", "(all segments)"])
+    matches_seg = raw.apply(_normalize_ai_segment) == _normalize_ai_segment(segment)
+    sub = df[is_wild | matches_seg]
     if sub.empty:
         st.caption(f"No suggestions listed for **{segment}** yet — add rows to the "
-                   f"'{SEGMENT_SUGGESTIONS_TAB}' tab.")
+                   f"'{SEGMENT_SUGGESTIONS_TAB}' tab (segment · account · suggestion).")
         return True
     for _, r in sub.iterrows():
         st.markdown(f"- {_seg_suggestion_line(r)}")
