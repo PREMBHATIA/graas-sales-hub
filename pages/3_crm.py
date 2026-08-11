@@ -18,62 +18,123 @@ load_dotenv(_env_path, override=True)
 
 
 # ── Per-segment email suggestions (item 5) ───────────────────────────────────
-# Replaces the static "playbook Google Doc" link. Suggestions live in a
-# "Segment Suggestions" tab of the Outreach Log sheet that Dhanashree edits
-# directly (columns tolerated: segment · account (optional) · subject (optional)
-# · suggestion). Read via the pre-existing cached fetch_sheet_tab — no new
-# service symbol (avoids the Streamlit-Cloud stale-module ImportError), and an
-# empty frame if the tab isn't set up yet so callers fall back gracefully.
-SEGMENT_SUGGESTIONS_TAB = "Segment Suggestions"
+# Replaces the static "playbook Google Doc" link. Suggestions are LIVE-READ from
+# Dhanashree's re-engagement audience sheet: each account carries an AI Maturity
+# and an "Email Theme" (the recommended angle, by maturity × reason stalled). We
+# reduce that to segment (AI Maturity) · account (Company) · suggestion (Email
+# Theme). Single source of truth — she edits the sheet, the composer follows.
+#
+# The sheet MUST be shared with the app's service account
+# (command-center@prefab-bruin-491807-n0.iam.gserviceaccount.com, Viewer is
+# enough). Until it is, the read returns empty and the header falls back to the
+# playbook Doc link — nothing breaks.
+#
+# Override sheet/tab via env if she moves it:
+#   SEGMENT_SUGGESTIONS_SHEET_ID  (default = her audience sheet)
+#   SEGMENT_SUGGESTIONS_GID       (the linked tab's gid; we header-validate and
+#                                  fall back to scanning tabs if it doesn't fit)
+SEGMENT_SUGGESTIONS_SHEET_ID = os.getenv(
+    "SEGMENT_SUGGESTIONS_SHEET_ID", "11uhucHZ6099LysoifJRmeGCx5DQ57ZxEa94Q0HjpaPo")
+SEGMENT_SUGGESTIONS_GID = os.getenv("SEGMENT_SUGGESTIONS_GID", "2125984853")
+# An Email Theme containing any of these = "don't send yet" (voice demo pending).
+_VOICE_HOLD_MARKERS = ("voice", "hold until demo")
+
+# AI-maturity segmentation (the 1-to-many campaign axis). Labels match the
+# pipeline sheet's "AI Maturity" column + Dhanashree's audience sheet exactly.
+# Blank → "Unclassified" (kept out of the campaign picker).
+AI_SEGMENTS = ["AI Laggard", "AI Exploring", "AI Mature"]
 
 
+def _extract_suggestions(vals) -> pd.DataFrame:
+    """Reduce a worksheet's raw values to segment/account/suggestion, but ONLY if
+    it's the audience tab (header must carry both 'AI Maturity' and 'Email
+    Theme'). Returns an empty frame otherwise, so tab auto-detection can skip it.
+    """
+    if not vals or len(vals) < 2:
+        return pd.DataFrame()
+    hdr = [str(h).strip().lower() for h in vals[0]]
+    has = lambda needle: any(needle in h for h in hdr)
+    if not (has("ai maturity") and has("email theme")):
+        return pd.DataFrame()
+
+    def col(needle):
+        for i, h in enumerate(hdr):
+            if needle in h:
+                return i
+        return None
+
+    ci_seg, ci_acct, ci_theme = col("ai maturity"), col("company"), col("email theme")
+    rows = []
+    for r in vals[1:]:
+        cell = lambda i: (str(r[i]).strip() if (i is not None and i < len(r)) else "")
+        acct, theme = cell(ci_acct), cell(ci_theme)
+        if not acct or not theme:
+            continue
+        rows.append({"segment": cell(ci_seg), "account": acct,
+                     "subject": "", "suggestion": theme})
+    return pd.DataFrame(rows)
+
+
+@st.cache_data(ttl=1800, show_spinner=False)
 def _load_segment_suggestions() -> pd.DataFrame:
-    from services.sheets_client import fetch_sheet_tab as _ft
-    sid = os.getenv("EMAIL_LOG_SHEET_ID", "")
-    if not sid:
+    """Live-read Dhanashree's audience sheet → segment/account/suggestion.
+
+    Tries the linked gid first (cheap), then scans worksheets for the audience
+    header. Empty frame if the sheet isn't shared with the app's service account
+    yet (graceful → header falls back to the playbook Doc)."""
+    from services.sheets_client import _get_client
+    if not SEGMENT_SUGGESTIONS_SHEET_ID:
         return pd.DataFrame()
     try:
-        df = _ft(sid, SEGMENT_SUGGESTIONS_TAB)
+        client = _get_client()
+        if client is None:
+            return pd.DataFrame()
+        ss = client.open_by_key(SEGMENT_SUGGESTIONS_SHEET_ID)
     except Exception:
         return pd.DataFrame()
-    if df is None or df.empty:
-        return pd.DataFrame()
-    ren = {}
-    for c in df.columns:
-        cl = str(c).strip().lower()
-        if "segment" in cl or "bucket" in cl:
-            ren[c] = "segment"
-        elif "account" in cl or "company" in cl:
-            ren[c] = "account"
-        elif "subject" in cl:
-            ren[c] = "subject"
-        elif any(w in cl for w in ("suggest", "angle", "copy", "idea", "note")):
-            ren[c] = "suggestion"
-    df = df.rename(columns=ren)
-    if "suggestion" not in df.columns:
-        return pd.DataFrame()
-    df = df[df["suggestion"].astype(str).str.strip() != ""].copy()
-    for col in ("segment", "account", "subject"):
-        if col not in df.columns:
-            df[col] = ""
-    return df.reset_index(drop=True)
+    # 1) the tab Prem linked, if its header fits
+    try:
+        if SEGMENT_SUGGESTIONS_GID:
+            ws = ss.get_worksheet_by_id(int(SEGMENT_SUGGESTIONS_GID))
+            df = _extract_suggestions(ws.get_all_values())
+            if not df.empty:
+                return df.reset_index(drop=True)
+    except Exception:
+        pass
+    # 2) otherwise find the worksheet whose header carries AI Maturity + Email Theme
+    try:
+        for ws in ss.worksheets():
+            df = _extract_suggestions(ws.get_all_values())
+            if not df.empty:
+                return df.reset_index(drop=True)
+    except Exception:
+        pass
+    return pd.DataFrame()
 
 
-def _seg_suggestion_line(r) -> str:
-    acct = str(r.get("account", "") or "").strip()
-    subj = str(r.get("subject", "") or "").strip()
-    sug = str(r.get("suggestion", "") or "").strip()
-    pre = (f"**{acct}** — " if acct else "") + (f"*{subj}* — " if subj else "")
-    return f"{pre}{sug}"
+def _is_voice_hold(suggestion: str) -> bool:
+    s = str(suggestion or "").lower()
+    return any(m in s for m in _VOICE_HOLD_MARKERS)
+
+
+def _voice_hold_companies() -> set:
+    """Normalized company names flagged 'Voice — Hold Until Demo' — do-not-send
+    until the voice demo ships. Empty set if the sheet isn't readable yet."""
+    df = _load_segment_suggestions()
+    if df.empty or "suggestion" not in df.columns:
+        return set()
+    held = df[df["suggestion"].apply(_is_voice_hold)]
+    return {_normalize_company(c) for c in held["account"].astype(str) if str(c).strip()}
 
 
 def _render_segment_suggestions(segment: str) -> bool:
-    """Show suggestions for one AI segment inline. Returns False if no tab exists.
+    """Show suggestions for one AI segment inline. Returns False if unreadable.
 
-    Matching is tolerant: the sheet's segment label is run through
-    _normalize_ai_segment, so 'AI Explorers' / 'explorer' / 'Exploring' all map to
-    the same canonical segment as the composer dropdown. Rows with a blank / 'all'
-    segment apply to every segment.
+    Segment matching is tolerant (via _normalize_ai_segment, so 'AI Explorers' /
+    'explorer' / 'Exploring' all match); blank/'all' rows apply to every segment.
+    Accounts are grouped by their Email Theme so a segment with 40 accounts on the
+    same theme reads as one line, with the exceptions (overrides, voice-hold)
+    called out separately.
     """
     df = _load_segment_suggestions()
     if df.empty:
@@ -83,11 +144,22 @@ def _render_segment_suggestions(segment: str) -> bool:
     matches_seg = raw.apply(_normalize_ai_segment) == _normalize_ai_segment(segment)
     sub = df[is_wild | matches_seg]
     if sub.empty:
-        st.caption(f"No suggestions listed for **{segment}** yet — add rows to the "
-                   f"'{SEGMENT_SUGGESTIONS_TAB}' tab (segment · account · suggestion).")
+        st.caption(f"No suggestions listed for **{segment}** yet.")
         return True
+    # Group accounts by theme; voice-hold themes surfaced last with a warning.
+    grouped = {}
     for _, r in sub.iterrows():
-        st.markdown(f"- {_seg_suggestion_line(r)}")
+        grouped.setdefault(str(r["suggestion"]).strip(), []).append(
+            str(r.get("account", "") or "").strip())
+    ordered = sorted(grouped.items(), key=lambda kv: (_is_voice_hold(kv[0]), -len(kv[1])))
+    for theme, accts in ordered:
+        accts = [a for a in accts if a]
+        names = ", ".join(sorted(accts))
+        tag = "🔇 " if _is_voice_hold(theme) else ""
+        head = f"**{tag}{theme}** ({len(accts)})" if accts else f"**{tag}{theme}**"
+        st.markdown(f"- {head}" + (f" — {names}" if names else ""))
+    if any(_is_voice_hold(t) for t, _ in ordered):
+        st.caption("🔇 Voice-hold accounts are auto-excluded from sends until the voice demo ships.")
     return True
 
 
@@ -97,24 +169,22 @@ st.caption("All-e Active + Dropped leads (team sheet, read-only) + local overlay
 
 _seg_sugg_hdr = _load_segment_suggestions()
 if _seg_sugg_hdr.empty:
-    # Tab not set up yet — keep Amruta's playbook Doc as the fallback reference.
+    # Sheet not shared with the app's service account yet — fall back to the Doc.
     st.info(
-        "📖 **Email suggestions by segment** — set these up in the **'Segment Suggestions'** "
-        "tab of the Outreach Log sheet (columns: *segment · account · suggestion*) and they'll "
-        "show here and in the composer. Until then, see Amruta's "
+        "📖 **Email suggestions by segment** — live-read from Dhanashree's re-engagement "
+        "audience sheet. To switch this on, share that sheet with the app's service account "
+        "`command-center@prefab-bruin-491807-n0.iam.gserviceaccount.com` (Viewer). Until then, "
+        "see Amruta's "
         "[playbook Google Doc ↗](https://docs.google.com/document/d/1kbDEjVTpVpFdrdtxhhEomdtss1f05O2Fm8ph4Y1TY1Y/edit?tab=t.0).",
         icon="📖",
     )
 else:
     with st.expander(
-        f"📖 Email suggestions by segment ({len(_seg_sugg_hdr)}) — from the Outreach Log "
-        f"'{SEGMENT_SUGGESTIONS_TAB}' tab", expanded=False):
-        _g = _seg_sugg_hdr.copy()
-        _g["segment"] = _g["segment"].astype(str).str.strip().replace({"": "(all segments)"})
-        for _seg, _grp in _g.groupby("segment"):
+        f"📖 Email suggestions by segment ({len(_seg_sugg_hdr)} accounts) — "
+        "live from Dhanashree's audience sheet", expanded=False):
+        for _seg in AI_SEGMENTS:
             st.markdown(f"**{_seg}**")
-            for _, _r in _grp.iterrows():
-                st.markdown(f"- {_seg_suggestion_line(_r)}")
+            _render_segment_suggestions(_seg)
 
 # ── Styling ──────────────────────────────────────────────────────────────────
 
@@ -249,13 +319,6 @@ def _safe(row, col):
         return ''
     val = row[col]
     return str(val).strip() if pd.notna(val) else ''
-
-
-# AI-maturity segmentation (the 1-to-many campaign axis). Populated from an
-# "AI Segment" column in the pipeline sheet, one value per company. Blank →
-# "Unclassified" (kept out of the campaign picker).
-# Labels match the pipeline sheet's column O ("AI Maturity") vocabulary exactly.
-AI_SEGMENTS = ["AI Laggard", "AI Exploring", "AI Mature"]
 
 
 def _normalize_ai_segment(v: str) -> str:
@@ -1480,9 +1543,9 @@ with tab_compose, _tab_guard("Email Composer"):
         with st.expander(f"💡 Email suggestions for {comp_ai_seg}", expanded=False):
             if not _render_segment_suggestions(comp_ai_seg):
                 st.caption(
-                    f"No **'{SEGMENT_SUGGESTIONS_TAB}'** tab in the Outreach Log sheet yet. "
-                    "Add one (columns: *segment · account · suggestion*) and suggestions "
-                    "for each segment show up here."
+                    "Suggestions are live-read from Dhanashree's audience sheet — share it "
+                    "with the app's service account "
+                    "(`command-center@prefab-bruin-491807-n0.iam.gserviceaccount.com`) to switch this on."
                 )
 
     # View / edit recipient greeting names — feeds {name} in sends.
@@ -1920,6 +1983,19 @@ with tab_compose, _tab_guard("Email Composer"):
                             f"never to {send_target['email']})."
                         )
 
+                    # Voice-hold — block real sends to accounts flagged
+                    # "Voice — Hold Until Demo" in Dhanashree's audience sheet (held
+                    # until the voice demo ships). Test mode is allowed (internal only).
+                    voice_hold_block = False
+                    if (not test_mode
+                            and _normalize_company(send_target["company"]) in _voice_hold_companies()):
+                        voice_hold_block = True
+                        st.error(
+                            f"🔇 **Cannot send to {send_target['company']}** — flagged "
+                            f"**Voice — Hold Until Demo** in the audience sheet. These accounts "
+                            f"are held until the voice demo ships. Use test mode to preview."
+                        )
+
                     # Dedup check — warn if this recipient was emailed within DEDUP_DAYS.
                     # Test mode bypasses (test addresses are hit repeatedly during testing).
                     dedup_override = False
@@ -1955,6 +2031,7 @@ with tab_compose, _tab_guard("Email Composer"):
                             (left <= 0)
                             or (test_mode and not test_email)
                             or no_touch_block
+                            or voice_hold_block
                             or (in_dedup_window and not dedup_override)
                             or preview_send_mismatch
                         )
@@ -2050,6 +2127,18 @@ with tab_compose, _tab_guard("Email Composer"):
                 after_no_touch = bulk_pool[~no_touch_mask]
                 stage_after_nt = len(after_no_touch)
 
+                # Stage 2b: remove voice-hold accounts (flagged "Voice — Hold Until
+                # Demo" in Dhanashree's audience sheet — held until the voice demo).
+                _vh_set = _voice_hold_companies()
+                if _vh_set:
+                    vh_mask = after_no_touch["company"].apply(
+                        lambda c: _normalize_company(str(c)) in _vh_set)
+                    bulk_voice_hold = after_no_touch[vh_mask]
+                    after_no_touch = after_no_touch[~vh_mask]
+                else:
+                    bulk_voice_hold = after_no_touch.iloc[0:0]
+                stage_after_vh = len(after_no_touch)
+
                 # Stage 3: remove suppressed
                 with st.spinner("Loading suppression + recent-send data…"):
                     supp_set = suppressed_emails()
@@ -2089,10 +2178,12 @@ with tab_compose, _tab_guard("Email Composer"):
                     _miss_bit = (f" · {len(bulk_missing)} missing "
                                  f"{'/'.join('{'+t+'}' for t in sorted(used_tokens))}"
                                  if len(bulk_missing) else "")
+                    _vh_bit = f"{stage_after_nt - stage_after_vh} voice-hold · " if len(bulk_voice_hold) else ""
                     st.caption(
                         f"{_skipped} skipped — "
                         f"{stage_total - stage_after_nt} no-touch · "
-                        f"{stage_after_nt - stage_after_supp} suppressed · "
+                        f"{_vh_bit}"
+                        f"{stage_after_vh - stage_after_supp} suppressed · "
                         f"{stage_after_supp - stage_after_dedup} emailed in last {get_dedup_days()}d"
                         f"{_miss_bit} · details below."
                     )
@@ -2115,6 +2206,12 @@ with tab_compose, _tab_guard("Email Composer"):
                             st.markdown(f"**🚫 No-Touch ({len(bulk_no_touch)}):**")
                             st.dataframe(
                                 bulk_no_touch[["company", "person_name", "email"]].rename(
+                                    columns={"company": "Company", "person_name": "Name", "email": "Email"}),
+                                use_container_width=True, hide_index=True, height=140)
+                        if not bulk_voice_hold.empty:
+                            st.markdown(f"**🔇 Voice — Hold Until Demo ({len(bulk_voice_hold)}):** held until the voice demo ships.")
+                            st.dataframe(
+                                bulk_voice_hold[["company", "person_name", "email"]].rename(
                                     columns={"company": "Company", "person_name": "Name", "email": "Email"}),
                                 use_container_width=True, hide_index=True, height=140)
                         if not bulk_supp.empty:
