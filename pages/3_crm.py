@@ -134,8 +134,63 @@ st.markdown("""
 .email-preview .subject { font-size: 1.1rem; font-weight: 600; color: #e2e8f0; }
 .email-preview .to { font-size: 0.9rem; color: #94a3b8; margin-bottom: 12px; }
 .email-preview .body { color: #cbd5e1; white-space: pre-wrap; line-height: 1.6; }
+
+/* ── Guided-flow polish (composer) ─────────────────────────────────────────
+   The composer's 3 radios (who / body-design / template) become Graas-blue
+   segmented pills so the current pick + the next choice pull the eye. Only the
+   composer uses st.radio, so this is effectively scoped to that tab. */
+div[role="radiogroup"] { gap: 8px !important; row-gap: 8px !important; }
+div[role="radiogroup"] > label {
+    border: 1.5px solid #dfe3ec;
+    border-radius: 10px;
+    padding: 9px 15px;
+    background: #ffffff;
+    transition: border-color .15s ease, background .15s ease, box-shadow .15s ease;
+}
+div[role="radiogroup"] > label:hover {
+    border-color: #2742FF;
+    background: #f5f7ff;
+}
+div[role="radiogroup"] > label:has(input:checked) {
+    border-color: #2742FF;
+    background: linear-gradient(135deg, rgba(8,193,255,.10), rgba(39,66,255,.10));
+    box-shadow: inset 0 0 0 1px #2742FF;
+    font-weight: 600;
+}
+
+/* Numbered step badges — a cyan→blue gradient chip gives the page a clear
+   1→2→3→4 rhythm so the eye tracks down to the next action. */
+.step-h {
+    display: flex; align-items: center; gap: 11px;
+    font-size: 1.2rem; font-weight: 700; color: #0D0D11;
+    margin: 6px 0 4px;
+}
+.step-h .step-num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 30px; height: 30px; border-radius: 50%;
+    background: linear-gradient(135deg, #08C1FF, #2742FF);
+    color: #ffffff; font-size: 0.98rem; font-weight: 800;
+    box-shadow: 0 2px 7px rgba(39,66,255,.38);
+    flex: 0 0 30px;
+}
+.step-h .step-sub { font-size: .82rem; font-weight: 500; color: #8a92a1; }
+
+/* Make the two top-level fork questions (who / body design) read louder than a
+   default radio label so they register as decision points. */
+div[data-testid="stRadio"] > label p { font-size: 1rem !important; font-weight: 600 !important; color: #0D0D11 !important; }
 </style>
 """, unsafe_allow_html=True)
+
+
+def _step_header(num, title, sub=""):
+    """Numbered gradient-badge step header — gives the composer a clear 1→2→3→4
+    visual sequence so the eye lands on the next action."""
+    sub_html = f" &nbsp;<span class='step-sub'>{sub}</span>" if sub else ""
+    st.markdown(
+        f"<div class='step-h'><span class='step-num'>{num}</span>"
+        f"<span>{title}{sub_html}</span></div>",
+        unsafe_allow_html=True,
+    )
 
 
 # ── Data Loading ─────────────────────────────────────────────────────────────
@@ -1370,7 +1425,8 @@ with tab_compose, _tab_guard("Email Composer"):
     _pool['person_name'] = _pool.apply(
         lambda r: overrides.get(r['email'], r['person_name']), axis=1)
 
-    st.markdown("#### 1. " + ("Pick the person" if is_1to1 else "Pick the segment"))
+    _step_header(1, "Pick the person" if is_1to1 else "Pick the segment",
+                 "who receives this")
 
     if is_1to1:
         _pool['_label'] = _pool.apply(
@@ -1456,7 +1512,7 @@ with tab_compose, _tab_guard("Email Composer"):
     st.markdown("---")
 
     # ── Step 2: Choose template ───────────────────────────────────────────────
-    st.markdown("#### 2. Choose Template & Compose")
+    _step_header(2, "Choose design & compose", "shell + subject + body")
 
     # Body-design axis — orthogonal to the 1:1/Segment "who" axis above.
     # "Use a Graas design"  → today's Minimal (1:1) / Newsletter (Segment) shell.
@@ -1563,7 +1619,7 @@ with tab_compose, _tab_guard("Email Composer"):
     st.markdown("---")
 
     # ── Step 3: Preview ───────────────────────────────────────────────────────
-    st.markdown("#### 3. Preview")
+    _step_header(3, "Preview", "how it lands, personalised")
 
     if not recipients.empty:
         preview_companies = recipients['company'].unique().tolist()
@@ -1620,7 +1676,7 @@ with tab_compose, _tab_guard("Email Composer"):
     st.markdown("---")
 
     # ── Step 4: Send ──────────────────────────────────────────────────────────
-    st.markdown("#### 4. Send")
+    _step_header(4, "Send", "test yourself first, then the batch")
 
     from services.email_sender import (
         send_email,
