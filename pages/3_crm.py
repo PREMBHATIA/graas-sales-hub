@@ -36,6 +36,9 @@ load_dotenv(_env_path, override=True)
 SEGMENT_SUGGESTIONS_SHEET_ID = os.getenv(
     "SEGMENT_SUGGESTIONS_SHEET_ID", "11uhucHZ6099LysoifJRmeGCx5DQ57ZxEa94Q0HjpaPo")
 SEGMENT_SUGGESTIONS_GID = os.getenv("SEGMENT_SUGGESTIONS_GID", "2125984853")
+# The "Theme - 3 Months" content-plan tab (gid-first hint; header-validated,
+# falls back to scanning tabs — survives renames/moves).
+SEGMENT_THEME_PLAN_GID = os.getenv("SEGMENT_THEME_PLAN_GID", "1963894330")
 # An Email Theme containing any of these = "don't send yet" (voice demo pending).
 _VOICE_HOLD_MARKERS = ("voice", "hold until demo")
 
@@ -98,24 +101,34 @@ def _extract_suggestions(vals) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def _open_suggestions_sheet():
+    """gspread handle on Dhanashree's sheet, or None (not shared / no creds)."""
+    from services.sheets_client import _get_client
+    if not SEGMENT_SUGGESTIONS_SHEET_ID:
+        return None
+    try:
+        client = _get_client()
+        if client is None:
+            return None
+        return client.open_by_key(SEGMENT_SUGGESTIONS_SHEET_ID)
+    except Exception:
+        return None
+
+
 @st.cache_data(ttl=1800, show_spinner=False)
 def _load_segment_suggestions() -> pd.DataFrame:
     """Live-read Dhanashree's audience sheet → segment/account/suggestion.
 
     Tries the linked gid first (cheap), then scans worksheets for the audience
-    header. Empty frame if the sheet isn't shared with the app's service account
-    yet (graceful → header falls back to the playbook Doc)."""
-    from services.sheets_client import _get_client
-    if not SEGMENT_SUGGESTIONS_SHEET_ID:
+    header. Dhanashree restructures this workbook freely (tabs renamed, added,
+    repurposed — the original linked gid is now a copy deck), so NOTHING is
+    keyed on tab name/position: a tab counts only if its header carries both
+    'AI Maturity' and 'Email Theme'. Empty frame if the sheet isn't shared with
+    the app's service account (graceful → header falls back to the Doc)."""
+    ss = _open_suggestions_sheet()
+    if ss is None:
         return pd.DataFrame()
-    try:
-        client = _get_client()
-        if client is None:
-            return pd.DataFrame()
-        ss = client.open_by_key(SEGMENT_SUGGESTIONS_SHEET_ID)
-    except Exception:
-        return pd.DataFrame()
-    # 1) the tab Prem linked, if its header fits
+    # 1) the linked gid, if its header fits
     try:
         if SEGMENT_SUGGESTIONS_GID:
             ws = ss.get_worksheet_by_id(int(SEGMENT_SUGGESTIONS_GID))
@@ -133,6 +146,104 @@ def _load_segment_suggestions() -> pd.DataFrame:
     except Exception:
         pass
     return pd.DataFrame()
+
+
+# ── 3-month content plan ("Theme - 3 Months" tab) ────────────────────────────
+# Dhanashree's nurture arc: TWO content buckets — "AI MATURE" (M1–M9) and
+# "AI EXPLORERS + LAGGARDS" (E1–E9) — each email numbered with a theme, core
+# question, new belief, and Graas POV. Located by content signature (a header
+# row containing 'email theme' + 'core question'), never by tab name/gid, so
+# she can rename/reorder tabs freely.
+_PLAN_CODE_RE = re.compile(r"^[A-Za-z]{0,2}\d{1,2}$")
+
+
+def _extract_theme_plan(vals) -> pd.DataFrame:
+    """Parse a worksheet into bucket/code/theme/question/belief/pov rows.
+    Returns empty if this tab doesn't look like the plan (signature miss)."""
+    rows, bucket, cols = [], "", None
+    for r in (vals or []):
+        cells = [str(x).strip() for x in r]
+        if not any(cells):
+            continue
+        low = [c.lower() for c in cells]
+        first = cells[0] if cells else ""
+        if first.upper().startswith("BUCKET"):
+            # bucket label = first non-empty cell after the BUCKET marker
+            rest = [c for c in cells[1:] if c]
+            bucket = rest[0] if rest else first
+            continue
+        if any("email theme" in c for c in low) and any("core question" in c for c in low):
+            def find(needle):
+                for i, c in enumerate(low):
+                    if needle in c:
+                        return i
+                return None
+            cols = {"theme": find("email theme"), "question": find("core question"),
+                    "belief": find("belief"), "pov": find("pov")}
+            continue
+        if cols is not None and _PLAN_CODE_RE.match(first):
+            cell = lambda i: (cells[i] if (i is not None and i < len(cells)) else "")
+            theme = cell(cols["theme"])
+            if theme:
+                rows.append({"bucket": bucket, "code": first, "theme": theme,
+                             "question": cell(cols["question"]),
+                             "belief": cell(cols["belief"]), "pov": cell(cols["pov"])})
+    return pd.DataFrame(rows)
+
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def _load_theme_plan() -> pd.DataFrame:
+    """Live-read the 3-month content plan. Empty frame when absent (graceful)."""
+    ss = _open_suggestions_sheet()
+    if ss is None:
+        return pd.DataFrame()
+    try:
+        if SEGMENT_THEME_PLAN_GID:
+            ws = ss.get_worksheet_by_id(int(SEGMENT_THEME_PLAN_GID))
+            df = _extract_theme_plan(ws.get_all_values())
+            if not df.empty:
+                return df.reset_index(drop=True)
+    except Exception:
+        pass
+    try:
+        for ws in ss.worksheets():
+            df = _extract_theme_plan(ws.get_all_values())
+            if not df.empty:
+                return df.reset_index(drop=True)
+    except Exception:
+        pass
+    return pd.DataFrame()
+
+
+def _plan_bucket_for_segment(segment: str, buckets) -> str:
+    """Map a composer AI segment onto a plan bucket label.
+    'AI Mature' → the bucket mentioning mature; Exploring/Laggard → the bucket
+    mentioning explorer/laggard. '' if no bucket fits."""
+    seg = _normalize_ai_segment(segment)
+    for b in buckets:
+        bl = str(b).lower()
+        if seg == "AI Mature" and "matur" in bl:
+            return b
+        if seg in ("AI Exploring", "AI Laggard") and ("explor" in bl or "laggard" in bl):
+            return b
+    return ""
+
+
+def _render_theme_plan(segment: str) -> bool:
+    """Show the 3-month email arc for this segment's bucket. False if no plan."""
+    df = _load_theme_plan()
+    if df.empty:
+        return False
+    bucket = _plan_bucket_for_segment(segment, df["bucket"].unique())
+    if not bucket:
+        return False
+    sub = df[df["bucket"] == bucket]
+    st.markdown(f"**📅 3-month content plan — {bucket}** ({len(sub)} emails)")
+    for _, r in sub.iterrows():
+        st.markdown(f"- **{r['code']} · {r['theme']}**")
+        if str(r.get("question", "")).strip():
+            st.caption(f"    ↳ {r['question']}")
+    return True
 
 
 def _is_voice_hold(suggestion: str) -> bool:
@@ -1542,9 +1653,15 @@ with tab_compose, _tab_guard("Email Composer"):
             f"{recipients['company'].nunique() if not recipients.empty else 0} companies "
             "(Newsletter design)."
         )
-        # Item 5: contextual per-segment email suggestions for the chosen segment.
+        # Item 5: contextual per-segment email suggestions for the chosen segment —
+        # the 3-month content arc first (what to send next), then the per-account
+        # themes from the audience list. Both live-read from Dhanashree's sheet.
         with st.expander(f"💡 Email suggestions for {comp_ai_seg}", expanded=False):
-            if not _render_segment_suggestions(comp_ai_seg):
+            _had_plan = _render_theme_plan(comp_ai_seg)
+            if _had_plan:
+                st.markdown("---")
+                st.markdown("**Per-account themes (audience list):**")
+            if not _render_segment_suggestions(comp_ai_seg) and not _had_plan:
                 st.caption(
                     "Suggestions are live-read from Dhanashree's audience sheet — share it "
                     "with the app's service account "
