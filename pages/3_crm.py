@@ -45,6 +45,29 @@ _VOICE_HOLD_MARKERS = ("voice", "hold until demo")
 AI_SEGMENTS = ["AI Laggard", "AI Exploring", "AI Mature"]
 
 
+# These two normalizers are defined UP HERE (not in the Data Loading section
+# below) because the item-5 header block runs at module top and transitively
+# needs them — a def lower in the file would NameError at page load.
+def _normalize_ai_segment(v: str) -> str:
+    """Map an AI-maturity label to a canonical segment — tolerant of casing and
+    the 'exploring'/'explorer' variants. Blank / 'TBD' / unknown → Unclassified."""
+    s = (v or "").strip().lower()
+    if not s:
+        return "Unclassified"
+    if "laggard" in s:
+        return "AI Laggard"
+    if "explor" in s:
+        return "AI Exploring"
+    if "matur" in s:
+        return "AI Mature"
+    return "Unclassified"
+
+
+def _normalize_company(name: str) -> str:
+    """Lowercase, strip, collapse spaces — for fuzzy matching."""
+    return " ".join((name or "").lower().split())
+
+
 def _extract_suggestions(vals) -> pd.DataFrame:
     """Reduce a worksheet's raw values to segment/account/suggestion, but ONLY if
     it's the audience tab (header must carry both 'AI Maturity' and 'Email
@@ -319,21 +342,6 @@ def _safe(row, col):
         return ''
     val = row[col]
     return str(val).strip() if pd.notna(val) else ''
-
-
-def _normalize_ai_segment(v: str) -> str:
-    """Map column O values to a canonical AI segment — tolerant of casing and
-    the 'exploring'/'explorer' variants. Blank / 'TBD' / unknown → Unclassified."""
-    s = (v or "").strip().lower()
-    if not s:
-        return "Unclassified"
-    if "laggard" in s:
-        return "AI Laggard"
-    if "explor" in s:
-        return "AI Exploring"
-    if "matur" in s:
-        return "AI Mature"
-    return "Unclassified"
 
 
 def _parse_contacts(df: pd.DataFrame, segment: str) -> pd.DataFrame:
@@ -676,11 +684,6 @@ NO_TOUCH = {
         },
     },
 }
-
-
-def _normalize_company(name: str) -> str:
-    """Lowercase, strip, collapse spaces — for fuzzy matching."""
-    return " ".join((name or "").lower().split())
 
 
 def playbook_lookup(company: str):
