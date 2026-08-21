@@ -1546,6 +1546,32 @@ def _missing_tokens(subs: dict, used: set) -> list:
     return sorted(out)
 
 
+def _fetch_watchers_page() -> list:
+    """Internal watcher emails from the Outreach Log's 'Watchers' tab.
+
+    Watchers receive one copy of every bulk campaign send (bypassing dedup and
+    the weekly cap). Defined HERE with only pre-existing service imports — the
+    Streamlit-Cloud stale-module gotcha means the page must not import the new
+    fetch_watchers symbol from email_sender directly.
+    """
+    from services.sheets_client import fetch_log_rows
+    sheet_id = os.getenv("EMAIL_LOG_SHEET_ID", "")
+    if not sheet_id:
+        return []
+    try:
+        df = fetch_log_rows(sheet_id, "Watchers")
+    except Exception:
+        return []
+    if df is None or df.empty or "email" not in df.columns:
+        return []
+    out = []
+    for e in df["email"].astype(str):
+        e = e.strip().lower()
+        if e and "@" in e and e not in out:
+            out.append(e)
+    return out
+
+
 # Bucket → framework auto-mapping (from Amruta's playbook).
 # Ghost Accounts split: E1 (distributor ordering) is the default since most
 # ghost accounts in the tracker are B2B distribution; pick E2 manually for
@@ -2263,6 +2289,7 @@ with tab_compose, _tab_guard("Email Composer"):
                 with st.spinner("Loading suppression + recent-send data…"):
                     supp_set = suppressed_emails()
                     recent_set = recent_sent_emails(get_dedup_days())
+                    watcher_list = _fetch_watchers_page()
                 sup_mask = after_no_touch["_email_norm"].isin(supp_set)
                 bulk_supp = after_no_touch[sup_mask]
                 after_supp = after_no_touch[~sup_mask]
@@ -2389,10 +2416,13 @@ with tab_compose, _tab_guard("Email Composer"):
                 bcols = st.columns([2, 1, 1])
                 with bcols[0]:
                     if not bulk_blocked_reason:
+                        _w_bit = (f"  \n**Internal copies:** {len(watcher_list)} watcher(s) — "
+                                  "not counted in cap" if watcher_list else "")
                         st.markdown(
                             f"**Will send {stage_final} email(s) via:** {sender_display_name} `<{sender_reply_to}>`  \n"
                             f"**Framework:** {template_name}  \n"
                             f"**Cap impact:** {used}/{cap} → **{used + stage_final}/{cap}**"
+                            f"{_w_bit}"
                         )
                 with bcols[1]:
                     if not st.session_state[bulk_confirm_key]:
@@ -2449,10 +2479,57 @@ with tab_compose, _tab_guard("Email Composer"):
                                     failures.append((row["email"], msg_b))
                                 progress_bar.progress(i / stage_final, text=f"Sending {i} of {stage_final}…")
 
+                            # Internal watcher copies — one per watcher, personalised
+                            # for a sample recipient so watchers see what the campaign
+                            # actually looked like. Bypasses dedup + weekly cap; logged
+                            # as "(internal copy)" so analytics can filter them out.
+                            watcher_sent, watcher_failed = 0, 0
+                            if watcher_list and sent_n > 0:
+                                progress_bar.progress(1.0, text="Sending internal copies…")
+                                _wrow = after_dedup.iloc[0]
+                                _w_full = str(_wrow.get("person_name", "")).strip()
+                                _w_subs = {
+                                    "company":    _wrow["company"],
+                                    "name":       _w_full.split()[0] if _w_full else _w_full,
+                                    "full_name":  _w_full,
+                                    "vertical":   _wrow["vertical"],
+                                    "sender":     sender_name,
+                                    "designation": _wrow.get("designation", ""),
+                                }
+                                _w_kwargs = dict(
+                                    sender_label=sender_label,
+                                    subject="[Internal] " + _substitute(subject, _w_subs),
+                                    body=_substitute(body, _w_subs),
+                                    company="[INTERNAL WATCHER]",
+                                    bucket="internal",
+                                    template=template_name + " (internal copy)",
+                                    bypass_dedup=True,
+                                    layout=email_layout,
+                                    headline=_substitute(headline, _w_subs),
+                                    deck=_substitute(deck, _w_subs),
+                                )
+                                for _w_email in watcher_list:
+                                    try:
+                                        ok_w, msg_w = send_email(
+                                            to_email=_w_email, to_name="Graas Internal",
+                                            bypass_cap=True, **_w_kwargs)
+                                    except TypeError:
+                                        # Stale service module on Cloud without the new
+                                        # bypass_cap kwarg — send anyway (cap applies).
+                                        ok_w, msg_w = send_email(
+                                            to_email=_w_email, to_name="Graas Internal",
+                                            **_w_kwargs)
+                                    if ok_w:
+                                        watcher_sent += 1
+                                    else:
+                                        watcher_failed += 1
+                                        failures.append((f"{_w_email} (watcher)", msg_w))
+
                             progress_bar.empty()
                             st.session_state[bulk_confirm_key] = False
                             # Stash result for persistent banner
-                            st.session_state["last_bulk_result"] = (sent_n, failed_n, failures)
+                            st.session_state["last_bulk_result"] = (
+                                sent_n, failed_n, failures, watcher_sent, watcher_failed)
                             st.rerun()
 
                 with bcols[2]:
@@ -2464,12 +2541,19 @@ with tab_compose, _tab_guard("Email Composer"):
                 # Show last bulk result if any
                 last_bulk = st.session_state.get("last_bulk_result")
                 if last_bulk:
-                    bsent, bfail, bfailures = last_bulk
-                    if bfail == 0:
-                        st.success(f"✅ Bulk send complete — **{bsent} sent**, 0 failed.")
+                    # 5-tuple since watcher copies landed; tolerate a stale 3-tuple
+                    # left in session_state from before the deploy.
+                    if len(last_bulk) == 5:
+                        bsent, bfail, bfailures, bwsent, bwfail = last_bulk
                     else:
-                        st.warning(f"⚠️ Bulk send done — **{bsent} sent**, **{bfail} failed**.")
-                        with st.expander(f"View {bfail} failure(s)"):
+                        bsent, bfail, bfailures = last_bulk
+                        bwsent, bwfail = 0, 0
+                    _w_note = f" · **{bwsent} internal cop{'y' if bwsent == 1 else 'ies'}**" if (bwsent or bwfail) else ""
+                    if bfail == 0 and bwfail == 0:
+                        st.success(f"✅ Bulk send complete — **{bsent} sent**, 0 failed{_w_note}.")
+                    else:
+                        st.warning(f"⚠️ Bulk send done — **{bsent} sent**, **{bfail + bwfail} failed**{_w_note}.")
+                        with st.expander(f"View {bfail + bwfail} failure(s)"):
                             for em, why in bfailures:
                                 st.markdown(f"- `{em}` — {why}")
                     if st.button("Dismiss bulk result", key="dismiss_bulk_result"):

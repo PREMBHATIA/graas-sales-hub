@@ -57,6 +57,12 @@ LOG_HEADERS = [
 SUPPRESSION_TAB_NAME = "Suppressions"
 SUPPRESSION_HEADERS = ["email", "reason", "added_at_utc", "added_by"]
 
+# Internal watchers — Graas folks who receive one copy of every bulk campaign
+# send. Maintained as a "Watchers" tab (single "email" column) in the Outreach
+# Log sheet so the list is self-serve; copies bypass dedup AND the weekly cap
+# and are logged with template "... (internal copy)" so analytics can filter.
+WATCHERS_TAB_NAME = "Watchers"
+
 # ── Open / click tracking ────────────────────────────────────────────────────
 # PIXEL_BASE_URL = the deployed Apps Script web-app URL that logs hits into the
 # "Tracking" tab of the same Outreach Log sheet. If it's unset, every helper
@@ -245,6 +251,25 @@ def suppressed_emails() -> set:
     return set(df["email"].str.lower().str.strip().tolist())
 
 
+def fetch_watchers() -> list:
+    """Internal watcher emails from the Watchers tab, deduped, order kept."""
+    sheet_id = os.getenv("EMAIL_LOG_SHEET_ID", "")
+    if not sheet_id:
+        return []
+    try:
+        df = fetch_log_rows(sheet_id, WATCHERS_TAB_NAME)
+    except Exception:
+        return []
+    if df.empty or "email" not in df.columns:
+        return []
+    out = []
+    for e in df["email"].astype(str):
+        e = e.strip().lower()
+        if e and "@" in e and e not in out:
+            out.append(e)
+    return out
+
+
 def last_sent_to(email: str):
     """Return (last_sent_datetime_utc, days_ago) for a recipient, or (None, None) if never sent.
 
@@ -299,6 +324,10 @@ def get_sends_this_week() -> int:
             return None
 
     sent = df[df["status"] == "sent"].copy()
+    # Internal watcher copies don't count toward the cap (mirrors bypass_cap
+    # on the send side — without this they'd still eat the cap indirectly).
+    if "template" in sent.columns:
+        sent = sent[~sent["template"].astype(str).str.endswith("(internal copy)")]
     sent["_ts"] = sent["timestamp_utc"].apply(_parse)
     sent = sent[sent["_ts"].notna()]
     return int((sent["_ts"] >= cutoff).sum())
@@ -332,6 +361,7 @@ def send_email(
     layout: str = "minimal",
     headline: str = "",
     deck: str = "",
+    bypass_cap: bool = False,
 ) -> tuple[bool, str]:
     """Send a single email + log the result.
 
@@ -352,7 +382,8 @@ def send_email(
     if sender_label not in SENDERS:
         return False, f"Unknown sender: {sender_label}"
 
-    if remaining_cap() <= 0:
+    # Internal watcher copies bypass the cap — they're not outreach volume.
+    if not bypass_cap and remaining_cap() <= 0:
         return False, f"Weekly cap reached ({get_weekly_cap()} sends in last 7d)"
 
     if not to_email or "@" not in to_email:
