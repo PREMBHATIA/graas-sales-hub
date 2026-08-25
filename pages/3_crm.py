@@ -2838,6 +2838,60 @@ with tab_analytics, _tab_guard("Analytics"):
             "(check GA for `utm_campaign` instead). Opens are directional (Apple Mail/Gmail prefetch)."
         )
 
+        # ── Account heat + circulating sends ─────────────────────────────────
+        # Built on the engagement-joined frame above. Real campaign sends only —
+        # tests and internal watcher copies excluded.
+        _rl = _exp[(_exp["status"] == "sent")
+                   & (_exp["_ts"] >= now_utc - pd.Timedelta(days=30))].copy()
+        _rl = _rl[~_rl["company"].astype(str).str.contains(r"\[INTERNAL WATCHER\]|\[TEST\]", regex=True, na=False)]
+        _rl = _rl[~_rl["template"].astype(str).str.contains(r"\(test\)|\(internal copy\)", regex=True, na=False)]
+
+        st.markdown("#### 🔥 Account heat (last 30d)")
+        st.caption(
+            "Engagement rolled up per company — multiple stakeholders opening is a "
+            "buying-committee signal. Sorted hottest first: clicks, then sends opened, "
+            "then total opens."
+        )
+        if _rl.empty:
+            st.caption("No campaign sends in the last 30 days yet.")
+        else:
+            _heat = (_rl.groupby("company")
+                       .agg(**{
+                           "Contacts": ("to_email", "nunique"),
+                           "Sends": ("to_email", "size"),
+                           "Sends opened": ("opened", "sum"),
+                           "Total opens": ("open_count", "sum"),
+                           "Clicks": ("click_count", "sum"),
+                           "Last send": ("_ts", "max"),
+                       })
+                       .reset_index()
+                       .rename(columns={"company": "Company"}))
+            _heat["Last send"] = _heat["Last send"].dt.strftime("%d %b")
+            _heat = _heat.sort_values(["Clicks", "Sends opened", "Total opens"],
+                                      ascending=False).reset_index(drop=True)
+            st.dataframe(_heat, use_container_width=True, hide_index=True,
+                         height=min(310, 80 + 35 * len(_heat)))
+
+        st.markdown("#### 🔁 Circulating sends (3+ opens)")
+        st.caption(
+            "Sends opened three or more times — the email is being revisited or passed "
+            "around internally (the closest measurable proxy for a forward). Treat as a "
+            "warm-lead signal; some inflation from Apple Mail/Gmail image prefetch."
+        )
+        _circ = _rl[_rl["open_count"] >= 3].copy()
+        if _circ.empty:
+            st.caption("None yet — appears once any send is opened 3+ times.")
+        else:
+            _circ["Sent"] = _circ["_ts"].dt.strftime("%d %b")
+            _circ["Subject"] = _circ["subject"].astype(str).str.slice(0, 60)
+            _circ = (_circ.rename(columns={"company": "Company", "to_email": "Recipient",
+                                           "open_count": "Opens", "click_count": "Clicks"})
+                         .sort_values("Opens", ascending=False))
+            st.dataframe(
+                _circ[["Company", "Recipient", "Subject", "Opens", "Clicks", "Sent"]],
+                use_container_width=True, hide_index=True,
+                height=min(310, 80 + 35 * len(_circ)))
+
         # ── Campaign creatives ───────────────────────────────────────────────
         # The Sends log stores the full body per send, so every campaign's
         # creative is already archived — this just makes it findable: pick a
