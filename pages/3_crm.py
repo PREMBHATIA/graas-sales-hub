@@ -2868,6 +2868,49 @@ with tab_analytics, _tab_guard("Analytics"):
             "(check GA for `utm_campaign` instead). Opens are directional (Apple Mail/Gmail prefetch)."
         )
 
+        # ── Campaign creatives ───────────────────────────────────────────────
+        # The Sends log stores the full body per send, so every campaign's
+        # creative is already archived — this just makes it findable: pick a
+        # campaign, see the exact copy that went out, download the HTML.
+        if "body" in log_df.columns:
+            st.markdown("#### 🎨 Campaign creatives")
+            _cr = log_df[(log_df["status"] == "sent")
+                         & (log_df["body"].astype(str).str.strip() != "")].copy()
+            _cr = _cr[~_cr["template"].astype(str).str.contains(r"\(test\)|\(internal copy\)", regex=True)]
+            if _cr.empty:
+                st.caption("No campaign sends with stored copy yet.")
+            else:
+                _cr = _cr.sort_values("_ts", ascending=False)
+                _first = _cr.groupby("subject", sort=False).first().reset_index()
+                _counts = _cr.groupby("subject")["to_email"].nunique()
+                _opts = {
+                    f"{r['subject']}  —  {r['_ts'].strftime('%d %b %Y')} · {_counts.get(r['subject'], 0)} recipient(s)": r["subject"]
+                    for _, r in _first.iterrows()
+                }
+                _pick = st.selectbox("Campaign", list(_opts.keys()), key="creative_pick")
+                _row = _first[_first["subject"] == _opts[_pick]].iloc[0]
+                _body = str(_row["body"])
+                _is_html = _body.lstrip()[:200].lower().find("<") != -1 and (
+                    "<html" in _body.lower() or "<table" in _body.lower() or "<div" in _body.lower())
+                _slug = re.sub(r"[^a-z0-9]+", "-", str(_row["subject"]).lower()).strip("-")[:60] or "campaign"
+                st.download_button(
+                    "⬇️ Download creative (.html)" if _is_html else "⬇️ Download copy (.txt)",
+                    _body.encode("utf-8"),
+                    file_name=f"{_slug}.{'html' if _is_html else 'txt'}",
+                    mime="text/html" if _is_html else "text/plain",
+                    key="dl_creative",
+                )
+                with st.expander("Preview the creative as sent", expanded=False):
+                    if _is_html:
+                        import streamlit.components.v1 as _cmp
+                        _cmp.html(_body, height=700, scrolling=True)
+                    else:
+                        st.text(_body)
+                st.caption(
+                    "The stored copy is the personalised version from one recipient of that "
+                    "campaign (tokens like {name} already substituted)."
+                )
+
     # ── Suppression list (always visible, even when no sends yet) ─────────────
     st.markdown("---")
     st.markdown("#### 🚫 Suppression list")
