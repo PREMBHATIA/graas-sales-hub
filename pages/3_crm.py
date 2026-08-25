@@ -192,8 +192,11 @@ def _extract_theme_plan(vals) -> pd.DataFrame:
 
 
 @st.cache_data(ttl=1800, show_spinner=False)
-def _load_theme_plan() -> pd.DataFrame:
-    """Live-read the 3-month content plan. Empty frame when absent (graceful)."""
+def _load_theme_plan(_cache_v: int = 2) -> pd.DataFrame:
+    """Live-read the Context arc plan. Empty frame when absent (graceful).
+    _cache_v exists ONLY to bust st.cache_data when the parser changes —
+    the cache hashes this function, not the helpers it calls. Bump it
+    whenever _extract_theme_plan's output shape changes."""
     ss = _open_suggestions_sheet()
     if ss is None:
         return pd.DataFrame()
@@ -2299,6 +2302,8 @@ with tab_calendar, _tab_guard("Calendar"):
         "— Target window + Status columns are Dhanashree's to fill."
     )
     _cal = _load_theme_plan()
+    if not _cal.empty and "audience" not in _cal.columns:
+        _cal = pd.DataFrame()  # stale cache / restructured sheet — treat as unreadable
     if _cal.empty:
         st.info("Calendar not readable — check the Context arc tab is shared with the "
                 "app's service account.")
