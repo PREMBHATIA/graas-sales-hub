@@ -301,25 +301,6 @@ st.set_page_config(page_title="CRM & Outreach | Graas", page_icon="📧", layout
 st.markdown("## 📧 CRM & Email Outreach")
 st.caption("All-e Active + Dropped leads (team sheet, read-only) + local overlay (Prem's personal adds) — merged view")
 
-_seg_sugg_hdr = _load_segment_suggestions()
-if _seg_sugg_hdr.empty:
-    # Sheet not shared with the app's service account yet — fall back to the Doc.
-    st.info(
-        "📖 **Email suggestions by segment** — live-read from Dhanashree's re-engagement "
-        "audience sheet. To switch this on, share that sheet with the app's service account "
-        "`command-center@prefab-bruin-491807-n0.iam.gserviceaccount.com` (Viewer). Until then, "
-        "see Amruta's "
-        "[playbook Google Doc ↗](https://docs.google.com/document/d/1kbDEjVTpVpFdrdtxhhEomdtss1f05O2Fm8ph4Y1TY1Y/edit?tab=t.0).",
-        icon="📖",
-    )
-else:
-    with st.expander(
-        f"📖 Email suggestions by segment ({len(_seg_sugg_hdr)} accounts) — "
-        "live from Dhanashree's audience sheet", expanded=False):
-        for _seg in AI_SEGMENTS:
-            st.markdown(f"**{_seg}**")
-            _render_segment_suggestions(_seg)
-
 # ── Styling ──────────────────────────────────────────────────────────────────
 
 st.markdown("""
@@ -1330,154 +1311,13 @@ with tab_segments, _tab_guard("Segments"):
 # TAB 3: EMAIL COMPOSER
 # ══════════════════════════════════════════════════════════════════════════════
 
-# 5 frameworks from Amruta's playbook (Building Agentic Frameworks).
-# Each maps 1:1 to a playbook bucket; the composer auto-suggests the right
-# framework based on which bucket the selected contact's company is in.
+# Templates: the playbook-era frameworks (A–F — Timing-Paused, Eval Stalled,
+# Ghost, Voice-Waiting…) were retired 2026-08-26; campaigns now come from the
+# Context arc calendar. Custom (blank canvas) is the only starter.
 EMAIL_TEMPLATES = {
-    "A — Market Signal (Timing-Paused)": {
-        "subject": "Why ordering adoption stays stuck at 12% — and what changes it",
-        "body": """Hi {name},
-
-One pattern worth sharing as {company} heads into FY26 planning.
-
-Brands with large retailer networks are finding a consistent gap: retailer apps and DMS tools sit at ~12% adoption even after years of investment. The ordering behavior doesn't change because the submission path is harder than a WhatsApp message to the FA.
-
-The brands that moved retailer ordering to WhatsApp — without replacing their existing stack — are seeing two things happen:
-1. Adoption crosses 25–30% within two quarters because retailers are already on WhatsApp all day.
-2. Scheme communication, which was always supposed to drive volume, finally reaches the retailer in time to act on it.
-
-The second outcome is the one most brands didn't plan for. The scheme and trade promotion layer becomes useful only when the ordering layer is actually being used.
-
-Given the scale of {company}'s retailer network, this seemed worth flagging as FY26 priorities are being set.
-
-Happy to share a brief note on how a peer in {vertical} structured this.
-
-Best,
-{sender}
-
-P.S. — Schneider Electric, B2B retailer ordering (FMEG): https://www.youtube.com/watch?v=jDJfMnR3OYE""",
-    },
-    "B — Outcome Reference (Evaluation Stalled)": {
-        "subject": "Outcome from a {vertical} brand's distributor ordering deployment",
-        "body": """Hi {name},
-
-One brief reference that might be relevant to your internal discussion.
-
-A {vertical} brand we work with — distributor network of comparable scale — deployed WhatsApp-based ordering last quarter. The primary metric they tracked was not adoption rate (though that hit 28%+ within 8 weeks). It was ERP data completeness — the share of orders flowing directly into their system without manual re-entry.
-
-That went from around 18% to over 45% within three months. The secondary benefit was reliable secondary sales data finally flowing in, which unlocked scheme tracking they'd been trying to operationalise for two years.
-
-Given the size of {company}'s distribution network, the same dynamics likely apply.
-
-Happy to walk through how the deployment was structured if the internal conversation is moving forward.
-
-Best,
-{sender}
-
-P.S. — References:
-• Schneider Electric — B2B retailer ordering (FMEG): https://www.youtube.com/watch?v=jDJfMnR3OYE
-• Distributor Agent — B2B distributor ordering: https://youtu.be/c0mnXe-MZeY""",
-    },
-    "C — Adoption Gap (Competitor-Adjacent)": {
-        "subject": "Why the DMS you have and the data you get are two different things",
-        "body": """Hi {name},
-
-One observation from brands in {vertical} that have been through the same evaluation.
-
-Most brands with SAP, DMS, and SFA in place find that distributor and retailer adoption of those systems sits at 5–12% in traditional trade. The tools are there. The data isn't. The reason is consistent: any solution that requires a separate login or a new app competes with WhatsApp for the distributor's attention — and loses.
-
-The brands that closed this gap didn't replace their DMS. They added a WhatsApp ordering layer on top of it.
-
-The agent handles the conversation — order placement, scheme queries, stock checks — and the DMS gets the structured data it was always supposed to have. Adoption follows because distributors and retailers are already on WhatsApp all day.
-
-The investment question then shifts: not whether to digitize, but whether the WA layer pays for itself in data quality and order volume. For a network the size of {company}'s, the math tends to work differently than for a smaller deployment.
-
-Happy to share how one {vertical} brand with a similar stack structured this.
-
-Best,
-{sender}""",
-    },
-    "D — Founder-Tone Strategic Note (Strategic Slow Movers)": {
-        "subject": "One observation on AI in {vertical} distribution",
-        "body": """Hi {name},
-
-One observation worth sharing as you plan FY26 priorities.
-
-The brands generating the most durable traction with AI in distribution are not the ones that started with the most ambitious deployments. They started with the narrowest, highest-friction workflow — typically order placement or invoice capture — and built outward.
-
-The reason it works: a narrow deployment generates the behavioral data that makes the broader system intelligent. The brands that skipped this step found themselves with a capable system and no signal to act on.
-
-At the scale of {company}'s network, the sequencing question matters significantly.
-
-Happy to share how a couple of brands in {vertical} have approached this if the conversation is useful.
-
-Best,
-{sender}""",
-    },
-    "E1 — Specific Trigger / Distributor Ordering (Ghost)": {
-        "subject": "Why DMS sits at 15% in traditional trade and what the WhatsApp layer does differently",
-        "body": """Hi {name},
-
-One observation that may be worth {company}'s attention as you plan for FY26.
-
-In the last two quarters, a set of {vertical} brands have moved primary distributor ordering to WhatsApp as the main channel. The reason is straightforward: distributors already operate on WhatsApp, and any solution that requires a separate login sees single-digit adoption regardless of how well it is designed.
-
-The brands that made this work connected the agent directly to their ERP / DMS systems so it knows real-time pricing, credit limits, and stock levels at the moment an order is placed. That is where a WhatsApp ordering interface becomes the data layer.
-
-Beyond ordering, the same agent handles delivery status updates, financial document retrieval, scheme nudges for utilisation and target achievement, restocking reminders, and ready-to-use personalised order lists based on past purchase history. And it is not just for distributors — the same setup extends to retailers as well.
-
-We have live deployments across agrochem (Agricon & PI Industries for distributor ordering) and electricals (Schneider Electric for contractor ordering). The setup and go-live runs 6–8 weeks.
-
-We had spoken some months ago about this for {company}. If the timing is better now, I am happy to walk through how a comparable brand in {vertical} set this up.
-
-Best,
-{sender}
-
-P.S. — Here is a short video of PI Industries using this for distributor ordering: https://drive.google.com/file/d/14eyziI1N1Yt0AFKfVho4WM5WmbzwumMW/view""",
-    },
-    "E2 — Specific Trigger / D2C Discovery (Ghost)": {
-        "subject": "Why product discovery fails on D2C sites and what the knowledge layer fixes",
-        "body": """Hi {name},
-
-A brief observation that may be relevant to where {company}'s D2C roadmap sits right now.
-
-In the last quarter, a few {vertical} brands have moved away from rule-based chat widgets toward agents that genuinely understand the product catalog — the kind that answers not just "which model should I buy" but "how does this compare to what I already own and what I specifically need." The gap between those two is the gap between a chatbot and an agent.
-
-What makes the difference is not the model. It is the knowledge layer underneath — a Brand Knowledge Graph built on your enriched catalog and customer purchase history. When a shopper asks a complex query, the agent maps intent to the right product, accounts for brand affinity, past purchases, and price preference, and surfaces a matched recommendation with explained trade-offs. No disambiguation loop, no wrong SKU, no generic answer.
-
-The same layer also handles basket growth — cross-sell suggestions driven by purchase signals from your own transaction history, not generic recommendations — and lifecycle nudges for restocking and repurchase.
-
-Two ways to deploy this: use our chat SDK and go live end-to-end, or plug our API and knowledge graph into your own agent interface. Available on cloud or on-premise.
-
-We are doing this for Puma and Canon. If this is back on the table at {company}, happy to show you exactly how the knowledge graph is built for your catalog.
-
-Best,
-{sender}
-
-P.S. — Here is Puma's agent in action: https://drive.google.com/file/d/119yh5D5m-0Z3opQEQtK_j-JiaVGcKcgH/view""",
-    },
-    "F — Voice Warm-Up (Voice-Waiting)": {
-        "subject": "One thing we observed from WA ordering deployments in {vertical} — relevant to what you mentioned",
-        "body": """Hi {name},
-
-Sharing one observation while we work on something we think will be directly relevant to the direction you mentioned.
-
-Across {vertical} brands, the ordering problem consistently splits into two parts: the conversation layer (getting the dealer to place an order at all) and the intelligence layer (knowing which SKU, which scheme, which depot, what credit limit applies).
-
-Voice handles the first part reasonably well. Where it consistently falls short is the second — when a dealer asks a specific product or scheme question, the agent either escalates or gives a generic answer, because it doesn't have the product and channel context to respond accurately.
-
-The brands that have gotten real traction built the intelligence layer first — so whatever interaction surface they use, the answers are right.
-
-We're working on something we hope to share a first look at in June that we think will be relevant to what you mentioned. Will be in touch then.
-
-Best,
-{sender}""",
-    },
-    "Custom": {
-        "subject": "",
-        "body": "",
-    },
+    "Custom": {"subject": "", "body": ""},
 }
+
 
 def _substitute(text: str, subs: dict) -> str:
     """Replace {key} placeholders case-insensitively.
@@ -1592,49 +1432,7 @@ def _fetch_watchers_page() -> list:
     return out
 
 
-# Bucket → framework auto-mapping (from Amruta's playbook).
-# Ghost Accounts split: E1 (distributor ordering) is the default since most
-# ghost accounts in the tracker are B2B distribution; pick E2 manually for
-# D2C/discovery-driven accounts (Wakefit, Samsung, KLF Nirmal, etc.).
-BUCKET_TO_FRAMEWORK = {
-    "Timing-Paused":            "A — Market Signal (Timing-Paused)",
-    "Evaluation Stalled":       "B — Outcome Reference (Evaluation Stalled)",
-    "Competitor-Adjacent":      "C — Adoption Gap (Competitor-Adjacent)",
-    "Strategic Slow Movers":    "D — Founder-Tone Strategic Note (Strategic Slow Movers)",
-    "Ghost Accounts":           "E1 — Specific Trigger / Distributor Ordering (Ghost)",
-    "Voice-Waiting":            "F — Voice Warm-Up (Voice-Waiting)",
-}
-
 with tab_compose, _tab_guard("Email Composer"):
-    # ── Auto-reset body/subject when template changes ─────────────────────────
-    # IMPORTANT history of this code:
-    # - Originally also reset on recipient change, to prevent personal lines
-    #   ("Hope golf is going well") leaking to the wrong person.
-    # - BUT: 7034da5 added auto-recipient-reset when the preview company changes.
-    #   Combined with this reset, switching preview company → recipient changes →
-    #   body+subject wiped to template defaults. For the "Custom" template
-    #   (defaults are empty strings), the user's typed content disappeared
-    #   silently — Dhanashree hit this and sent empty emails.
-    # - Fix: only reset on TEMPLATE change, never on recipient change. Also skip
-    #   reset when the new template has empty defaults (Custom), so switching to
-    #   Custom preserves whatever the user is currently working on.
-    _prev_template = st.session_state.get("_last_template_name")
-    _curr_template = st.session_state.get("template_sel")
-    # In "Paste my own HTML" mode the template starter doesn't apply — never let
-    # a template change overwrite hand-pasted HTML in the body field.
-    _raw_now = str(st.session_state.get("body_design", "")).startswith("📄")
-
-    if not _raw_now and _curr_template and _curr_template in EMAIL_TEMPLATES:
-        _tmpl = EMAIL_TEMPLATES[_curr_template]
-        if _prev_template is not None and _prev_template != _curr_template:
-            # Only reset to non-empty defaults — empty defaults (Custom) would
-            # wipe user content with nothing useful.
-            if _tmpl.get("body") or _tmpl.get("subject"):
-                st.session_state["email_body"] = _tmpl["body"]
-                st.session_state["email_subject"] = _tmpl["subject"]
-
-    st.session_state["_last_template_name"] = _curr_template
-
     st.markdown("### ✉️ Compose Outreach Email")
 
     # ── Step 1: Mode + recipients ─────────────────────────────────────────────
@@ -1666,7 +1464,7 @@ with tab_compose, _tab_guard("Email Composer"):
             st.stop()
         _pick = st.selectbox("Contact", _opts, key="one_to_one_pick")
         recipients = _pool[_pool['_label'] == _pick].copy()
-        st.caption("✍️ Sends a clean **personal** email (Minimal design).")
+        st.caption("✍️ Sends one personal email to this contact.")
     else:
         _sc1, _sc2 = st.columns([2, 3])
         with _sc1:
@@ -1696,8 +1494,7 @@ with tab_compose, _tab_guard("Email Composer"):
             )
         st.caption(
             f"📣 {len(recipients)} contacts across "
-            f"{recipients['company'].nunique() if not recipients.empty else 0} companies "
-            "(Newsletter design)."
+            f"{recipients['company'].nunique() if not recipients.empty else 0} companies."
         )
         # Item 5: contextual per-segment email suggestions for the chosen segment —
         # the 3-month content arc first (what to send next), then the per-account
@@ -1768,31 +1565,16 @@ with tab_compose, _tab_guard("Email Composer"):
         # Override the mode-derived shell. Raw works in BOTH 1:1 and Segment.
         email_layout = "raw"
 
-    tc1, tc2 = st.columns([1, 2])
-    with tc1:
-        if use_raw:
-            st.markdown("**📄 Paste your own HTML**")
-            st.caption(
-                "Sent as-authored — no Graas shell. Tokens like `{name}`/`{company}` "
-                "still substitute. Your links are click-tracked through the redirect "
-                "(destinations + UTMs preserved) so opens AND clicks show in Analytics."
-            )
-            template_name = "Custom"
-        else:
-            template_name = st.radio(
-                "Start from a template" if is_1to1 else "Template (segment starter)",
-                list(EMAIL_TEMPLATES.keys()), key="template_sel",
-                help="1:1 → an optional starting point (pick 'Custom' to write from scratch). "
-                     "Segment → the angle for this campaign.",
-            )
-            st.caption(
-                ("✍️ **1:1** · Minimal design" if is_1to1
-                 else "📣 **Segment** · Newsletter design") + " — set by the mode above."
-            )
+    template_name = "Custom"
+    template = EMAIL_TEMPLATES["Custom"]
+    if use_raw:
+        st.caption(
+            "📄 Sent as-authored — no Graas shell. Tokens like `{name}`/`{company}` still "
+            "substitute; links are click-tracked (destinations + UTMs preserved), so opens "
+            "AND clicks show in Analytics."
+        )
 
-    template = EMAIL_TEMPLATES.get(template_name, EMAIL_TEMPLATES["Custom"])
-
-    with tc2:
+    with st.container():
         from services.email_sender import SENDERS as _SENDERS
         sender_label = st.selectbox(
             "Send as",
@@ -1848,6 +1630,12 @@ with tab_compose, _tab_guard("Email Composer"):
                      "⚠️ Images must be hosted at absolute https:// URLs — Gmail/Outlook "
                      "strip `data:` URIs, so pasted base64 images won't show.",
             )
+            if body.strip() and "<" not in body:
+                st.warning(
+                    "⚠️ This looks like plain text, not HTML — in raw mode it sends as one "
+                    "unformatted block (no paragraphs). Paste real HTML, or switch to "
+                    "**Use a Graas design** for plain-text emails."
+                )
         else:
             body = st.text_area("Body", value=template["body"], height=300, key="email_body")
 
@@ -1879,7 +1667,7 @@ with tab_compose, _tab_guard("Email Composer"):
             rendered_subject = _substitute(subject, _pv_subs)
             rendered_body = _substitute(body, _pv_subs)
 
-            to_list = ', '.join(preview_contacts['email'].tolist())
+
 
             # Render the ACTUAL email shell (minimal or branded newsletter) so
             # the preview matches what lands in the inbox. CID logo is swapped
@@ -1888,11 +1676,13 @@ with tab_compose, _tab_guard("Email Composer"):
                 wrap_email, body_to_paragraphs, preview_html,
             )
             import streamlit.components.v1 as _components
-            st.caption(f"To: {to_list}  ·  Subject: {rendered_subject}")
+            st.caption(f"To: {len(preview_contacts)} contact(s) at {preview_co} — each receives an individual email  ·  Subject: {rendered_subject}")
             if email_layout == "raw":
                 # Bring-your-own HTML: render EXACTLY as authored (after token
                 # substitution) — no shell, matching what the recipient gets.
                 if rendered_body.strip():
+                    if "<" not in rendered_body:
+                        st.warning("⚠️ Plain text in raw-HTML mode — this will land as one unformatted block.")
                     st.caption("📄 Your HTML, personalised for this recipient — sent as-authored (no Graas shell).")
                     _components.html(rendered_body, height=760, scrolling=True)
                 else:
@@ -2036,24 +1826,8 @@ with tab_compose, _tab_guard("Email Composer"):
                             f"{send_target['company']} so the substituted body matches who you're sending to."
                         )
 
-                    # Show the playbook bucket(s) for this contact + suggest the right framework
-                    target_buckets = send_target.get("playbook_buckets_all") or []
-                    if not isinstance(target_buckets, list):
-                        target_buckets = []
                     target_no_touch = send_target.get("playbook_no_touch")
                     target_note = send_target.get("playbook_note", "")
-
-                    if target_buckets:
-                        suggested_for_recipient = BUCKET_TO_FRAMEWORK.get(target_buckets[0])
-                        bucket_str = " · ".join(target_buckets)
-                        if suggested_for_recipient and suggested_for_recipient != template_name:
-                            st.info(
-                                f"📋 **{send_target['company']}** is in playbook bucket(s): **{bucket_str}** → "
-                                f"suggested framework: **{suggested_for_recipient}** "
-                                f"(currently using {template_name})"
-                            )
-                        else:
-                            st.caption(f"📋 Playbook bucket(s): **{bucket_str}**")
 
                     # NaN is truthy in Python, so a plain `if target_note:` would
                     # render the string "nan" for accounts without a playbook note.
@@ -2238,23 +2012,6 @@ with tab_compose, _tab_guard("Email Composer"):
                         st.warning(f"Weekly cap of {cap} reached. New sends blocked until older sends roll out of the 7-day window.")
 
         if not is_1to1:  # bulk send is only for segment campaigns
-            # Bulk-copy fallback (kept for manual / Gmail-direct workflows)
-            with st.expander("📋 Copy emails for manual sending (Gmail BCC, etc.)"):
-                ac1, ac2 = st.columns(2)
-                with ac1:
-                    st.markdown("**All recipient emails**")
-                    all_emails = ', '.join(recipients['email'].unique().tolist())
-                    st.code(all_emails, language=None)
-                with ac2:
-                    st.markdown("**Emails by company**")
-                    for co in recipients['company'].unique()[:20]:
-                        co_emails = recipients[recipients['company'] == co]['email'].tolist()
-                        co_names = recipients[recipients['company'] == co]['person_name'].tolist()
-                        st.markdown(f"**{co}** ({', '.join(co_names)})")
-                        st.code(', '.join(co_emails), language=None)
-                    if len(recipients['company'].unique()) > 20:
-                        st.caption(f"... and {len(recipients['company'].unique()) - 20} more companies")
-
             # ── Bulk send to filtered set ─────────────────────────────────────────
             st.markdown("---")
             st.markdown("##### 📨 Bulk send to everyone in this segment")
