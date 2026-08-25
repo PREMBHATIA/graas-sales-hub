@@ -909,11 +909,15 @@ def _tab_guard(label):
         st.exception(e)
 
 
-tab_contacts, tab_segments, tab_compose, tab_news, tab_analytics = st.tabs([
+# Newsworthy tab removed 2026-08-22: its daily Claude+web_search fetch ran on
+# EVERY page load (Streamlit executes all tab bodies) and could block the whole
+# page for minutes on a cache miss. The Context arc + per-segment suggestions
+# superseded its talking-points job. services/commerce_news.py still serves the
+# Prospect Brief 'While you wait' card.
+tab_contacts, tab_segments, tab_compose, tab_analytics = st.tabs([
     "👥 Contacts",
     "🎯 Segments",
     "✉️ Email Composer",
-    "📰 Newsworthy",
     "📊 Analytics",
 ])
 
@@ -1544,6 +1548,22 @@ def _missing_tokens(subs: dict, used: set) -> list:
         if not v or v.lower() == "nan":
             out.append(k)
     return sorted(out)
+
+
+@st.cache_data(ttl=90, show_spinner=False)
+def _cached_log_df():
+    """The Sends log, one read per 90s — Analytics previously re-read this sheet
+    ~6× per page load (cap counter, engagement table, export all fetched their
+    own copy), which is most of why the tab took minutes."""
+    from services.email_sender import recent_sends
+    return recent_sends(limit=10000)
+
+
+@st.cache_data(ttl=90, show_spinner=False)
+def _cached_tracking_df():
+    """The open/click beacon log, one read per 90s (was fetched 3× per load)."""
+    from services.email_sender import fetch_tracking_events
+    return fetch_tracking_events()
 
 
 def _fetch_watchers_page() -> list:
@@ -2572,80 +2592,6 @@ with tab_compose, _tab_guard("Email Composer"):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# TAB 4: NEWSWORTHY
-#   Top 3 commerce-tech stories from the last 21 days — high-impact
-#   talking points Dhanashree can drop into outreach emails. Shares the
-#   same 24h-cached pool that the Prospect Brief 'While you wait' card
-#   pulls from (services/commerce_news.py), so one web_search per day
-#   per instance serves both surfaces.
-# ══════════════════════════════════════════════════════════════════════════════
-
-with tab_news, _tab_guard("Newsworthy"):
-    st.markdown("### 📰 Newsworthy")
-    st.caption(
-        "Top 3 high-impact commerce-tech stories from the last 21 days. "
-        "Use these as 'have you seen this?' openers in cold outreach. "
-        "Refreshes daily."
-    )
-
-    from services.commerce_news import fetch_commerce_tech_stories as _fetch_news
-
-    _stories = _fetch_news() or []
-    if not _stories:
-        st.info(
-            "Couldn't fetch news right now. Either web_search is rate-limited "
-            "or the day's headlines haven't surfaced anything substantive yet. "
-            "Try again in a few minutes."
-        )
-    else:
-        st.caption(f"{len(_stories)} stor{'y' if len(_stories) == 1 else 'ies'} loaded · "
-                   f"hit your browser's reload after 24h for fresh ones.")
-
-        # Three vertical cards side-by-side. Headline + source are the
-        # decision-drivers, so they're at the top of each card; body +
-        # email angle sit below for the deeper read.
-        _cols = st.columns(len(_stories))
-        for col, (i, s) in zip(_cols, enumerate(_stories, start=1)):
-            with col:
-                with st.container(border=True):
-                    # Headline — the hero element
-                    st.markdown(
-                        f"<div style='font-size:1.0rem;font-weight:700;"
-                        f"line-height:1.35;color:#111827;margin-bottom:8px;'>"
-                        f"{i}. {s['title']}</div>",
-                        unsafe_allow_html=True,
-                    )
-                    # Source + region tag — the credibility row
-                    st.markdown(
-                        f"<div style='font-size:0.78rem;color:#6B7280;"
-                        f"margin-bottom:10px;'>"
-                        f"<a href='{s['source_url']}' target='_blank' "
-                        f"style='color:#2563EB;text-decoration:none;"
-                        f"border-bottom:1px dotted #2563EB;font-weight:600;'>"
-                        f"🔗 {s['source_label']}</a> &nbsp;·&nbsp; {s['tag']}"
-                        f"</div>",
-                        unsafe_allow_html=True,
-                    )
-                    # Body — secondary detail
-                    st.markdown(
-                        f"<div style='font-size:0.88rem;line-height:1.45;"
-                        f"color:#374151;margin-bottom:10px;'>{s['body']}</div>",
-                        unsafe_allow_html=True,
-                    )
-                    # Email angle — collapsible to keep the card compact
-                    with st.expander("📧 Email angle + snippet"):
-                        st.markdown(f"**Why it lands:** {s['why']}")
-                        st.markdown("**Copy-ready opener:**")
-                        _snippet = (
-                            f"Saw this and thought of you — "
-                            f"[{s['title']}]({s['source_url']}) "
-                            f"({s['source_label']}). "
-                            f"{s['body'].split('. ')[0]}."
-                        )
-                        st.code(_snippet, language="markdown")
-
-
-# ══════════════════════════════════════════════════════════════════════════════
 # TAB 5: ANALYTICS
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -2656,9 +2602,7 @@ with tab_analytics, _tab_guard("Analytics"):
                "they need Gmail reply-polling and a hosted unsubscribe endpoint.")
 
     from services.email_sender import (
-        recent_sends as _recent_sends,
         get_weekly_cap as _get_weekly_cap,
-        get_sends_this_week as _get_sends_this_week,
         preflight_check as _preflight_check,
         fetch_suppressions as _fetch_suppressions,
         add_to_suppression as _add_to_suppression,
@@ -2668,8 +2612,14 @@ with tab_analytics, _tab_guard("Analytics"):
     if a_pre_err:
         st.warning(f"⚠️ {a_pre_err} — analytics will be empty until email sending is configured (see **Email Composer** tab).")
 
-    # Pull the full log once
-    log_df = _recent_sends(limit=10000)
+    # Pull the full log + tracking beacons ONCE (90s cache) — every section
+    # below reuses these two frames instead of re-reading the sheet.
+    log_df = _cached_log_df()
+    track_df = _cached_tracking_df()
+    if track_df is not None and not track_df.empty and "tracking_id" in track_df.columns:
+        track_df = track_df.copy()
+        track_df["tracking_id"] = track_df["tracking_id"].astype(str).str.strip()
+        track_df["event"] = track_df.get("event", "").astype(str).str.strip().str.lower()
 
     if log_df.empty:
         st.info("No sends logged yet. Once you send your first email from the composer, metrics will populate here.")
@@ -2690,18 +2640,13 @@ with tab_analytics, _tab_guard("Analytics"):
         # counts once. None => tracking not configured / nothing to match yet.
         _opened_7d = _clicked_7d = None
         try:
-            from services.email_sender import fetch_tracking_events
             if "tracking_id" in sent_7d.columns:
                 _ids = {t for t in sent_7d["tracking_id"].astype(str).str.strip() if t}
                 if _ids:
                     _opened_7d = _clicked_7d = 0
-                    _ev = fetch_tracking_events()
-                    if not _ev.empty and "tracking_id" in _ev.columns:
-                        _e = _ev.copy()
-                        _e["tracking_id"] = _e["tracking_id"].astype(str).str.strip()
-                        _e["event"] = _e.get("event", "").astype(str).str.strip().str.lower()
-                        _opened_7d = len(_ids & set(_e.loc[_e["event"] == "open", "tracking_id"]))
-                        _clicked_7d = len(_ids & set(_e.loc[_e["event"] == "click", "tracking_id"]))
+                    if track_df is not None and not track_df.empty and "tracking_id" in track_df.columns:
+                        _opened_7d = len(_ids & set(track_df.loc[track_df["event"] == "open", "tracking_id"]))
+                        _clicked_7d = len(_ids & set(track_df.loc[track_df["event"] == "click", "tracking_id"]))
         except Exception:
             pass
 
@@ -2717,9 +2662,14 @@ with tab_analytics, _tab_guard("Analytics"):
         k4.metric("↩️ Replied", "—", help="Not tracked yet — needs Gmail API reply polling")
         k5.metric("🚫 Unsubscribed", "—", help="Not tracked yet — needs a hosted unsubscribe endpoint")
 
-        # Weekly cap row
+        # Weekly cap row — computed from the already-fetched frame (mirrors
+        # get_sends_this_week incl. the internal-copy exclusion) instead of
+        # re-reading the sheet.
         cap = _get_weekly_cap()
-        used = _get_sends_this_week()
+        _cap_df = sent_7d
+        if "template" in _cap_df.columns:
+            _cap_df = _cap_df[~_cap_df["template"].astype(str).str.endswith("(internal copy)")]
+        used = len(_cap_df)
         st.markdown(f"**Weekly send cap:** {used} / {cap} used · {max(0, cap - used)} remaining")
         st.progress(min(used / cap, 1.0) if cap > 0 else 0)
 
@@ -2783,8 +2733,32 @@ with tab_analytics, _tab_guard("Analytics"):
         with col_d:
             st.markdown("#### 📨 Opens & clicks by template (the A/B answer)")
             try:
-                from services.email_sender import engagement_by_template
-                _eng = engagement_by_template(days=30)
+                # Computed from the cached frames (was engagement_by_template,
+                # which re-read both sheets on every load).
+                _eng = pd.DataFrame()
+                if "tracking_id" in sent_30d.columns:
+                    _s = sent_30d.copy()
+                    _s["tracking_id"] = _s["tracking_id"].astype(str).str.strip()
+                    _s = _s[_s["tracking_id"] != ""]
+                    if not _s.empty:
+                        if "template" not in _s.columns:
+                            _s["template"] = "(none)"
+                        _s["template"] = (_s["template"].astype(str).str.strip()
+                                          .replace({"": "(none)", "nan": "(none)"}))
+                        _op, _cl = set(), set()
+                        if track_df is not None and not track_df.empty and "tracking_id" in track_df.columns:
+                            _op = set(track_df.loc[track_df["event"] == "open", "tracking_id"])
+                            _cl = set(track_df.loc[track_df["event"] == "click", "tracking_id"])
+                        _s["_opened"] = _s["tracking_id"].isin(_op)
+                        _s["_clicked"] = _s["tracking_id"].isin(_cl)
+                        _eng = (_s.groupby("template")
+                                  .agg(Sent=("tracking_id", "nunique"),
+                                       Opened=("_opened", "sum"),
+                                       Clicked=("_clicked", "sum"))
+                                  .reset_index())
+                        _eng["Open %"] = (_eng["Opened"] / _eng["Sent"] * 100).round(0)
+                        _eng["Click %"] = (_eng["Clicked"] / _eng["Sent"] * 100).round(0)
+                        _eng = _eng.sort_values("Sent", ascending=False).reset_index(drop=True)
                 if _eng.empty:
                     st.caption(
                         "No tracked sends yet — engagement appears once emails go "
@@ -2830,16 +2804,12 @@ with tab_analytics, _tab_guard("Analytics"):
 
         # Full export WITH engagement — sends joined to the Tracking beacons so
         # the CSV answers "who opened / who clicked" without cross-referencing.
-        from services.email_sender import fetch_tracking_events as _fetch_events
         _exp = log_df.sort_values("_ts", ascending=False).copy()
         _exp["timestamp_utc"] = _exp["_ts"].dt.strftime("%Y-%m-%d %H:%M UTC")
         _exp["opened"], _exp["open_count"] = False, 0
         _exp["clicked"], _exp["click_count"], _exp["clicked_urls"] = False, 0, ""
-        _ev = _fetch_events()
+        _ev = track_df if track_df is not None else pd.DataFrame()
         if not _ev.empty and "tracking_id" in _ev.columns and "tracking_id" in _exp.columns:
-            _ev = _ev.copy()
-            _ev["tracking_id"] = _ev["tracking_id"].astype(str).str.strip()
-            _ev["event"] = _ev.get("event", "").astype(str).str.strip().str.lower()
             _opens = _ev[_ev["event"] == "open"].groupby("tracking_id").size()
             _clicks = _ev[_ev["event"] == "click"].groupby("tracking_id").size()
             _urls = (_ev[_ev["event"] == "click"].groupby("tracking_id")["dest_url"]
