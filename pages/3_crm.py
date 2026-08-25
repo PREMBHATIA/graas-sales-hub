@@ -2433,11 +2433,34 @@ with tab_compose, _tab_guard("Email Composer"):
                 if bulk_blocked_reason:
                     st.error(f"⚠️ {bulk_blocked_reason}")
 
+                # Internal copies — optional per campaign (Dhanashree: watchers
+                # shouldn't get every batch). Default ON for the first batch of a
+                # campaign; untick for follow-up batches of the same campaign.
+                watchers_selected = []
+                if watcher_list:
+                    _w_on = st.checkbox(
+                        f"📣 Send internal copies to watchers ({len(watcher_list)})",
+                        value=True, key="watchers_on",
+                        help="One [Internal] copy of this campaign to each selected watcher "
+                             "(Watchers tab of the Outreach Log). Not counted in the weekly cap. "
+                             "Untick when re-sending batches of a campaign watchers already saw.",
+                    )
+                    if _w_on:
+                        with st.expander(f"Choose watchers ({len(watcher_list)} selected by default)",
+                                         expanded=False):
+                            watchers_selected = st.multiselect(
+                                "Watchers to copy", watcher_list, default=watcher_list,
+                                key="watchers_pick", label_visibility="collapsed",
+                            )
+                    else:
+                        watchers_selected = []
+
                 bcols = st.columns([2, 1, 1])
                 with bcols[0]:
                     if not bulk_blocked_reason:
-                        _w_bit = (f"  \n**Internal copies:** {len(watcher_list)} watcher(s) — "
-                                  "not counted in cap" if watcher_list else "")
+                        _w_bit = (f"  \n**Internal copies:** {len(watchers_selected)} watcher(s) — "
+                                  "not counted in cap" if watchers_selected else
+                                  "  \n**Internal copies:** off for this send")
                         st.markdown(
                             f"**Will send {stage_final} email(s) via:** {sender_display_name} `<{sender_reply_to}>`  \n"
                             f"**Framework:** {template_name}  \n"
@@ -2512,7 +2535,7 @@ with tab_compose, _tab_guard("Email Composer"):
                             # actually looked like. Bypasses dedup + weekly cap; logged
                             # as "(internal copy)" so analytics can filter them out.
                             watcher_sent, watcher_failed = 0, 0
-                            if watcher_list and sent_n > 0:
+                            if watchers_selected and sent_n > 0:
                                 progress_bar.progress(1.0, text="Sending internal copies…")
                                 _wrow = after_dedup.iloc[0]
                                 _w_full = str(_wrow.get("person_name", "")).strip()
@@ -2536,7 +2559,7 @@ with tab_compose, _tab_guard("Email Composer"):
                                     headline=_substitute(headline, _w_subs),
                                     deck=_substitute(deck, _w_subs),
                                 )
-                                for _w_email in watcher_list:
+                                for _w_email in watchers_selected:
                                     try:
                                         ok_w, msg_w = send_email(
                                             to_email=_w_email, to_name="Graas Internal",
