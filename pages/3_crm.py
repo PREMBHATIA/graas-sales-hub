@@ -1163,273 +1163,82 @@ with tab_contacts, _tab_guard("Contacts"):
 # ══════════════════════════════════════════════════════════════════════════════
 
 with tab_segments, _tab_guard("Segments"):
-    st.markdown("### Re-engagement Buckets")
+    st.markdown("### 🎯 AI Segments")
     st.caption(
-        "Sourced from Amruta's *All-e email re-engagement* playbook (V1, 7 May 2026). "
-        "Each bucket has a defined framework, cadence, and rules. "
-        "Accounts with explicit warnings (voice references, vendor lock-in nuances) are flagged inline."
+        "Every company by AI maturity — the axis campaigns target. Move a company "
+        "between segments below; the change writes straight to the pipeline sheet's "
+        "AI Maturity column. (The old playbook re-engagement buckets were retired "
+        "2026-08-26 — campaigns run on these three segments + the Context arc.)"
     )
 
-    emailable = contacts[contacts['has_email']].copy()
+    _sp = contacts.copy()
+    _sp["ai_segment"] = _sp["ai_segment"].replace("", "Unclassified").fillna("Unclassified")
+    _co_seg = (_sp.groupby("company", as_index=False)
+                  .agg(Segment=("ai_segment", "first"),
+                       Contacts=("has_email", "sum")))
+    _co_seg["Contacts"] = _co_seg["Contacts"].astype(int)
+    _seg_order_tab = ["AI Laggard", "AI Exploring", "AI Mature", "Unclassified"]
 
-    # ── Top-line counts by bucket ─────────────────────────────────────────────
-    bucketed = emailable[emailable['playbook_bucket'].notna()]
-    no_touch_df = emailable[emailable['playbook_no_touch'].notna()]
-    in_buckets_df = emailable[
-        emailable['playbook_bucket'].notna()
-        & emailable['playbook_no_touch'].isna()
-    ]
-    unbucketed = emailable[
-        emailable['playbook_bucket'].isna()
-        & emailable['playbook_no_touch'].isna()
-    ]
+    _mtiles = st.columns(4)
+    for _mt, _sg in zip(_mtiles, _seg_order_tab):
+        _n_co = int((_co_seg["Segment"] == _sg).sum())
+        _n_ct = int(_co_seg.loc[_co_seg["Segment"] == _sg, "Contacts"].sum())
+        _mt.metric(_sg, _n_co, help=f"{_n_ct} emailable contact(s)")
 
-    kc1, kc2, kc3, kc4 = st.columns(4)
-    with kc1:
-        st.metric("In playbook buckets", in_buckets_df['company'].nunique(),
-                  help="Unique companies with at least one playbook bucket. "
-                       "Many appear in multiple buckets (e.g. Polycab is both "
-                       "Timing-Paused AND Strategic).")
-    with kc2: st.metric("🚫 No Touch", no_touch_df['company'].nunique())
-    with kc3: st.metric("Unbucketed", unbucketed['company'].nunique())
-    with kc4: st.metric("Total emailable", emailable['company'].nunique())
+    _lcols = st.columns(4)
+    for _lc, _sg in zip(_lcols, _seg_order_tab):
+        with _lc:
+            _d = (_co_seg[_co_seg["Segment"] == _sg][["company", "Contacts"]]
+                  .rename(columns={"company": "Company"}).sort_values("Company"))
+            st.dataframe(_d, hide_index=True, use_container_width=True,
+                         height=min(560, 80 + 35 * max(1, len(_d))))
 
+    # ── Move a company between segments (writes the pipeline sheet) ──────────
     st.markdown("---")
+    st.markdown("#### ↔️ Move a company")
+    from services.sheets_client import _get_writer_client, _normalize_company_key_for_pipeline
+    _mc1, _mc2, _mc3 = st.columns([2, 1, 1])
+    with _mc1:
+        _mv_co = st.selectbox("Company", sorted(_co_seg["company"]), key="seg_mv_co")
+    _mv_cur = (_co_seg.loc[_co_seg["company"] == _mv_co, "Segment"].iloc[0]
+               if _mv_co else "")
+    with _mc2:
+        _mv_to = st.selectbox("Move to", [x for x in _seg_order_tab if x != "Unclassified"],
+                              key="seg_mv_to", help=f"Currently: {_mv_cur}")
+    with _mc3:
+        st.markdown("&nbsp;")
+        if st.button("Move", type="primary", use_container_width=True, key="seg_mv_btn"):
+            try:
+                _wc = _get_writer_client()
+                _pws = (_wc.open_by_key(os.getenv("ALLE_SHEET_ID", ""))
+                           .worksheet("Overall Pipeline for IN and SEA"))
+                _phdr = [str(h).strip().lower() for h in _pws.row_values(1)]
+                _ai_col = next(i + 1 for i, h in enumerate(_phdr) if "ai maturity" in h)
+                _leads = _pws.col_values(1)
+                _tk = _normalize_company_key_for_pipeline(_mv_co)
+                _nrows = 0
+                for _ri, _nm in enumerate(_leads[1:], start=2):
+                    if _normalize_company_key_for_pipeline(_nm) == _tk:
+                        _pws.update_cell(_ri, _ai_col, _mv_to)
+                        _nrows += 1
+                if _nrows:
+                    st.success(f"✅ **{_mv_co}**: {_mv_cur} → **{_mv_to}** "
+                               f"({_nrows} row(s) updated). Hit 🔄 Refresh CRM Data to see it everywhere.")
+                else:
+                    st.error(f"'{_mv_co}' not found in the pipeline sheet — overlay-only "
+                             "companies are edited via the Contacts tab overlay instead.")
+            except StopIteration:
+                st.error("No 'AI Maturity' column found in the pipeline sheet.")
+            except Exception as _mv_err:
+                st.error(f"Move failed: {_mv_err}")
+    st.caption(f"Selected company is currently **{_mv_cur or '—'}**. Moving updates every "
+               "pipeline row matching the company name.")
 
-    # ── No Touch list (warning, top of page) ──────────────────────────────────
-    if not no_touch_df.empty:
-        with st.expander(
-            f"🚫 **No Touch list** — {no_touch_df['company'].nunique()} accounts that must NOT receive outreach",
-            expanded=False,
-        ):
-            for category, info in NO_TOUCH.items():
-                cat_companies = []
-                for acc_name in info["accounts"]:
-                    matches = no_touch_df[
-                        no_touch_df['company'].str.lower().str.contains(
-                            acc_name.lower(), na=False, regex=False
-                        )
-                    ]
-                    if not matches.empty:
-                        cat_companies.append((acc_name, info["accounts"][acc_name], matches))
-                if not cat_companies:
-                    continue
-                st.markdown(f"**{info['icon']} {category}** — _{info['desc']}_")
-                for acc_name, reason, matches in cat_companies:
-                    n = matches['company'].nunique()
-                    st.markdown(f"- **{acc_name}** ({n} contact{'s' if n != 1 else ''}) — {reason}")
-                st.markdown("")
-
-    # ── Playbook buckets (the main event) ─────────────────────────────────────
-    st.markdown("#### 📬 Playbook Buckets")
-    st.caption("Each bucket has a designated email framework. Click to expand contacts + see rules.")
-
-    for bucket_name, info in PLAYBOOK_BUCKETS.items():
-        # Multi-bucket: account appears in every bucket it matches
-        bucket_grp = emailable[
-            emailable['playbook_buckets_all'].apply(
-                lambda bs: bucket_name in (bs or [])
-            )
-            & emailable['playbook_no_touch'].isna()
-        ]
-        n_companies = bucket_grp['company'].nunique()
-        n_contacts = len(bucket_grp)
-
-        # Companies from playbook list that we did NOT find in the data
-        found_companies = {_normalize_company(c) for c in bucket_grp['company'].unique()}
-        missing = []
-        for acc in info["accounts"]:
-            an = _normalize_company(acc)
-            if not any(an in fc or fc in an for fc in found_companies):
-                missing.append(acc)
-
-        header = f"{info['icon']} **{bucket_name}** — {n_companies} companies, {n_contacts} contacts  ·  Framework: {info['framework']}"
-        with st.expander(header, expanded=False):
-            st.markdown(f"_{info['desc']}_")
-            st.markdown(f"**📨 Cadence:** {info['cadence']}")
-            st.markdown("**📋 Rules:**")
-            for rule in info["rules"]:
-                st.markdown(f"- {rule}")
-
-            if not bucket_grp.empty:
-                st.markdown("**Contacts:**")
-                # Show "Also in" column when account is in multiple buckets
-                preview = bucket_grp[['company', 'person_name', 'email', 'designation',
-                                      'lead_status', 'last_contact',
-                                      'playbook_buckets_all', 'playbook_note']].copy()
-                preview['last_contact'] = preview['last_contact'].apply(
-                    lambda x: x.strftime('%d %b %Y') if pd.notna(x) else '—')
-                preview['Also in'] = preview['playbook_buckets_all'].apply(
-                    lambda bs: ', '.join(b for b in (bs or []) if b != bucket_name) or '—'
-                )
-                preview = preview.drop(columns=['playbook_buckets_all'])
-                preview = preview.sort_values(['company', 'last_contact'], ascending=[True, False])
-                preview['playbook_note'] = preview['playbook_note'].fillna('')
-                st.dataframe(preview.rename(columns={
-                    'company': 'Company', 'person_name': 'Name', 'email': 'Email',
-                    'designation': 'Title', 'lead_status': 'Status',
-                    'last_contact': 'Last Contact', 'playbook_note': '⚠️ Note',
-                }), use_container_width=True, hide_index=True, height=min(320, 40 + 35 * len(preview)))
-
-            if missing:
-                st.warning(
-                    f"📋 Listed in playbook but NOT found in CRM data ({len(missing)}): "
-                    f"{', '.join(missing)}. "
-                    f"Either add them to the All-e Active/Dropped sheet, or update the spelling in the playbook."
-                )
-
-    st.markdown("---")
-
-    # ── Unbucketed accounts (recency view as fallback) ────────────────────────
-    with st.expander(
-        f"📂 **Unbucketed accounts** — {unbucketed['company'].nunique()} companies not in playbook (recency view)",
-        expanded=False,
-    ):
-        st.caption("These accounts are not classified in the playbook yet. Showing recency for context.")
-        recency_order = ['🔥 Hot (<30d)', '☀️ Warm (30-90d)', '❄️ Cool (90-180d)', '🧊 Cold (180+d)', '⚫ No date']
-        matrix = unbucketed.groupby(['recency', 'segment'])['company'].nunique().unstack(fill_value=0)
-        matrix = matrix.reindex(recency_order, fill_value=0)
-        if 'Active' not in matrix.columns: matrix['Active'] = 0
-        if 'Dropped' not in matrix.columns: matrix['Dropped'] = 0
-        matrix['Total'] = matrix['Active'] + matrix['Dropped']
-        matrix = matrix.reset_index().rename(columns={'recency': 'Recency'})
-        st.dataframe(matrix, use_container_width=True, hide_index=True)
-
-        un_preview = unbucketed[['company', 'person_name', 'email', 'segment', 'lead_status',
-                                 'recency', 'last_contact']].copy()
-        un_preview['last_contact'] = un_preview['last_contact'].apply(
-            lambda x: x.strftime('%d %b %Y') if pd.notna(x) else '—')
-        un_preview = un_preview.sort_values(['recency', 'company'])
-        st.dataframe(un_preview.rename(columns={
-            'company': 'Company', 'person_name': 'Name', 'email': 'Email',
-            'segment': 'Segment', 'lead_status': 'Status',
-            'recency': 'Recency', 'last_contact': 'Last Contact',
-        }), use_container_width=True, hide_index=True, height=400)
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# TAB 3: EMAIL COMPOSER
-# ══════════════════════════════════════════════════════════════════════════════
-
-# Templates: the playbook-era frameworks (A–F — Timing-Paused, Eval Stalled,
-# Ghost, Voice-Waiting…) were retired 2026-08-26; campaigns now come from the
-# Context arc calendar. Custom (blank canvas) is the only starter.
-EMAIL_TEMPLATES = {
-    "Custom": {"subject": "", "body": ""},
-}
-
-
-def _substitute(text: str, subs: dict) -> str:
-    """Replace {key} placeholders case-insensitively.
-
-    Dhanashree hit a bug where typing {Sender} (capital S) wasn't replaced
-    because the old code only matched lowercase {sender}. This handles
-    {sender}, {Sender}, {SENDER}, {name}, {Name}, {NAME}, etc. uniformly.
-
-    Unknown placeholders pass through unchanged (so typos like {senderr}
-    stay visible instead of being silently dropped).
-    """
-    if not text:
-        return text
-    keys_lower = {k.lower(): v for k, v in subs.items()}
-
-    def _repl(match):
-        key = match.group(1).lower()
-        if key in keys_lower:
-            return str(keys_lower[key])
-        return match.group(0)  # unknown — leave as-is
-
-    return re.sub(r"\{([a-zA-Z_]+)\}", _repl, text)
-
-
-# ── Personalisation validation (item 4) ──────────────────────────────────────
-# Tokens the composer substitutes per recipient. {sender} always resolves, so
-# it's excluded — a "missing personalisation field" is one of these coming up
-# blank for a recipient, which we must catch BEFORE a broken {Company} ships to
-# a named enterprise contact.
-_RECIPIENT_TOKENS = {"name", "full_name", "company", "vertical", "designation"}
-
-
-def _used_tokens(*texts) -> set:
-    """Lowercased recipient-token names used across the given texts.
-
-    Works on both plain-text bodies and pasted HTML (it just scans for {token}),
-    so raw-HTML sends get validated too. Ignores {sender} and unknown tokens.
-    """
-    found = set()
-    for t in texts:
-        if not t:
-            continue
-        for m in re.finditer(r"\{([a-zA-Z_]+)\}", str(t)):
-            k = m.group(1).lower()
-            if k in _RECIPIENT_TOKENS:
-                found.add(k)
-    return found
-
-
-def _row_subs(row, sender_first: str) -> dict:
-    """Build the substitution dict for one recipient row (mirrors the send path)."""
-    _full = str(row.get("person_name", "") or "").strip()
-    return {
-        "company":     row.get("company", "") or "",
-        "name":        _full.split()[0] if _full else _full,
-        "full_name":   _full,
-        "vertical":    row.get("vertical", "") or "",
-        "sender":      sender_first,
-        "designation": row.get("designation", "") or "",
-    }
-
-
-def _missing_tokens(subs: dict, used: set) -> list:
-    """Which of the used recipient-tokens resolve to blank/'nan' for this row."""
-    out = []
-    for k in used:
-        v = str(subs.get(k, "") or "").strip()
-        if not v or v.lower() == "nan":
-            out.append(k)
-    return sorted(out)
-
-
-@st.cache_data(ttl=90, show_spinner=False)
-def _cached_log_df():
-    """The Sends log, one read per 90s — Analytics previously re-read this sheet
-    ~6× per page load (cap counter, engagement table, export all fetched their
-    own copy), which is most of why the tab took minutes."""
-    from services.email_sender import recent_sends
-    return recent_sends(limit=10000)
-
-
-@st.cache_data(ttl=90, show_spinner=False)
-def _cached_tracking_df():
-    """The open/click beacon log, one read per 90s (was fetched 3× per load)."""
-    from services.email_sender import fetch_tracking_events
-    return fetch_tracking_events()
-
-
-def _fetch_watchers_page() -> list:
-    """Internal watcher emails from the Outreach Log's 'Watchers' tab.
-
-    Watchers receive one copy of every bulk campaign send (bypassing dedup and
-    the weekly cap). Defined HERE with only pre-existing service imports — the
-    Streamlit-Cloud stale-module gotcha means the page must not import the new
-    fetch_watchers symbol from email_sender directly.
-    """
-    from services.sheets_client import fetch_log_rows
-    sheet_id = os.getenv("EMAIL_LOG_SHEET_ID", "")
-    if not sheet_id:
-        return []
-    try:
-        df = fetch_log_rows(sheet_id, "Watchers")
-    except Exception:
-        return []
-    if df is None or df.empty or "email" not in df.columns:
-        return []
-    out = []
-    for e in df["email"].astype(str):
-        e = e.strip().lower()
-        if e and "@" in e and e not in out:
-            out.append(e)
-    return out
+    # ── No Touch (safety list stays visible) ─────────────────────────────────
+    _nt = contacts[contacts["playbook_no_touch"].notna()]
+    with st.expander(f"🚫 No Touch — {_nt['company'].nunique()} account(s) blocked from all outreach"):
+        for _ntc in sorted(_nt["company"].unique()):
+            st.markdown(f"- {_ntc}")
 
 
 with tab_compose, _tab_guard("Email Composer"):
