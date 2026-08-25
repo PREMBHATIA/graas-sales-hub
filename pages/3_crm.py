@@ -2508,7 +2508,7 @@ with tab_compose, _tab_guard("Email Composer"):
                                     company=row["company"],
                                     subject=r_subj,
                                     body=r_body,
-                                    bucket=str(row.get("playbook_bucket", "")) or str(row.get("recency", "")),
+                                    bucket=str(comp_ai_seg),
                                     template=template_name,
                                     bypass_dedup=False,
                                     layout=email_layout,
@@ -2658,32 +2658,44 @@ with tab_analytics, _tab_guard("Analytics"):
         sent_30d = sent_df[sent_df["_ts"] >= now_utc - pd.Timedelta(days=30)]
         failed_7d = log_df[(log_df["status"] != "sent") & (log_df["_ts"] >= now_utc - pd.Timedelta(days=7))]
 
-        # ── Engagement from the open/click beacons ────────────────────────────
-        # Unique per send (tracking_id), so one recipient opening five times
-        # counts once. None => tracking not configured / nothing to match yet.
-        _opened_7d = _clicked_7d = None
-        try:
-            if "tracking_id" in sent_7d.columns:
-                _ids = {t for t in sent_7d["tracking_id"].astype(str).str.strip() if t}
-                if _ids:
-                    _opened_7d = _clicked_7d = 0
-                    if track_df is not None and not track_df.empty and "tracking_id" in track_df.columns:
-                        _opened_7d = len(_ids & set(track_df.loc[track_df["event"] == "open", "tracking_id"]))
-                        _clicked_7d = len(_ids & set(track_df.loc[track_df["event"] == "click", "tracking_id"]))
-        except Exception:
-            pass
+        # ── KPI tiles — externals only (tests + internal copies excluded) ─────
+        def _externals(df):
+            out = df
+            if "company" in out.columns:
+                out = out[~out["company"].astype(str).str.contains(r"\[INTERNAL WATCHER\]|\[TEST\]", regex=True, na=False)]
+            if "template" in out.columns:
+                out = out[~out["template"].astype(str).str.contains(r"\(test\)|\(internal copy\)", regex=True, na=False)]
+            return out
 
-        # ── KPI tiles ─────────────────────────────────────────────────────────
-        k1, k2, k3, k4, k5 = st.columns(5)
-        k1.metric("📤 Sent (7d)", len(sent_7d), help=f"{len(sent_30d)} in last 30 days · {len(sent_df)} all-time")
-        k2.metric("👀 Opened (7d)", "—" if _opened_7d is None else _opened_7d,
-                  help="Unique sends opened. Directional only — Apple Mail pre-fetches "
-                       "images and Gmail proxies them, so this over-counts.")
-        k3.metric("🔗 Clicked (7d)", "—" if _clicked_7d is None else _clicked_7d,
-                  help="Unique sends with a link click — a deliberate human action, "
-                       "so this is the number to trust for 'what resonated'.")
-        k4.metric("↩️ Replied", "—", help="Not tracked yet — needs Gmail API reply polling")
-        k5.metric("🚫 Unsubscribed", "—", help="Not tracked yet — needs a hosted unsubscribe endpoint")
+        _ext7 = _externals(sent_7d)
+        _ext30 = _externals(sent_30d)
+        _op_ids, _cl_ids, _cl_counts = set(), set(), {}
+        if track_df is not None and not track_df.empty and "tracking_id" in track_df.columns:
+            _op_ids = set(track_df.loc[track_df["event"] == "open", "tracking_id"])
+            _cl_ev = track_df[track_df["event"] == "click"]
+            _cl_ids = set(_cl_ev["tracking_id"])
+            _cl_counts = _cl_ev.groupby("tracking_id").size().to_dict()
+
+        def _tid_series(df):
+            return (df["tracking_id"].astype(str).str.strip()
+                    if "tracking_id" in df.columns else pd.Series([], dtype=str))
+
+        _t7 = _tid_series(_ext7)
+        _delivered7 = len(_ext7)
+        _opened7 = int(_t7.isin(_op_ids).sum())
+        _clicks7 = int(sum(_cl_counts.get(t, 0) for t in _t7))
+        _t30 = _tid_series(_ext30)
+        _hot30 = int(_ext30.loc[_t30.isin(_cl_ids)]["company"].nunique()) if len(_ext30) else 0
+
+        k1, k2, k3, k4 = st.columns(4)
+        k1.metric("📤 Delivered (7d)", _delivered7,
+                  help=f"External sends only — tests and internal copies excluded everywhere on this page. {len(_ext30)} in last 30d.")
+        k2.metric("👀 Open rate (7d)", f"{round(_opened7 / _delivered7 * 100)}%" if _delivered7 else "—",
+                  help="Unique external sends opened. Directional — Apple Mail/Gmail prefetch inflates it.")
+        k3.metric("🔗 Clicks (7d)", _clicks7,
+                  help="Total link clicks on external sends — a deliberate action, the number to trust.")
+        k4.metric("🔥 Hot accounts (30d)", _hot30,
+                  help="Companies with at least one click in the last 30 days — see Account heat below.")
 
         # Weekly cap row — computed from the already-fetched frame (mirrors
         # get_sends_this_week incl. the internal-copy exclusion) instead of
@@ -2699,6 +2711,39 @@ with tab_analytics, _tab_guard("Analytics"):
         # Failure callout
         if not failed_7d.empty:
             st.error(f"⚠️ {len(failed_7d)} send failure(s) in the last 7 days — see Recent sends below for details.")
+
+        # ── Segments at a glance — audience size + engagement per AI segment ──
+        st.markdown("---")
+        st.markdown("#### 🎯 Segments at a glance")
+        _seg_order = ["AI Laggard", "AI Exploring", "AI Mature", "Unclassified"]
+        _aud = contacts[contacts["has_email"]].copy() if "has_email" in contacts.columns else contacts.copy()
+        _aud["ai_segment"] = _aud["ai_segment"].fillna("Unclassified").replace("", "Unclassified")
+        _email_seg = {str(e).strip().lower(): sgm for e, sgm in zip(_aud["email"], _aud["ai_segment"])}
+        _e30 = _ext30.copy()
+        _e30["_seg"] = _e30["to_email"].astype(str).str.strip().str.lower().map(_email_seg).fillna("Unclassified")
+        _e30["_tid"] = _tid_series(_e30)
+        _seg_rows = []
+        for _sg in _seg_order:
+            _a = _aud[_aud["ai_segment"] == _sg]
+            _sv = _e30[_e30["_seg"] == _sg]
+            _seg_rows.append({
+                "Segment": _sg,
+                "Companies": int(_a["company"].nunique()),
+                "Contacts": int(len(_a)),
+                "Sends (30d)": int(len(_sv)),
+                "Opened": int(_sv["_tid"].isin(_op_ids).sum()),
+                "Clicks": int(sum(_cl_counts.get(t, 0) for t in _sv["_tid"])),
+            })
+        _seg_df = pd.DataFrame(_seg_rows)
+        _ssty = (_seg_df.style
+                 .set_properties(subset=["Clicks"],
+                                 **{"background-color": "#DBEAFE", "color": "#1D4ED8", "font-weight": "700"})
+                 .set_properties(subset=["Opened"],
+                                 **{"background-color": "#F5F3FF", "color": "#6D28D9", "font-weight": "600"}))
+        st.dataframe(_ssty, use_container_width=True, hide_index=True,
+                     height=min(260, 80 + 35 * len(_seg_df)))
+        st.caption("Audience = contacts with an email in the pipeline sheet, by AI segment. "
+                   "Engagement = external campaign sends in the last 30 days, attributed via each recipient's segment.")
 
         # Full export WITH engagement — sends joined to the Tracking beacons so
         # the CSV answers "who opened / who clicked" without cross-referencing.
@@ -2785,117 +2830,31 @@ with tab_analytics, _tab_guard("Analytics"):
 
         st.markdown("---")
 
-        # ── Volume over time + by sender ──────────────────────────────────────
-        col_a, col_b = st.columns([3, 2])
-
-        with col_a:
-            st.markdown("#### Sends per day (last 30 days)")
-            daily = (sent_30d.assign(_day=sent_30d["_ts"].dt.tz_convert(None).dt.date)
-                            .groupby("_day").size().reset_index(name="Sends"))
-            if daily.empty:
-                st.caption("No sends in the last 30 days.")
-            else:
-                fig_daily = px.bar(daily, x="_day", y="Sends",
-                                   color_discrete_sequence=["#4F46E5"])
-                fig_daily.update_layout(template="plotly_dark", height=280,
-                                        margin=dict(l=10, r=10, t=10, b=10),
-                                        xaxis_title=None, yaxis_title="Sends")
-                st.plotly_chart(fig_daily, use_container_width=True)
-
-        with col_b:
-            st.markdown("#### By sender (last 30d)")
-            if "sender_label" in sent_30d.columns and not sent_30d.empty:
-                by_sender = (sent_30d.groupby("sender_label").size()
-                             .reset_index(name="Sends").sort_values("Sends", ascending=True))
-                fig_s = px.bar(by_sender, x="Sends", y="sender_label", orientation="h",
-                               color_discrete_sequence=["#7C3AED"])
-                fig_s.update_layout(template="plotly_dark", height=280,
-                                    margin=dict(l=10, r=10, t=10, b=10),
-                                    xaxis_title=None, yaxis_title=None)
-                st.plotly_chart(fig_s, use_container_width=True)
-            else:
-                st.caption("No sender data yet.")
-
-        # ── By template + by bucket ───────────────────────────────────────────
-        col_c, col_d = st.columns(2)
-        with col_c:
-            st.markdown("#### By template (last 30d)")
-            if "template" in sent_30d.columns and not sent_30d.empty:
-                by_t = (sent_30d.groupby("template").size().reset_index(name="Sends")
-                        .sort_values("Sends", ascending=True))
-                by_t = by_t[by_t["template"] != ""]
-                if by_t.empty:
-                    st.caption("No template data.")
-                else:
-                    fig_t = px.bar(by_t, x="Sends", y="template", orientation="h",
-                                   color_discrete_sequence=["#10B981"])
-                    fig_t.update_layout(template="plotly_dark", height=280,
-                                        margin=dict(l=10, r=10, t=10, b=10),
-                                        xaxis_title=None, yaxis_title=None)
-                    st.plotly_chart(fig_t, use_container_width=True)
-            else:
-                st.caption("No template data yet.")
-
-        with col_d:
-            st.markdown("#### 📨 Opens & clicks by template (the A/B answer)")
-            try:
-                # Computed from the cached frames (was engagement_by_template,
-                # which re-read both sheets on every load).
-                _eng = pd.DataFrame()
-                if "tracking_id" in sent_30d.columns:
-                    _s = sent_30d.copy()
-                    _s["tracking_id"] = _s["tracking_id"].astype(str).str.strip()
-                    _s = _s[_s["tracking_id"] != ""]
-                    if not _s.empty:
-                        if "template" not in _s.columns:
-                            _s["template"] = "(none)"
-                        _s["template"] = (_s["template"].astype(str).str.strip()
-                                          .replace({"": "(none)", "nan": "(none)"}))
-                        _op, _cl = set(), set()
-                        if track_df is not None and not track_df.empty and "tracking_id" in track_df.columns:
-                            _op = set(track_df.loc[track_df["event"] == "open", "tracking_id"])
-                            _cl = set(track_df.loc[track_df["event"] == "click", "tracking_id"])
-                        _s["_opened"] = _s["tracking_id"].isin(_op)
-                        _s["_clicked"] = _s["tracking_id"].isin(_cl)
-                        _eng = (_s.groupby("template")
-                                  .agg(Sent=("tracking_id", "nunique"),
-                                       Opened=("_opened", "sum"),
-                                       Clicked=("_clicked", "sum"))
-                                  .reset_index())
-                        _eng["Open %"] = (_eng["Opened"] / _eng["Sent"] * 100).round(0)
-                        _eng["Click %"] = (_eng["Clicked"] / _eng["Sent"] * 100).round(0)
-                        _eng = _eng.sort_values("Sent", ascending=False).reset_index(drop=True)
-                if _eng.empty:
-                    st.caption(
-                        "No tracked sends yet — engagement appears once emails go "
-                        "out with PIXEL_BASE_URL configured."
-                    )
-                else:
-                    st.dataframe(_eng, use_container_width=True, hide_index=True)
-                    st.caption(
-                        "Counted once per send. **Judge the A/B on Click %** — opens are "
-                        "directional only (Apple Mail pre-fetches images and Gmail proxies "
-                        "them, so open rate is inflated); a click is a deliberate action."
-                    )
-            except Exception as _eng_err:
-                st.caption(f"Engagement unavailable: {_eng_err}")
-
-            st.markdown("#### By bucket (last 30d)")
-            if "bucket" in sent_30d.columns and not sent_30d.empty:
-                by_b = (sent_30d.groupby("bucket").size().reset_index(name="Sends")
-                        .sort_values("Sends", ascending=True))
-                by_b = by_b[by_b["bucket"] != ""]
-                if by_b.empty:
-                    st.caption("No bucket data.")
-                else:
-                    fig_b = px.bar(by_b, x="Sends", y="bucket", orientation="h",
-                                   color_discrete_sequence=["#F59E0B"])
-                    fig_b.update_layout(template="plotly_dark", height=280,
-                                        margin=dict(l=10, r=10, t=10, b=10),
-                                        xaxis_title=None, yaxis_title=None)
-                    st.plotly_chart(fig_b, use_container_width=True)
-            else:
-                st.caption("No bucket data yet.")
+        # ── Campaign performance — one row per campaign (subject), externals ──
+        st.markdown("#### 📮 Campaign performance (last 30d)")
+        if _rl.empty:
+            st.caption("No campaign sends in the last 30 days.")
+        else:
+            _cp = (_rl.groupby("subject")
+                     .agg(**{"First sent": ("_ts", "min"), "Sent": ("to_email", "size"),
+                             "Opened": ("opened", "sum"), "Clicks": ("click_count", "sum"),
+                             "_clicked_sends": ("clicked", "sum")})
+                     .reset_index().rename(columns={"subject": "Campaign"}))
+            _cp["Open %"] = (_cp["Opened"] / _cp["Sent"] * 100).round(0).astype(int)
+            _cp["Click %"] = (_cp["_clicked_sends"] / _cp["Sent"] * 100).round(0).astype(int)
+            _cp = _cp.sort_values("First sent", ascending=False)
+            _cp["First sent"] = _cp["First sent"].dt.strftime("%d %b")
+            _cp = _cp[["Campaign", "First sent", "Sent", "Opened", "Open %", "Clicks", "Click %"]]
+            _psty = (_cp.style
+                     .set_properties(subset=["Clicks", "Click %"],
+                                     **{"background-color": "#DBEAFE", "color": "#1D4ED8", "font-weight": "700"})
+                     .set_properties(subset=["Opened", "Open %"],
+                                     **{"background-color": "#F5F3FF", "color": "#6D28D9", "font-weight": "600"}))
+            st.dataframe(_psty, use_container_width=True, hide_index=True,
+                         height=min(400, 80 + 35 * len(_cp)))
+            st.caption("Campaigns are identified by subject line. Judge on **Click %** — opens are "
+                       "inflated by Apple Mail/Gmail prefetch. Tests and internal copies are excluded "
+                       "from every number on this page.")
 
         st.markdown("---")
 
