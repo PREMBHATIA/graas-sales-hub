@@ -1922,6 +1922,9 @@ with tab_compose, _tab_guard("Email Composer"):
                 # ── Pre-flight: build filter pipeline ─────────────────────────
                 bulk_pool = recipients[recipients["email"].apply(lambda e: bool(e) and "@" in str(e))].copy()
                 bulk_pool["_email_norm"] = bulk_pool["email"].str.lower().str.strip()
+                # One email = one send, even if the contact appears under two
+                # company rows (sheet + overlay) — guards against double-sends.
+                bulk_pool = bulk_pool.drop_duplicates("_email_norm")
 
                 # Stage 1: total
                 stage_total = len(bulk_pool)
@@ -2400,7 +2403,14 @@ with tab_analytics, _tab_guard("Analytics"):
         _t30 = _tid_series(_ext30)
         _hot30 = int(_ext30.loc[_t30.isin(_cl_ids)]["company"].nunique()) if len(_ext30) else 0
 
-        k1, k2, k3, k4 = st.columns(4)
+        supp_df = _fetch_suppressions()
+        _unsub_n = 0
+        if not supp_df.empty and "reason" in supp_df.columns:
+            _unsub_n = int(supp_df["reason"].astype(str).str.lower()
+                           .str.contains("unsub").sum())
+        _supp_total = 0 if supp_df.empty else len(supp_df)
+
+        k1, k2, k3, k4, k5 = st.columns(5)
         k1.metric("📤 Delivered (7d)", _delivered7,
                   help=f"External sends only — tests and internal copies excluded everywhere on this page. {len(_ext30)} in last 30d.")
         k2.metric("👀 Open rate (7d)", f"{round(_opened7 / _delivered7 * 100)}%" if _delivered7 else "—",
@@ -2409,6 +2419,9 @@ with tab_analytics, _tab_guard("Analytics"):
                   help="Total link clicks on external sends — a deliberate action, the number to trust.")
         k4.metric("🔥 Hot accounts (30d)", _hot30,
                   help="Companies with at least one click in the last 30 days — see Account heat below.")
+        k5.metric("🚫 Unsubscribed", _unsub_n,
+                  help=f"Suppression-list entries whose reason mentions unsubscribe "
+                       f"(added when someone replies 'unsubscribe'). Total suppressed: {_supp_total}.")
 
         # Weekly cap row — computed from the already-fetched frame (mirrors
         # get_sends_this_week incl. the internal-copy exclusion) instead of
@@ -2650,7 +2663,8 @@ with tab_analytics, _tab_guard("Analytics"):
         "any other reason. Stored in the **Suppressions** tab of the Outreach Log."
     )
 
-    supp_df = _fetch_suppressions()
+    if "supp_df" not in dir():
+        supp_df = _fetch_suppressions()
 
     add_cols = st.columns([3, 4, 2, 1])
     with add_cols[0]:

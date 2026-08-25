@@ -2,7 +2,7 @@
   "_comment": "Local CRM overlay — contacts added by Prem outside the team All-e sheet. Merged into CRM view at load time. All-e sheet is NOT modified.",
   "contacts": [
     {
-      "company": "Havells India Limited",
+      "company": "Havells",
       "vertical": "FMEG",
       "entity_type": "OEM",
       "lead_status": "2-POC",
