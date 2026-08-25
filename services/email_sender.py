@@ -63,6 +63,18 @@ SUPPRESSION_HEADERS = ["email", "reason", "added_at_utc", "added_by"]
 # and are logged with template "... (internal copy)" so analytics can filter.
 WATCHERS_TAB_NAME = "Watchers"
 
+# Every EXTERNAL send is silently BCC'd to this list (true BCC — envelope
+# recipients only, no header, invisible to the prospect). Tests and internal
+# watcher copies are excluded so these folks aren't double-copied. Override
+# via env AUDIT_BCC (comma-separated); set AUDIT_BCC="" to disable.
+AUDIT_BCC_DEFAULT = ("prem@graas.ai,amruta@graas.ai,"
+                     "dhanashree.mohite@graas.ai,ajinkya.patil@graas.ai")
+
+
+def _audit_bcc() -> list:
+    raw = os.getenv("AUDIT_BCC", AUDIT_BCC_DEFAULT)
+    return [e.strip().lower() for e in raw.split(",") if "@" in e.strip()]
+
 # ── Open / click tracking ────────────────────────────────────────────────────
 # PIXEL_BASE_URL = the deployed Apps Script web-app URL that logs hits into the
 # "Tracking" tab of the same Outreach Log sheet. If it's unset, every helper
@@ -220,11 +232,13 @@ def _html_to_text(html: str) -> str:
 # ── Public API ───────────────────────────────────────────────────────────────
 
 def get_weekly_cap() -> int:
-    """Read weekly cap from env, default 50."""
+    """Read weekly cap from env. Default raised 50→500 (2026-08-26): 50 blocked
+    a 46-recipient segment campaign; 500 is effectively uncapped at current
+    volumes while still guarding against a runaway send loop."""
     try:
-        return int(os.getenv("WEEKLY_SEND_CAP", "50"))
+        return int(os.getenv("WEEKLY_SEND_CAP", "500"))
     except ValueError:
-        return 50
+        return 500
 
 
 def get_dedup_days() -> int:
@@ -482,6 +496,16 @@ def send_email(
         alt.attach(MIMEText(html_full, "html", "utf-8"))
         msg.attach(logo_mime_part())
 
+    # Audit BCC — external sends only. True BCC: the addresses go on the SMTP
+    # envelope, never into the message headers, so recipients can't see them.
+    _internal_send = (
+        "[TEST]" in (company or "") or "[INTERNAL WATCHER]" in (company or "")
+        or str(template).endswith("(test)") or str(template).endswith("(internal copy)")
+    )
+    _rcpts = [to_email]
+    if not _internal_send:
+        _rcpts += [b for b in _audit_bcc() if b != to_email.strip().lower()]
+
     status = "sent"
     error_msg = ""
     try:
@@ -490,7 +514,7 @@ def send_email(
             server.starttls()
             server.ehlo()
             server.login(smtp_user, smtp_pass)
-            server.sendmail(smtp_user, [to_email], msg.as_string())
+            server.sendmail(smtp_user, _rcpts, msg.as_string())
     except smtplib.SMTPAuthenticationError as e:
         status, error_msg = "failed", f"SMTP auth failed — check App Password: {e}"
     except Exception as e:
