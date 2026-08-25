@@ -38,7 +38,7 @@ SEGMENT_SUGGESTIONS_SHEET_ID = os.getenv(
 SEGMENT_SUGGESTIONS_GID = os.getenv("SEGMENT_SUGGESTIONS_GID", "2125984853")
 # The "Theme - 3 Months" content-plan tab (gid-first hint; header-validated,
 # falls back to scanning tabs — survives renames/moves).
-SEGMENT_THEME_PLAN_GID = os.getenv("SEGMENT_THEME_PLAN_GID", "1963894330")
+SEGMENT_THEME_PLAN_GID = os.getenv("SEGMENT_THEME_PLAN_GID", "1357660099")
 # An Email Theme containing any of these = "don't send yet" (voice demo pending).
 _VOICE_HOLD_MARKERS = ("voice", "hold until demo")
 
@@ -158,36 +158,33 @@ _PLAN_CODE_RE = re.compile(r"^[A-Za-z]{0,2}\d{1,2}$")
 
 
 def _extract_theme_plan(vals) -> pd.DataFrame:
-    """Parse a worksheet into bucket/code/theme/question/belief/pov rows.
-    Returns empty if this tab doesn't look like the plan (signature miss)."""
-    rows, bucket, cols = [], "", None
+    """Parse the "Context arc - v2" tab: code/theme/question/audience rows.
+    Signature = a header row carrying BOTH 'Email Theme' and 'Audience' (the
+    retired "Theme - 3 Months" tab has no Audience column, so it can't match).
+    Handles both section headers (main arc + the E/L show-don't-tell track)."""
+    rows, cols = [], None
     for r in (vals or []):
         cells = [str(x).strip() for x in r]
         if not any(cells):
             continue
         low = [c.lower() for c in cells]
         first = cells[0] if cells else ""
-        if first.upper().startswith("BUCKET"):
-            # bucket label = first non-empty cell after the BUCKET marker
-            rest = [c for c in cells[1:] if c]
-            bucket = rest[0] if rest else first
-            continue
-        if any("email theme" in c for c in low) and any("core question" in c for c in low):
-            def find(needle):
+        if any("email theme" in c for c in low) and any("audience" in c for c in low):
+            def _find(needle):
                 for i, c in enumerate(low):
                     if needle in c:
                         return i
                 return None
-            cols = {"theme": find("email theme"), "question": find("core question"),
-                    "belief": find("belief"), "pov": find("pov")}
+            cols = {"theme": _find("email theme"), "question": _find("core question"),
+                    "audience": _find("audience")}
             continue
         if cols is not None and _PLAN_CODE_RE.match(first):
             cell = lambda i: (cells[i] if (i is not None and i < len(cells)) else "")
             theme = cell(cols["theme"])
             if theme:
-                rows.append({"bucket": bucket, "code": first, "theme": theme,
+                rows.append({"code": first, "theme": theme,
                              "question": cell(cols["question"]),
-                             "belief": cell(cols["belief"]), "pov": cell(cols["pov"])})
+                             "audience": cell(cols["audience"])})
     return pd.DataFrame(rows)
 
 
@@ -215,30 +212,19 @@ def _load_theme_plan() -> pd.DataFrame:
     return pd.DataFrame()
 
 
-def _plan_bucket_for_segment(segment: str, buckets) -> str:
-    """Map a composer AI segment onto a plan bucket label.
-    'AI Mature' → the bucket mentioning mature; Exploring/Laggard → the bucket
-    mentioning explorer/laggard. '' if no bucket fits."""
-    seg = _normalize_ai_segment(segment)
-    for b in buckets:
-        bl = str(b).lower()
-        if seg == "AI Mature" and "matur" in bl:
-            return b
-        if seg in ("AI Exploring", "AI Laggard") and ("explor" in bl or "laggard" in bl):
-            return b
-    return ""
-
-
 def _render_theme_plan(segment: str) -> bool:
-    """Show the 3-month email arc for this segment's bucket. False if no plan."""
+    """Show the Context arc emails for this segment (Audience column match)."""
     df = _load_theme_plan()
-    if df.empty:
+    if df.empty or "audience" not in df.columns:
         return False
-    bucket = _plan_bucket_for_segment(segment, df["bucket"].unique())
-    if not bucket:
+    seg = _normalize_ai_segment(segment)
+    _needle = {"AI Laggard": "laggard", "AI Exploring": "explor", "AI Mature": "mature"}.get(seg, "")
+    aud = df["audience"].astype(str).str.lower()
+    sub = df[aud.str.contains("all") | (aud.str.contains(_needle) if _needle else False)]
+    if sub.empty:
         return False
-    sub = df[df["bucket"] == bucket]
-    st.markdown(f"**📅 3-month content plan — {bucket}** ({len(sub)} emails)")
+    st.markdown(f"**📅 Context arc — the {len(sub)} emails for {seg}** "
+                "(from the 'Context arc - v2' tab)")
     for _, r in sub.iterrows():
         st.markdown(f"- **{r['code']} · {r['theme']}**")
         if str(r.get("question", "")).strip():
@@ -252,49 +238,15 @@ def _is_voice_hold(suggestion: str) -> bool:
 
 
 def _voice_hold_companies() -> set:
-    """Normalized company names flagged 'Voice — Hold Until Demo' — do-not-send
-    until the voice demo ships. Empty set if the sheet isn't readable yet."""
+    """Normalized company names flagged 'Voice — Hold Until Demo' in the
+    audience sheet — do-not-send until the voice demo ships. This is the ONLY
+    remaining consumer of the audience-list themes (display was retired with
+    the playbook). Empty set if the sheet isn't readable."""
     df = _load_segment_suggestions()
     if df.empty or "suggestion" not in df.columns:
         return set()
     held = df[df["suggestion"].apply(_is_voice_hold)]
     return {_normalize_company(c) for c in held["account"].astype(str) if str(c).strip()}
-
-
-def _render_segment_suggestions(segment: str) -> bool:
-    """Show suggestions for one AI segment inline. Returns False if unreadable.
-
-    Segment matching is tolerant (via _normalize_ai_segment, so 'AI Explorers' /
-    'explorer' / 'Exploring' all match); blank/'all' rows apply to every segment.
-    Accounts are grouped by their Email Theme so a segment with 40 accounts on the
-    same theme reads as one line, with the exceptions (overrides, voice-hold)
-    called out separately.
-    """
-    df = _load_segment_suggestions()
-    if df.empty:
-        return False
-    raw = df["segment"].astype(str).str.strip()
-    is_wild = raw.str.lower().isin(["", "all", "any", "all segments", "(all segments)"])
-    matches_seg = raw.apply(_normalize_ai_segment) == _normalize_ai_segment(segment)
-    sub = df[is_wild | matches_seg]
-    if sub.empty:
-        st.caption(f"No suggestions listed for **{segment}** yet.")
-        return True
-    # Group accounts by theme; voice-hold themes surfaced last with a warning.
-    grouped = {}
-    for _, r in sub.iterrows():
-        grouped.setdefault(str(r["suggestion"]).strip(), []).append(
-            str(r.get("account", "") or "").strip())
-    ordered = sorted(grouped.items(), key=lambda kv: (_is_voice_hold(kv[0]), -len(kv[1])))
-    for theme, accts in ordered:
-        accts = [a for a in accts if a]
-        names = ", ".join(sorted(accts))
-        tag = "🔇 " if _is_voice_hold(theme) else ""
-        head = f"**{tag}{theme}** ({len(accts)})" if accts else f"**{tag}{theme}**"
-        st.markdown(f"- {head}" + (f" — {names}" if names else ""))
-    if any(_is_voice_hold(t) for t, _ in ordered):
-        st.caption("🔇 Voice-hold accounts are auto-excluded from sends until the voice demo ships.")
-    return True
 
 
 st.set_page_config(page_title="CRM & Outreach | Graas", page_icon="📧", layout="wide")
@@ -1436,19 +1388,14 @@ with tab_compose, _tab_guard("Email Composer"):
             f"📣 {len(recipients)} contacts across "
             f"{recipients['company'].nunique() if not recipients.empty else 0} companies."
         )
-        # Item 5: contextual per-segment email suggestions for the chosen segment —
-        # the 3-month content arc first (what to send next), then the per-account
-        # themes from the audience list. Both live-read from Dhanashree's sheet.
-        with st.expander(f"💡 Email suggestions for {comp_ai_seg}", expanded=False):
-            _had_plan = _render_theme_plan(comp_ai_seg)
-            if _had_plan:
-                st.markdown("---")
-                st.markdown("**Per-account themes (audience list):**")
-            if not _render_segment_suggestions(comp_ai_seg) and not _had_plan:
+        # What to send this segment — the Context arc calendar (the audience-list
+        # per-account themes were retired with the playbook; the audience sheet
+        # is still read invisibly for voice-hold exclusions).
+        with st.expander(f"📅 Context arc — what to send {comp_ai_seg}", expanded=False):
+            if not _render_theme_plan(comp_ai_seg):
                 st.caption(
-                    "Suggestions are live-read from Dhanashree's audience sheet — share it "
-                    "with the app's service account "
-                    "(`command-center@prefab-bruin-491807-n0.iam.gserviceaccount.com`) to switch this on."
+                    "Context arc not readable yet — check the 'Context arc - v2' tab in "
+                    "Dhanashree's workbook is shared with the app's service account."
                 )
 
     # View / edit recipient greeting names — feeds {name} in sends.

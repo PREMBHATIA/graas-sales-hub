@@ -88,7 +88,7 @@ except Exception as e:
     traceback.print_exc()
     print(f"\nSMOKE FAIL: {type(e).__name__}: {e}")
     sys.exit(1)
-print("SMOKE OK — prologue executes; header called _render_segment_suggestions without NameError")
+print("SMOKE OK — prologue executes without NameError")
 
 
 # ── Regression guard: module-level symbols the tab bodies depend on ──────────
@@ -99,7 +99,8 @@ _src_full = open(PAGE).read()
 _REQUIRED = ["EMAIL_TEMPLATES = {", "def _substitute", "def _used_tokens",
              "def _row_subs", "def _missing_tokens", "def _fetch_watchers_page",
              "def _cached_log_df", "def _cached_tracking_df",
-             "def _render_segment_suggestions", "def _render_theme_plan",
+             "def _render_theme_plan", "def _load_theme_plan",
+             "def _load_segment_suggestions", "def _voice_hold_companies", "def _is_voice_hold",
              "def _normalize_ai_segment", "def _normalize_company", "def _step_header"]
 _missing = [r for r in _REQUIRED if r not in _src_full]
 assert not _missing, f"SMOKE FAIL — definitions deleted: {_missing}"
