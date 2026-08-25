@@ -1179,15 +1179,37 @@ with tab_segments, _tab_guard("Segments"):
     _co_seg["Contacts"] = _co_seg["Contacts"].astype(int)
     _seg_order_tab = ["AI Laggard", "AI Exploring", "AI Mature", "Unclassified"]
 
-    _mtiles = st.columns(4)
-    for _mt, _sg in zip(_mtiles, _seg_order_tab):
-        _n_co = int((_co_seg["Segment"] == _sg).sum())
-        _n_ct = int(_co_seg.loc[_co_seg["Segment"] == _sg, "Contacts"].sum())
-        _mt.metric(_sg, _n_co, help=f"{_n_ct} emailable contact(s)")
+    # ── Near-duplicate company names → banner (split accounts double-email) ──
+    _SUFFIXES = {"ltd", "limited", "pvt", "private", "india", "inc", "corp", "co"}
+
+    def _dup_key(n):
+        toks = [t for t in _normalize_company(n).replace(".", " ").split()
+                if t not in _SUFFIXES]
+        return " ".join(toks)
+
+    _co_seg["_dk"] = _co_seg["company"].apply(_dup_key)
+    _dups = _co_seg[(_co_seg["_dk"] != "") & _co_seg.duplicated("_dk", keep=False)]
+    if not _dups.empty:
+        _dl = []
+        for _dk, _dg in _dups.groupby("_dk"):
+            _dl.append(" ↔ ".join(f"**{r.company}** ({r.Segment})"
+                                   for r in _dg.itertuples()))
+        st.warning(
+            "⚠️ **Possible duplicate companies** — the same account appears under "
+            "more than one name (campaigns could double-email it). Reconcile the "
+            "Lead name in the sheet/overlay:\n\n- " + "\n- ".join(_dl))
 
     _lcols = st.columns(4)
     for _lc, _sg in zip(_lcols, _seg_order_tab):
+        _n_co = int((_co_seg["Segment"] == _sg).sum())
+        _n_ct = int(_co_seg.loc[_co_seg["Segment"] == _sg, "Contacts"].sum())
         with _lc:
+            st.markdown(
+                f"<div style='text-align:center;padding:4px 0 10px;'>"
+                f"<div style='font-size:0.95rem;font-weight:700;color:#6b7280;'>{_sg}</div>"
+                f"<div style='font-size:2.2rem;font-weight:800;color:#0D0D11;line-height:1.15;'>{_n_co}</div>"
+                f"<div style='font-size:0.78rem;color:#9aa1ad;'>{_n_ct} contact(s)</div>"
+                f"</div>", unsafe_allow_html=True)
             _d = (_co_seg[_co_seg["Segment"] == _sg][["company", "Contacts"]]
                   .rename(columns={"company": "Company"}).sort_values("Company"))
             st.dataframe(_d, hide_index=True, use_container_width=True,
