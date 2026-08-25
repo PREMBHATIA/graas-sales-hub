@@ -89,3 +89,21 @@ except Exception as e:
     print(f"\nSMOKE FAIL: {type(e).__name__}: {e}")
     sys.exit(1)
 print("SMOKE OK — prologue executes; header called _render_segment_suggestions without NameError")
+
+
+# ── Regression guard: module-level symbols the tab bodies depend on ──────────
+# py_compile can't catch these (NameError only fires at page load) and the
+# prologue exec stops at st.tabs — this list is the contract. Bit us 2026-08-26
+# when a tab rebuild deleted EMAIL_TEMPLATES/_substitute wholesale.
+_src_full = open(PAGE).read()
+_REQUIRED = ["EMAIL_TEMPLATES = {", "def _substitute", "def _used_tokens",
+             "def _row_subs", "def _missing_tokens", "def _fetch_watchers_page",
+             "def _cached_log_df", "def _cached_tracking_df",
+             "def _render_segment_suggestions", "def _render_theme_plan",
+             "def _normalize_ai_segment", "def _normalize_company", "def _step_header"]
+_missing = [r for r in _REQUIRED if r not in _src_full]
+assert not _missing, f"SMOKE FAIL — definitions deleted: {_missing}"
+_tab_idx = _src_full.index("with tab_compose")
+_late = [r for r in _REQUIRED if _src_full.index(r) > _tab_idx]
+assert not _late, f"SMOKE FAIL — defined after tab_compose (NameError at load): {_late}"
+print(f"SYMBOLS OK — {len(_REQUIRED)} module-level definitions present & ordered")

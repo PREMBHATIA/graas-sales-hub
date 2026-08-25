@@ -1241,6 +1241,115 @@ with tab_segments, _tab_guard("Segments"):
             st.markdown(f"- {_ntc}")
 
 
+# Templates: the playbook-era frameworks (A–F — Timing-Paused, Eval Stalled,
+# Ghost, Voice-Waiting…) were retired 2026-08-26; campaigns now come from the
+# Context arc calendar. Custom (blank canvas) is the only starter.
+EMAIL_TEMPLATES = {
+    "Custom": {"subject": "", "body": ""},
+}
+
+
+def _substitute(text: str, subs: dict) -> str:
+    """Replace {key} placeholders case-insensitively.
+
+    Handles {sender}, {Sender}, {SENDER}, {name}, {Name}, {NAME}, etc.
+    uniformly. Unknown placeholders pass through unchanged (so typos like
+    {senderr} stay visible instead of being silently dropped)."""
+    if not text:
+        return text
+    keys_lower = {k.lower(): v for k, v in subs.items()}
+
+    def _repl(match):
+        key = match.group(1).lower()
+        if key in keys_lower:
+            return str(keys_lower[key])
+        return match.group(0)  # unknown — leave as-is
+
+    return re.sub(r"\{([a-zA-Z_]+)\}", _repl, text)
+
+
+# ── Personalisation validation (item 4) ──────────────────────────────────────
+# Tokens the composer substitutes per recipient. {sender} always resolves, so
+# it's excluded — a "missing personalisation field" is one of these coming up
+# blank for a recipient, which we must catch BEFORE a broken {Company} ships.
+_RECIPIENT_TOKENS = {"name", "full_name", "company", "vertical", "designation"}
+
+
+def _used_tokens(*texts) -> set:
+    """Lowercased recipient-token names used across the given texts."""
+    found = set()
+    for t in texts:
+        if not t:
+            continue
+        for m in re.finditer(r"\{([a-zA-Z_]+)\}", str(t)):
+            k = m.group(1).lower()
+            if k in _RECIPIENT_TOKENS:
+                found.add(k)
+    return found
+
+
+def _row_subs(row, sender_first: str) -> dict:
+    """Build the substitution dict for one recipient row (mirrors the send path)."""
+    _full = str(row.get("person_name", "") or "").strip()
+    return {
+        "company":     row.get("company", "") or "",
+        "name":        _full.split()[0] if _full else _full,
+        "full_name":   _full,
+        "vertical":    row.get("vertical", "") or "",
+        "sender":      sender_first,
+        "designation": row.get("designation", "") or "",
+    }
+
+
+def _missing_tokens(subs: dict, used: set) -> list:
+    """Which of the used recipient-tokens resolve to blank/'nan' for this row."""
+    out = []
+    for k in used:
+        v = str(subs.get(k, "") or "").strip()
+        if not v or v.lower() == "nan":
+            out.append(k)
+    return sorted(out)
+
+
+@st.cache_data(ttl=90, show_spinner=False)
+def _cached_log_df():
+    """The Sends log, one read per 90s — Analytics reuses this everywhere."""
+    from services.email_sender import recent_sends
+    return recent_sends(limit=10000)
+
+
+@st.cache_data(ttl=90, show_spinner=False)
+def _cached_tracking_df():
+    """The open/click beacon log, one read per 90s."""
+    from services.email_sender import fetch_tracking_events
+    return fetch_tracking_events()
+
+
+def _fetch_watchers_page() -> list:
+    """Internal watcher emails from the Outreach Log's 'Watchers' tab.
+
+    Defined page-side with only pre-existing service imports — the
+    Streamlit-Cloud stale-module gotcha means the page must not import the
+    fetch_watchers symbol from email_sender directly.
+    """
+    from services.sheets_client import fetch_log_rows
+    sheet_id = os.getenv("EMAIL_LOG_SHEET_ID", "")
+    if not sheet_id:
+        return []
+    try:
+        df = fetch_log_rows(sheet_id, "Watchers")
+    except Exception:
+        return []
+    if df is None or df.empty or "email" not in df.columns:
+        return []
+    out = []
+    for e in df["email"].astype(str):
+        e = e.strip().lower()
+        if e and "@" in e and e not in out:
+            out.append(e)
+    return out
+
+
 with tab_compose, _tab_guard("Email Composer"):
     st.markdown("### ✉️ Compose Outreach Email")
 
