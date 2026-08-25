@@ -1754,8 +1754,8 @@ with tab_compose, _tab_guard("Email Composer"):
             st.markdown("**📄 Paste your own HTML**")
             st.caption(
                 "Sent as-authored — no Graas shell. Tokens like `{name}`/`{company}` "
-                "still substitute; bare URLs get tracked links, your `<a>` tags are "
-                "left intact."
+                "still substitute. Your links are click-tracked through the redirect "
+                "(destinations + UTMs preserved) so opens AND clicks show in Analytics."
             )
             template_name = "Custom"
         else:
@@ -2458,7 +2458,7 @@ with tab_compose, _tab_guard("Email Composer"):
                                 r_headline = _substitute(headline, _r_subs)
                                 r_deck = _substitute(deck, _r_subs)
 
-                                ok_b, msg_b = send_email(
+                                _b_kwargs = dict(
                                     sender_label=sender_label,
                                     to_email=row["email"],
                                     to_name=r_full,
@@ -2467,11 +2467,19 @@ with tab_compose, _tab_guard("Email Composer"):
                                     body=r_body,
                                     bucket=str(row.get("playbook_bucket", "")) or str(row.get("recency", "")),
                                     template=template_name,
-                                    bypass_dedup=False,  # already pre-filtered, but keep guard active
+                                    bypass_dedup=False,
                                     layout=email_layout,
                                     headline=r_headline,
                                     deck=r_deck,
                                 )
+                                try:
+                                    # precleared: the pre-flight pipeline above already ran
+                                    # cap/suppression/dedup for the whole batch — skipping
+                                    # the per-recipient re-reads keeps us under the Sheets
+                                    # API quota (what dropped log rows on Aug 21).
+                                    ok_b, msg_b = send_email(precleared=True, **_b_kwargs)
+                                except TypeError:
+                                    ok_b, msg_b = send_email(**_b_kwargs)
                                 if ok_b:
                                     sent_n += 1
                                 else:
@@ -2512,10 +2520,10 @@ with tab_compose, _tab_guard("Email Composer"):
                                     try:
                                         ok_w, msg_w = send_email(
                                             to_email=_w_email, to_name="Graas Internal",
-                                            bypass_cap=True, **_w_kwargs)
+                                            bypass_cap=True, precleared=True, **_w_kwargs)
                                     except TypeError:
                                         # Stale service module on Cloud without the new
-                                        # bypass_cap kwarg — send anyway (cap applies).
+                                        # kwargs — send anyway (checks apply).
                                         ok_w, msg_w = send_email(
                                             to_email=_w_email, to_name="Graas Internal",
                                             **_w_kwargs)
@@ -2819,6 +2827,46 @@ with tab_analytics, _tab_guard("Analytics"):
             ["timestamp_utc", "sender_label", "to_email", "company", "template", "subject", "status", "error_msg"]
             if c in recent_view.columns]
         st.dataframe(recent_view[cols_to_show], use_container_width=True, hide_index=True, height=420)
+
+        # Full export WITH engagement — sends joined to the Tracking beacons so
+        # the CSV answers "who opened / who clicked" without cross-referencing.
+        from services.email_sender import fetch_tracking_events as _fetch_events
+        _exp = log_df.sort_values("_ts", ascending=False).copy()
+        _exp["timestamp_utc"] = _exp["_ts"].dt.strftime("%Y-%m-%d %H:%M UTC")
+        _exp["opened"], _exp["open_count"] = False, 0
+        _exp["clicked"], _exp["click_count"], _exp["clicked_urls"] = False, 0, ""
+        _ev = _fetch_events()
+        if not _ev.empty and "tracking_id" in _ev.columns and "tracking_id" in _exp.columns:
+            _ev = _ev.copy()
+            _ev["tracking_id"] = _ev["tracking_id"].astype(str).str.strip()
+            _ev["event"] = _ev.get("event", "").astype(str).str.strip().str.lower()
+            _opens = _ev[_ev["event"] == "open"].groupby("tracking_id").size()
+            _clicks = _ev[_ev["event"] == "click"].groupby("tracking_id").size()
+            _urls = (_ev[_ev["event"] == "click"].groupby("tracking_id")["dest_url"]
+                     .apply(lambda s: " | ".join(sorted(set(str(x) for x in s if str(x).strip()))))
+                     if "dest_url" in _ev.columns else None)
+            _tid = _exp["tracking_id"].astype(str).str.strip()
+            _exp["open_count"] = _tid.map(_opens).fillna(0).astype(int)
+            _exp["click_count"] = _tid.map(_clicks).fillna(0).astype(int)
+            _exp["opened"] = _exp["open_count"] > 0
+            _exp["clicked"] = _exp["click_count"] > 0
+            if _urls is not None:
+                _exp["clicked_urls"] = _tid.map(_urls).fillna("")
+        _exp_cols = [c for c in
+            ["timestamp_utc", "sender_label", "to_email", "company", "template", "subject",
+             "status", "error_msg", "opened", "open_count", "clicked", "click_count", "clicked_urls"]
+            if c in _exp.columns]
+        st.download_button(
+            "⬇️ Download all sends + opens/clicks (CSV)",
+            _exp[_exp_cols].to_csv(index=False).encode("utf-8"),
+            file_name=f"graas_sends_engagement_{datetime.now().strftime('%Y%m%d')}.csv",
+            mime="text/csv", key="dl_sends_engagement",
+        )
+        st.caption(
+            "⚠️ Click columns only populate for campaigns sent AFTER 21 Aug 2026 — earlier "
+            "raw-HTML sends linked out directly, so their clicks were never measurable here "
+            "(check GA for `utm_campaign` instead). Opens are directional (Apple Mail/Gmail prefetch)."
+        )
 
     # ── Suppression list (always visible, even when no sends yet) ─────────────
     st.markdown("---")

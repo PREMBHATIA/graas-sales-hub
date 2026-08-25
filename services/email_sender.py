@@ -151,14 +151,31 @@ def _linkify_bare_text(text: str, tracking_id: str, base: str) -> str:
     return _URL_RE.sub(_sub, text)
 
 
-def _linkify_raw_html(html: str, tracking_id: str) -> str:
-    """Linkify ONLY bare URLs in author-supplied HTML, leaving markup intact.
+_HREF_RE = re.compile(r'''(href\s*=\s*)(["'])(https?://[^"']+)\2''', re.I)
 
-    Unlike `_linkify_with_tracking` (which assumes we escaped plain text into
-    HTML and so there are no real tags), this walks the HTML tag-by-tag and only
-    rewrites URLs sitting in loose text OUTSIDE any tag and outside
-    <a>/<style>/<script>. Tags pass through verbatim, so existing href/src
-    attributes are never touched and the author's links keep their exact URLs.
+
+def _track_anchor_href(tag: str, tracking_id: str, base: str) -> str:
+    """Rewrite an <a> tag's http(s) href through the click tracker.
+
+    The destination URL (including any UTM params) is preserved inside the
+    redirect, so GA attribution still works — the tracker just counts the click
+    on the way through. mailto:/tel:/# hrefs are untouched. Added because the
+    Aug 21 campaign's CTA clicks were invisible: raw mode used to leave author
+    anchors alone, so the composer could never count them.
+    """
+    def _sub(m: "re.Match") -> str:
+        dest = m.group(3)
+        return f'{m.group(1)}{m.group(2)}{base}?t={tracking_id}&e=click&u={quote(dest, safe="")}{m.group(2)}'
+    return _HREF_RE.sub(_sub, tag)
+
+
+def _linkify_raw_html(html: str, tracking_id: str) -> str:
+    """Make author-supplied HTML click-trackable without changing how it renders.
+
+    Walks the HTML tag-by-tag: bare URLs in loose text become tracked anchors
+    (outside <a>/<style>/<script>), and existing <a href="http…"> attributes are
+    rewritten through the tracking redirect with the original destination (and
+    its UTMs) preserved. All other markup passes through verbatim.
     """
     base = _tracking_base()
     skip_depth = 0
@@ -171,7 +188,9 @@ def _linkify_raw_html(html: str, tracking_id: str) -> str:
                 skip_depth = max(0, skip_depth - 1)
             elif _SKIP_OPEN_RE.match(tok) and not tok.rstrip().endswith("/>"):
                 skip_depth += 1
-            out.append(tok)                      # tag verbatim — attrs safe
+            if base and tracking_id and re.match(r"<\s*a\b", tok, re.I):
+                tok = _track_anchor_href(tok, tracking_id, base)
+            out.append(tok)
             continue
         if skip_depth > 0:
             out.append(tok)                      # text inside <a>/<style>/<script>
@@ -362,6 +381,7 @@ def send_email(
     headline: str = "",
     deck: str = "",
     bypass_cap: bool = False,
+    precleared: bool = False,
 ) -> tuple[bool, str]:
     """Send a single email + log the result.
 
@@ -382,8 +402,11 @@ def send_email(
     if sender_label not in SENDERS:
         return False, f"Unknown sender: {sender_label}"
 
+    # precleared=True → the bulk pre-flight already ran cap/suppression/dedup
+    # checks against the whole batch; re-reading the sheet per recipient here
+    # only burns Sheets API quota (which is what rate-limited the log writes).
     # Internal watcher copies bypass the cap — they're not outreach volume.
-    if not bypass_cap and remaining_cap() <= 0:
+    if not precleared and not bypass_cap and remaining_cap() <= 0:
         return False, f"Weekly cap reached ({get_weekly_cap()} sends in last 7d)"
 
     if not to_email or "@" not in to_email:
@@ -393,13 +416,14 @@ def send_email(
     # Test addresses can also be suppressed (e.g. someone typo'd them in by accident);
     # if you really need to send to a suppressed address, remove it from the
     # Suppressions tab in the Outreach Log sheet first.
-    suppressed, supp_reason = is_suppressed(to_email)
-    if suppressed:
-        return False, f"On suppression list: {supp_reason or 'no reason given'}"
+    if not precleared:
+        suppressed, supp_reason = is_suppressed(to_email)
+        if suppressed:
+            return False, f"On suppression list: {supp_reason or 'no reason given'}"
 
     # Dedup check — refuse to email the same recipient twice within DEDUP_DAYS
     # unless bypass_dedup is explicitly True (test mode, or composer override).
-    if not bypass_dedup:
+    if not precleared and not bypass_dedup:
         dedup_days = get_dedup_days()
         last_sent, days_ago = last_sent_to(to_email)
         if last_sent and days_ago is not None and days_ago < dedup_days:
@@ -491,7 +515,18 @@ def send_email(
     ]
     sheet_id = os.getenv("EMAIL_LOG_SHEET_ID", "")
     if sheet_id:
-        append_log_row(sheet_id, LOG_TAB_NAME, log_row, headers=LOG_HEADERS)
+        # Retry with backoff — bulk sends burst the Sheets API and rate-limited
+        # appends silently dropped log rows (Aug 21: 9 of 18 watcher sends went
+        # out but never got logged, so the log undercounted deliveries).
+        import time as _time
+        for _attempt, _wait in enumerate((0, 2, 5, 10)):
+            if _wait:
+                _time.sleep(_wait)
+            try:
+                if append_log_row(sheet_id, LOG_TAB_NAME, log_row, headers=LOG_HEADERS):
+                    break
+            except Exception:
+                pass
 
     return (status == "sent"), (error_msg or "ok")
 
