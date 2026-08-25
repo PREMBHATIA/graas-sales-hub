@@ -176,7 +176,8 @@ def _extract_theme_plan(vals) -> pd.DataFrame:
                         return i
                 return None
             cols = {"theme": _find("email theme"), "question": _find("core question"),
-                    "audience": _find("audience")}
+                    "audience": _find("audience"), "target": _find("target"),
+                    "status": _find("status")}
             continue
         if cols is not None and _PLAN_CODE_RE.match(first):
             cell = lambda i: (cells[i] if (i is not None and i < len(cells)) else "")
@@ -184,7 +185,9 @@ def _extract_theme_plan(vals) -> pd.DataFrame:
             if theme:
                 rows.append({"code": first, "theme": theme,
                              "question": cell(cols["question"]),
-                             "audience": cell(cols["audience"])})
+                             "audience": cell(cols["audience"]),
+                             "target": cell(cols["target"]),
+                             "status": cell(cols["status"])})
     return pd.DataFrame(rows)
 
 
@@ -847,10 +850,11 @@ def _tab_guard(label):
 # page for minutes on a cache miss. The Context arc + per-segment suggestions
 # superseded its talking-points job. services/commerce_news.py still serves the
 # Prospect Brief 'While you wait' card.
-tab_contacts, tab_segments, tab_compose, tab_analytics = st.tabs([
+tab_contacts, tab_segments, tab_compose, tab_calendar, tab_analytics = st.tabs([
     "👥 Contacts",
     "🎯 Segments",
     "✉️ Email Composer",
+    "📅 Calendar",
     "📊 Analytics",
 ])
 
@@ -2274,6 +2278,53 @@ with tab_compose, _tab_guard("Email Composer"):
                         st.rerun()
 
         st.caption("📊 Open the **Analytics** tab to see send history, volume by sender, and outreach metrics.")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB: CALENDAR — the Context arc content calendar (Sept–Dec), live from the
+# workbook tab (rename-proof: matched by header signature). Read-only mirror;
+# editing stays in the sheet so Dhanashree keeps full flexibility.
+# ══════════════════════════════════════════════════════════════════════════════
+
+with tab_calendar, _tab_guard("Calendar"):
+    st.markdown("### 📅 Content calendar — the Context arc")
+    st.caption(
+        "One argument, taught in two tracks. Every email carries **Context** and one "
+        "Index receipt. Emails 1–2 go to everyone; Mature gets the architecture track, "
+        "Explorers + Laggards get the show-don't-tell track. Edit in "
+        "[the workbook tab ↗](https://docs.google.com/spreadsheets/d/11uhucHZ6099LysoifJRmeGCx5DQ57ZxEa94Q0HjpaPo/edit?gid=1357660099) "
+        "— Target window + Status columns are Dhanashree's to fill."
+    )
+    _cal = _load_theme_plan()
+    if _cal.empty:
+        st.info("Calendar not readable — check the Context arc tab is shared with the "
+                "app's service account.")
+    else:
+        _cal_view = _cal.rename(columns={
+            "code": "#", "theme": "Email", "question": "Core question",
+            "audience": "Audience", "target": "Target window", "status": "Status"})
+        _tracks = [
+            ("📣 Everyone (both tracks open with these)", _cal_view["Audience"].str.lower().str.contains("all")),
+            ("🏛️ Mature track — architecture", _cal_view["Audience"].str.lower().str.contains("matur")),
+            ("📷 Explorers + Laggards track — show, don't tell", _cal_view["Audience"].str.lower().str.contains("laggard|explor", regex=True)),
+        ]
+        for _title, _mask in _tracks:
+            _t = _cal_view[_mask]
+            if _t.empty:
+                continue
+            st.markdown(f"#### {_title}")
+            _cols_show = [c for c in ["#", "Email", "Core question", "Target window", "Status"]
+                          if c in _t.columns]
+            _tsty = _t[_cols_show].style.set_properties(
+                subset=["Status"] if "Status" in _cols_show else [],
+                **{"background-color": "#DBEAFE", "color": "#1D4ED8", "font-weight": "600"})
+            st.dataframe(_tsty, hide_index=True, use_container_width=True,
+                         height=min(300, 80 + 35 * len(_t)))
+        st.caption(
+            "Blogs: emails 4/5/6 click through to graas.ai articles (the Knowledge Graph "
+            "piece links onward to the technical deep dive). Cadence: fortnightly — "
+            "matches the 14-day dedup window."
+        )
 
 
 # ══════════════════════════════════════════════════════════════════════════════
