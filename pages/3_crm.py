@@ -2438,12 +2438,30 @@ with tab_compose, _tab_guard("Email Composer"):
                 # campaign; untick for follow-up batches of the same campaign.
                 watchers_selected = []
                 if watcher_list:
+                    # Smart default: if watchers already got a copy of this campaign
+                    # (same subject, earlier batch), default OFF so follow-up batches
+                    # don't hit them again. Ticking re-enables deliberately.
+                    _w_dup = False
+                    try:
+                        _wlog = _cached_log_df()
+                        if not _wlog.empty and "subject" in _wlog.columns and "template" in _wlog.columns:
+                            _int_sent = _wlog[
+                                (_wlog["status"] == "sent")
+                                & _wlog["template"].astype(str).str.endswith("(internal copy)")]
+                            _w_dup = (_int_sent["subject"].astype(str)
+                                      .str.replace(r"^\[Internal\] ", "", regex=True)
+                                      .eq(str(subject)).any())
+                    except Exception:
+                        pass
+                    if _w_dup:
+                        st.caption("ℹ️ Watchers already received a copy of this campaign "
+                                   "(same subject) — internal copies default **off**; tick to send again.")
                     _w_on = st.checkbox(
                         f"📣 Send internal copies to watchers ({len(watcher_list)})",
-                        value=True, key="watchers_on",
+                        value=not _w_dup, key="watchers_on",
                         help="One [Internal] copy of this campaign to each selected watcher "
                              "(Watchers tab of the Outreach Log). Not counted in the weekly cap. "
-                             "Untick when re-sending batches of a campaign watchers already saw.",
+                             "Defaults off automatically when watchers already saw this campaign.",
                     )
                     if _w_on:
                         with st.expander(f"Choose watchers ({len(watcher_list)} selected by default)",
