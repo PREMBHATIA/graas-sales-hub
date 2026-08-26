@@ -1306,6 +1306,17 @@ def _cached_tracking_df():
     return fetch_tracking_events()
 
 
+@st.cache_data(ttl=900, show_spinner=False)
+def _cached_bounces(_v: int = 1):
+    """Bounce reports from the insights@ inbox (15-min cache). Empty on any
+    failure — IMAP needs SMTP_USER/SMTP_PASS with IMAP enabled."""
+    try:
+        from services.bounce_scanner import scan_bounces
+        return scan_bounces()
+    except Exception:
+        return []
+
+
 def _fetch_watchers_page() -> list:
     """Internal watcher emails from the Outreach Log's 'Watchers' tab.
 
@@ -2416,8 +2427,12 @@ with tab_analytics, _tab_guard("Analytics"):
         _supp_total = 0 if supp_df.empty else len(supp_df)
 
         k1, k2, k3, k4, k5 = st.columns(5)
-        k1.metric("📤 Delivered (7d)", _delivered7,
-                  help=f"External sends only — tests and internal copies excluded everywhere on this page. {len(_ext30)} in last 30d.")
+        _b7 = {b["email"] for b in _cached_bounces()}
+        _bounced7 = int(_tid_series(_ext7).index.isin(
+            _ext7[_ext7["to_email"].astype(str).str.lower().isin(_b7)].index).sum()) if _b7 else 0
+        k1.metric("📤 Delivered (7d)", _delivered7 - _bounced7,
+                  help=f"External sends accepted by Gmail, minus {_bounced7} known bounce(s) in the window. "
+                       f"{len(_ext30)} sent in last 30d. See Delivery issues below.")
         k2.metric("👀 Open rate (7d)", f"{round(_opened7 / _delivered7 * 100)}%" if _delivered7 else "—",
                   help="Unique external sends opened. Directional — Apple Mail/Gmail prefetch inflates it.")
         k3.metric("🔗 Clicks (7d)", _clicks7,
@@ -2504,6 +2519,43 @@ with tab_analytics, _tab_guard("Analytics"):
                    & (_exp["_ts"] >= now_utc - pd.Timedelta(days=30))].copy()
         _rl = _rl[~_rl["company"].astype(str).str.contains(r"\[INTERNAL WATCHER\]|\[TEST\]", regex=True, na=False)]
         _rl = _rl[~_rl["template"].astype(str).str.contains(r"\(test\)|\(internal copy\)", regex=True, na=False)]
+
+        # ── Delivery issues (bounces) ────────────────────────────────────────
+        # "sent" only means Gmail accepted it; rejections arrive later as bounce
+        # mail to insights@. This surfaces them so the log means "delivered".
+        _bounces = _cached_bounces()
+        if _bounces:
+            _bdf = pd.DataFrame(_bounces)
+            _sup_now = set()
+            if not supp_df.empty and "email" in supp_df.columns:
+                _sup_now = set(supp_df["email"].astype(str).str.lower().str.strip())
+            _bdf["Suppressed"] = _bdf["email"].isin(_sup_now)
+            _open_hard = _bdf[(_bdf["hard"]) & (~_bdf["Suppressed"])]
+            st.markdown("#### ↩️ Delivery issues")
+            st.caption(
+                "Bounce reports read from the insights@ inbox — these addresses were "
+                "logged as *sent* (Gmail accepted them) but the receiving server "
+                "rejected them afterwards. Hard bounces should be suppressed."
+            )
+            if not _open_hard.empty:
+                st.error(f"⚠️ **{len(_open_hard)} hard bounce(s) not yet suppressed** — "
+                         "they'll keep consuming sends until suppressed.")
+                if st.button(f"🚫 Suppress {len(_open_hard)} bounced address(es)",
+                             type="primary", key="supp_bounces"):
+                    _ok = 0
+                    for _, _br in _open_hard.iterrows():
+                        if _add_to_suppression(_br["email"],
+                                               f"hard bounce — {_br['reason']}",
+                                               "bounce scanner"):
+                            _ok += 1
+                    st.success(f"✅ Suppressed {_ok} address(es).")
+                    st.rerun()
+            _bshow = (_bdf.rename(columns={"email": "Address", "reason": "Reason",
+                                           "date": "Bounced", "subject": "Report"})
+                          .assign(Type=lambda d: d["hard"].map({True: "Hard", False: "Soft"}))
+                          [["Address", "Type", "Reason", "Bounced", "Suppressed"]])
+            st.dataframe(_bshow, hide_index=True, use_container_width=True,
+                         height=min(320, 80 + 35 * len(_bshow)))
 
         st.markdown("#### 🔥 Account heat (last 30d)")
         st.caption(
