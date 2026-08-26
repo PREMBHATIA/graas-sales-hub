@@ -1340,6 +1340,16 @@ def _human_open_counts(track_df, sends_df):
 
 
 @st.cache_data(ttl=900, show_spinner=False)
+def _cached_unsubs(_v: int = 1):
+    """Unsubscribe requests sitting in the insights@ inbox (15-min cache)."""
+    try:
+        from services.bounce_scanner import scan_unsubscribes
+        return scan_unsubscribes()
+    except Exception:
+        return []
+
+
+@st.cache_data(ttl=900, show_spinner=False)
 def _cached_bounces(_v: int = 1):
     """Bounce reports from the insights@ inbox (15-min cache). Empty on any
     failure — IMAP needs SMTP_USER/SMTP_PASS with IMAP enabled."""
@@ -2572,11 +2582,51 @@ with tab_analytics, _tab_guard("Analytics"):
             _undeliv |= {b["email"] for b in _cached_bounces() if b.get("hard")}
         except Exception:
             pass
+        try:
+            _undeliv |= {u["email"] for u in _cached_unsubs()}
+        except Exception:
+            pass
         _rl_undeliv = 0
         if _undeliv:
             _mask_ud = _rl["to_email"].astype(str).str.lower().str.strip().isin(_undeliv)
             _rl_undeliv = int(_mask_ud.sum())
             _rl = _rl[~_mask_ud]
+
+        # ── Unsubscribe requests ─────────────────────────────────────────────
+        # Unsubscribe is a mailto (and Gmail's native button uses our
+        # List-Unsubscribe header), so requests arrive as email to insights@ —
+        # unread, they'd keep receiving campaigns. Surfaced here to be honoured.
+        _unsubs = _cached_unsubs()
+        if _unsubs:
+            _udf = pd.DataFrame(_unsubs)
+            _sup_set = set()
+            if not supp_df.empty and "email" in supp_df.columns:
+                _sup_set = set(supp_df["email"].astype(str).str.lower().str.strip())
+            _udf["Honoured"] = _udf["email"].isin(_sup_set)
+            _pending = _udf[~_udf["Honoured"]]
+            st.markdown("#### ✋ Unsubscribe requests")
+            st.caption(
+                "People who asked to opt out — read from the insights@ inbox. Until an "
+                "address is suppressed they will keep receiving campaigns, so honour "
+                "these promptly."
+            )
+            if not _pending.empty:
+                st.error(f"⚠️ **{len(_pending)} unactioned unsubscribe request(s)** — "
+                         "these people are still on the list.")
+                if st.button(f"✅ Honour {len(_pending)} request(s) — suppress now",
+                             type="primary", key="honour_unsubs"):
+                    _n = 0
+                    for _, _ur in _pending.iterrows():
+                        if _add_to_suppression(_ur["email"], "unsubscribe requested",
+                                               "unsubscribe scanner"):
+                            _n += 1
+                    st.success(f"✅ Suppressed {_n} address(es) — they won't be emailed again.")
+                    st.rerun()
+            st.dataframe(
+                _udf.rename(columns={"email": "Address", "subject": "Request",
+                                     "date": "Received"})[["Address", "Request", "Received", "Honoured"]],
+                hide_index=True, use_container_width=True,
+                height=min(260, 80 + 35 * len(_udf)))
 
         # ── Delivery issues (bounces) ────────────────────────────────────────
         # "sent" only means Gmail accepted it; rejections arrive later as bounce

@@ -165,3 +165,86 @@ def scan_bounces(since: str = "01-Aug-2026", limit: int = 200,
     except Exception:
         return rows
     return rows
+
+
+# ── Unsubscribe requests ─────────────────────────────────────────────────────
+# Unsubscribe is a mailto: link (and Gmail's native Unsubscribe button uses our
+# List-Unsubscribe mailto header), so the request arrives as an EMAIL to
+# insights@ — the same unread mailbox bounces land in. Unprocessed, the person
+# stays on the list and keeps receiving campaigns. This finds those requests so
+# they can be honoured.
+
+_UNSUB_SEARCHES = [
+    '(SUBJECT "unsubscribe")',
+    '(BODY "unsubscribe")',
+]
+# Our own outbound mail also contains the word "unsubscribe" (footer link), so
+# only treat a message as a request if the SUBJECT asks, or the body is short
+# and says so — never a full campaign bouncing around.
+_UNSUB_SUBJECT_RE = re.compile(r"\bunsub(scribe|)\b", re.I)
+
+
+def scan_unsubscribes(since: str = "01-Aug-2026", limit: int = 200,
+                      user: Optional[str] = None, password: Optional[str] = None) -> list:
+    """Return [{email, subject, date, msg_id}] — people who asked to opt out."""
+    user = user or os.getenv("SMTP_USER", "")
+    password = password or os.getenv("SMTP_PASS", "")
+    if not user or not password:
+        return []
+    rows, seen = [], set()
+    try:
+        M = imaplib.IMAP4_SSL(IMAP_HOST)
+        M.login(user, password)
+        M.select("INBOX", readonly=True)
+        ids = set()
+        for crit in _UNSUB_SEARCHES:
+            try:
+                typ, data = M.search(None, f"(SINCE {since})", crit)
+                if typ == "OK" and data and data[0]:
+                    ids |= set(data[0].split())
+            except Exception:
+                continue
+        for mid in sorted(ids, key=lambda x: int(x))[-limit:]:
+            try:
+                typ, msgdata = M.fetch(mid, "(RFC822)")
+                if typ != "OK" or not msgdata or not msgdata[0]:
+                    continue
+                msg = email_lib.message_from_bytes(msgdata[0][1])
+                subject = _decode(msg.get("Subject", ""))
+                text = _body_text(msg)
+                sender = _decode(msg.get("From", ""))
+                # Skip delivery reports — those are bounces, handled elsewhere.
+                if any(n in sender.lower() for n in ("mailer-daemon", "postmaster")):
+                    continue
+                asked = bool(_UNSUB_SUBJECT_RE.search(subject)) or (
+                    len(text.strip()) < 400 and "unsubscribe" in text.lower())
+                if not asked:
+                    continue
+                # We put the address in the subject ("Unsubscribe x@y.com");
+                # otherwise fall back to who sent the request.
+                addr = ""
+                m = re.search(r"([\w.+-]+@[\w-]+\.[\w.-]+)", subject)
+                if m:
+                    addr = m.group(1)
+                if not addr:
+                    m = re.search(r"([\w.+-]+@[\w-]+\.[\w.-]+)", sender)
+                    if m:
+                        addr = m.group(1)
+                addr = addr.strip().lower()
+                if not addr or any(d in addr for d in _OUR_DOMAINS) and "@graas.ai" in addr and False:
+                    continue
+                if not addr or addr in seen:
+                    continue
+                seen.add(addr)
+                rows.append({
+                    "email": addr,
+                    "subject": subject[:120],
+                    "date": _decode(msg.get("Date", ""))[:40],
+                    "msg_id": mid.decode() if isinstance(mid, bytes) else str(mid),
+                })
+            except Exception:
+                continue
+        M.logout()
+    except Exception:
+        return rows
+    return rows
