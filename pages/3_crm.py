@@ -1306,6 +1306,39 @@ def _cached_tracking_df():
     return fetch_tracking_events()
 
 
+# Opens are noisy: mail servers and scanners fetch the pixel on arrival (a burst
+# within seconds of the send), and a single reader's client can re-fetch it many
+# times while the mail sits open. "Human" opens = events at least
+# _OPEN_PREFETCH_SEC after the send, collapsed into _OPEN_BUCKET_MIN windows.
+_OPEN_PREFETCH_SEC = 60
+_OPEN_BUCKET_MIN = 10
+
+
+def _human_open_counts(track_df, sends_df):
+    """{tracking_id: human_open_count} — prefetch burst removed, repeats collapsed."""
+    import pandas as _pd
+    if (track_df is None or track_df.empty or sends_df is None or sends_df.empty
+            or "tracking_id" not in track_df.columns or "tracking_id" not in sends_df.columns):
+        return {}
+    ev = track_df[track_df["event"] == "open"].copy()
+    if ev.empty:
+        return {}
+    ev["_ev_ts"] = _pd.to_datetime(ev.get("ts_utc"), errors="coerce", utc=True)
+    base = sends_df[["tracking_id", "_ts"]].copy()
+    base["tracking_id"] = base["tracking_id"].astype(str).str.strip()
+    ev = ev.merge(base, on="tracking_id", how="inner")
+    ev = ev[ev["_ev_ts"].notna() & ev["_ts"].notna()]
+    if ev.empty:
+        return {}
+    ev["_lag"] = (ev["_ev_ts"] - ev["_ts"]).dt.total_seconds()
+    ev = ev[ev["_lag"] > _OPEN_PREFETCH_SEC]
+    if ev.empty:
+        return {}
+    ev["_bucket"] = (ev["_lag"] // (_OPEN_BUCKET_MIN * 60)).astype(int)
+    return (ev.drop_duplicates(["tracking_id", "_bucket"])
+              .groupby("tracking_id").size().to_dict())
+
+
 @st.cache_data(ttl=900, show_spinner=False)
 def _cached_bounces(_v: int = 1):
     """Bounce reports from the insights@ inbox (15-min cache). Empty on any
@@ -2401,9 +2434,10 @@ with tab_analytics, _tab_guard("Analytics"):
 
         _ext7 = _externals(sent_7d)
         _ext30 = _externals(sent_30d)
+        _human_opens = _human_open_counts(track_df, sent_df)
         _op_ids, _cl_ids, _cl_counts = set(), set(), {}
         if track_df is not None and not track_df.empty and "tracking_id" in track_df.columns:
-            _op_ids = set(track_df.loc[track_df["event"] == "open", "tracking_id"])
+            _op_ids = {t for t, n in _human_opens.items() if n > 0}
             _cl_ev = track_df[track_df["event"] == "click"]
             _cl_ids = set(_cl_ev["tracking_id"])
             _cl_counts = _cl_ev.groupby("tracking_id").size().to_dict()
@@ -2434,7 +2468,9 @@ with tab_analytics, _tab_guard("Analytics"):
                   help=f"External sends accepted by Gmail, minus {_bounced7} known bounce(s) in the window. "
                        f"{len(_ext30)} sent in last 30d. See Delivery issues below.")
         k2.metric("👀 Open rate (7d)", f"{round(_opened7 / _delivered7 * 100)}%" if _delivered7 else "—",
-                  help="Unique external sends opened. Directional — Apple Mail/Gmail prefetch inflates it.")
+                  help=f"Share of external sends with at least one human open — the "
+                       f"first-{_OPEN_PREFETCH_SEC}s prefetch burst is discarded and repeat "
+                       f"fetches within {_OPEN_BUCKET_MIN} min count once.")
         k3.metric("🔗 Clicks (7d)", _clicks7,
                   help="Total link clicks on external sends — a deliberate action, the number to trust.")
         k4.metric("🔥 Hot accounts (30d)", _hot30,
@@ -2499,7 +2535,7 @@ with tab_analytics, _tab_guard("Analytics"):
         _exp["clicked"], _exp["click_count"], _exp["clicked_urls"] = False, 0, ""
         _ev = track_df if track_df is not None else pd.DataFrame()
         if not _ev.empty and "tracking_id" in _ev.columns and "tracking_id" in _exp.columns:
-            _opens = _ev[_ev["event"] == "open"].groupby("tracking_id").size()
+            _opens = pd.Series(_human_opens, dtype="int64")
             _clicks = _ev[_ev["event"] == "click"].groupby("tracking_id").size()
             _urls = (_ev[_ev["event"] == "click"].groupby("tracking_id")["dest_url"]
                      .apply(lambda s: " | ".join(sorted(set(str(x) for x in s if str(x).strip()))))
@@ -2588,11 +2624,13 @@ with tab_analytics, _tab_guard("Analytics"):
             st.dataframe(_hsty, use_container_width=True, hide_index=True,
                          height=min(640, 80 + 35 * len(_heat)))
 
-        st.markdown("#### 🔁 Circulating sends (3+ opens)")
+        st.markdown("#### 🔁 Circulating sends (3+ separate reads)")
         st.caption(
-            "Sends opened three or more times — the email is being revisited or passed "
-            "around internally (the closest measurable proxy for a forward). Treat as a "
-            "warm-lead signal; some inflation from Apple Mail/Gmail image prefetch."
+            "Opens counted the honest way: the machine prefetch burst in the first "
+            f"{_OPEN_PREFETCH_SEC}s after sending is discarded, and repeat fetches inside a "
+            f"{_OPEN_BUCKET_MIN}-minute window count once. Three or more separate reads means "
+            "the mail is being revisited or passed around — the closest measurable proxy "
+            "for a forward."
         )
         _circ = _rl[_rl["open_count"] >= 3].copy()
         if _circ.empty:

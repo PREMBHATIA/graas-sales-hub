@@ -496,15 +496,18 @@ def send_email(
         alt.attach(MIMEText(html_full, "html", "utf-8"))
         msg.attach(logo_mime_part())
 
-    # Audit BCC — external sends only. True BCC: the addresses go on the SMTP
-    # envelope, never into the message headers, so recipients can't see them.
+    # Audit copies — external sends only. Sent as a SEPARATE, UNTRACKED message
+    # (2026-08-27): envelope-BCC put the prospect's tracking pixel in four
+    # internal inboxes, so our own opens were counted as theirs (Rejin showed 12
+    # "opens" on mail his server had rejected). The audit copy carries no pixel
+    # and no rewritten links, so it can never pollute engagement data.
     _internal_send = (
         "[TEST]" in (company or "") or "[INTERNAL WATCHER]" in (company or "")
         or str(template).endswith("(test)") or str(template).endswith("(internal copy)")
     )
+    _audit_to = [] if _internal_send else [b for b in _audit_bcc()
+                                           if b != to_email.strip().lower()]
     _rcpts = [to_email]
-    if not _internal_send:
-        _rcpts += [b for b in _audit_bcc() if b != to_email.strip().lower()]
 
     status = "sent"
     error_msg = ""
@@ -515,6 +518,33 @@ def send_email(
             server.ehlo()
             server.login(smtp_user, smtp_pass)
             server.sendmail(smtp_user, _rcpts, msg.as_string())
+            if _audit_to:
+                try:
+                    # tracking_id="" disables the pixel AND link rewriting, so
+                    # this copy is invisible to analytics.
+                    _amsg = MIMEMultipart("alternative")
+                    _amsg["Subject"] = f"[Audit] {subject}"
+                    _amsg["From"] = formataddr((from_display, smtp_user))
+                    _amsg["To"] = ", ".join(_audit_to)
+                    _amsg["Reply-To"] = formataddr((sender_name, reply_to))
+                    _amsg["X-Graas-Audit-Copy"] = f"to={to_email}; company={company}"
+                    if layout == "raw":
+                        _ahtml = _linkify_raw_html(body, "")
+                        _atext = _html_to_text(body)
+                    else:
+                        _ahtml = wrap_email(
+                            layout if layout in ("branded", "minimal") else "minimal",
+                            body_to_paragraphs(body), sender_name=sender_name,
+                            unsubscribe_href=unsub_href, headline=headline, deck=deck,
+                            date_str=datetime.now().strftime("%B %-d, %Y"))
+                        _ahtml = _ahtml.replace(f"cid:{'graaslogo'}", "")
+                        _atext = body
+                    _amsg.attach(MIMEText(f"[Audit copy — sent to {to_email} ({company})]\n\n{_atext}",
+                                          "plain", "utf-8"))
+                    _amsg.attach(MIMEText(_ahtml, "html", "utf-8"))
+                    server.sendmail(smtp_user, _audit_to, _amsg.as_string())
+                except Exception:
+                    pass  # audit copy is best-effort; never fail a real send
     except smtplib.SMTPAuthenticationError as e:
         status, error_msg = "failed", f"SMTP auth failed — check App Password: {e}"
     except Exception as e:
