@@ -2556,6 +2556,28 @@ with tab_analytics, _tab_guard("Analytics"):
         _rl = _rl[~_rl["company"].astype(str).str.contains(r"\[INTERNAL WATCHER\]|\[TEST\]", regex=True, na=False)]
         _rl = _rl[~_rl["template"].astype(str).str.contains(r"\(test\)|\(internal copy\)", regex=True, na=False)]
 
+        # Undeliverable sends can't have been engaged with — any "opens" on them
+        # are our own internal copies or scanners (Wipro's Rejin showed 3 opens
+        # on mail his server rejected). Excluded from heat / circulating /
+        # campaign stats; they live in Delivery issues instead.
+        _undeliv = set()
+        if not supp_df.empty and "email" in supp_df.columns:
+            _sd = supp_df.copy()
+            _sd["email"] = _sd["email"].astype(str).str.lower().str.strip()
+            _rz = _sd.get("reason", pd.Series([""] * len(_sd))).astype(str).str.lower()
+            _undeliv |= set(_sd.loc[_rz.str.contains(
+                r"bounce|no longer|undeliverable|rejected|does not exist|doesn't exist|invalid",
+                regex=True, na=False), "email"])
+        try:
+            _undeliv |= {b["email"] for b in _cached_bounces() if b.get("hard")}
+        except Exception:
+            pass
+        _rl_undeliv = 0
+        if _undeliv:
+            _mask_ud = _rl["to_email"].astype(str).str.lower().str.strip().isin(_undeliv)
+            _rl_undeliv = int(_mask_ud.sum())
+            _rl = _rl[~_mask_ud]
+
         # ── Delivery issues (bounces) ────────────────────────────────────────
         # "sent" only means Gmail accepted it; rejections arrive later as bounce
         # mail to insights@. This surfaces them so the log means "delivered".
@@ -2598,6 +2620,8 @@ with tab_analytics, _tab_guard("Analytics"):
             "Engagement rolled up per company — multiple stakeholders opening is a "
             "buying-committee signal. Sorted hottest first: clicks, then sends opened, "
             "then total opens."
+            + (f" {_rl_undeliv} undeliverable send(s) excluded — see Delivery issues."
+               if _rl_undeliv else "")
         )
         if _rl.empty:
             st.caption("No campaign sends in the last 30 days yet.")
@@ -2630,7 +2654,7 @@ with tab_analytics, _tab_guard("Analytics"):
             f"{_OPEN_PREFETCH_SEC}s after sending is discarded, and repeat fetches inside a "
             f"{_OPEN_BUCKET_MIN}-minute window count once. Three or more separate reads means "
             "the mail is being revisited or passed around — the closest measurable proxy "
-            "for a forward."
+            "for a forward. Undeliverable (bounced/suppressed) sends are excluded."
         )
         _circ = _rl[_rl["open_count"] >= 3].copy()
         if _circ.empty:
