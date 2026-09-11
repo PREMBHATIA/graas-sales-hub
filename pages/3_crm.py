@@ -1339,6 +1339,17 @@ def _human_open_counts(track_df, sends_df):
               .groupby("tracking_id").size().to_dict())
 
 
+def _inbox_scan_results() -> dict:
+    """Bounce/unsubscribe scan results from THIS session only.
+
+    The scanners open IMAP connections. Streamlit executes every tab body on
+    every page load, so calling them automatically made the whole page wait on
+    the mail server (and imaplib has no default timeout — a blocked connection
+    hung the app). They now run only when the user presses Scan.
+    """
+    return st.session_state.get("_inbox_scan", {"bounces": [], "unsubs": [], "at": None})
+
+
 @st.cache_data(ttl=900, show_spinner=False)
 def _cached_unsubs(_v: int = 1):
     """Unsubscribe requests sitting in the insights@ inbox (15-min cache)."""
@@ -2471,7 +2482,7 @@ with tab_analytics, _tab_guard("Analytics"):
         _supp_total = 0 if supp_df.empty else len(supp_df)
 
         k1, k2, k3, k4, k5 = st.columns(5)
-        _b7 = {b["email"] for b in _cached_bounces()}
+        _b7 = {b["email"] for b in _inbox_scan_results()["bounces"]}
         _bounced7 = int(_tid_series(_ext7).index.isin(
             _ext7[_ext7["to_email"].astype(str).str.lower().isin(_b7)].index).sum()) if _b7 else 0
         k1.metric("📤 Delivered (7d)", _delivered7 - _bounced7,
@@ -2579,11 +2590,11 @@ with tab_analytics, _tab_guard("Analytics"):
                 r"bounce|no longer|undeliverable|rejected|does not exist|doesn't exist|invalid",
                 regex=True, na=False), "email"])
         try:
-            _undeliv |= {b["email"] for b in _cached_bounces() if b.get("hard")}
+            _undeliv |= {b["email"] for b in _inbox_scan_results()["bounces"] if b.get("hard")}
         except Exception:
             pass
         try:
-            _undeliv |= {u["email"] for u in _cached_unsubs()}
+            _undeliv |= {u["email"] for u in _inbox_scan_results()["unsubs"]}
         except Exception:
             pass
         _rl_undeliv = 0
@@ -2592,11 +2603,39 @@ with tab_analytics, _tab_guard("Analytics"):
             _rl_undeliv = int(_mask_ud.sum())
             _rl = _rl[~_mask_ud]
 
+        # ── Mailbox scan (on demand) ─────────────────────────────────────────
+        _scan = _inbox_scan_results()
+        _sc1, _sc2 = st.columns([1, 3])
+        with _sc1:
+            if st.button("📥 Scan insights@ inbox", key="scan_inbox",
+                         help="Reads bounces and unsubscribe requests over IMAP. "
+                              "Runs only when you press this — never on page load, "
+                              "so the dashboard stays fast."):
+                with st.spinner("Reading insights@ …"):
+                    try:
+                        st.session_state["_inbox_scan"] = {
+                            "bounces": _cached_bounces(),
+                            "unsubs": _cached_unsubs(),
+                            "at": datetime.now().strftime("%d %b %H:%M"),
+                        }
+                    except Exception as _se:
+                        st.session_state["_inbox_scan"] = {"bounces": [], "unsubs": [],
+                                                           "at": f"failed: {_se}"}
+                st.rerun()
+        with _sc2:
+            st.caption(
+                f"Last scan: **{_scan['at']}** — {len(_scan['bounces'])} bounce(s), "
+                f"{len(_scan['unsubs'])} unsubscribe request(s)."
+                if _scan.get("at") else
+                "Bounces and unsubscribe requests are not checked automatically "
+                "(IMAP is slow) — press Scan to read the inbox."
+            )
+
         # ── Unsubscribe requests ─────────────────────────────────────────────
         # Unsubscribe is a mailto (and Gmail's native button uses our
         # List-Unsubscribe header), so requests arrive as email to insights@ —
         # unread, they'd keep receiving campaigns. Surfaced here to be honoured.
-        _unsubs = _cached_unsubs()
+        _unsubs = _inbox_scan_results()["unsubs"]
         if _unsubs:
             _udf = pd.DataFrame(_unsubs)
             _sup_set = set()
@@ -2631,7 +2670,7 @@ with tab_analytics, _tab_guard("Analytics"):
         # ── Delivery issues (bounces) ────────────────────────────────────────
         # "sent" only means Gmail accepted it; rejections arrive later as bounce
         # mail to insights@. This surfaces them so the log means "delivered".
-        _bounces = _cached_bounces()
+        _bounces = _inbox_scan_results()["bounces"]
         if _bounces:
             _bdf = pd.DataFrame(_bounces)
             _sup_now = set()

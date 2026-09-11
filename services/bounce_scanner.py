@@ -25,6 +25,9 @@ from email.header import decode_header, make_header
 from typing import Optional
 
 IMAP_HOST = "imap.gmail.com"
+# imaplib has NO default timeout — without this a slow/blocked IMAP hangs the
+# whole Streamlit page (every tab body runs on every load).
+IMAP_TIMEOUT = 20
 
 # Senders/subjects that mark a delivery-status report.
 _BOUNCE_SEARCHES = [
@@ -127,7 +130,7 @@ def scan_bounces(since: str = "01-Aug-2026", limit: int = 200,
         return []
     rows, seen_pairs = [], set()
     try:
-        M = imaplib.IMAP4_SSL(IMAP_HOST)
+        M = imaplib.IMAP4_SSL(IMAP_HOST, timeout=IMAP_TIMEOUT)
         M.login(user, password)
         M.select("INBOX", readonly=True)
         ids = set()
@@ -193,7 +196,7 @@ def scan_unsubscribes(since: str = "01-Aug-2026", limit: int = 200,
         return []
     rows, seen = [], set()
     try:
-        M = imaplib.IMAP4_SSL(IMAP_HOST)
+        M = imaplib.IMAP4_SSL(IMAP_HOST, timeout=IMAP_TIMEOUT)
         M.login(user, password)
         M.select("INBOX", readonly=True)
         ids = set()
