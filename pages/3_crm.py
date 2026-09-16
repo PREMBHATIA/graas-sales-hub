@@ -2935,6 +2935,73 @@ with tab_analytics, _tab_guard("Analytics"):
 
         st.markdown("---")
 
+        # ── Campaign deep-dive ───────────────────────────────────────────────
+        # One campaign at a time: headline numbers, how each AI segment responded,
+        # which links were clicked, and which companies engaged.
+        _cx = _exp[(_exp["status"] == "sent")].copy()
+        _cx = _cx[~_cx["company"].astype(str).str.contains(r"\[INTERNAL WATCHER\]|\[TEST\]", regex=True, na=False)]
+        _cx = _cx[~_cx["template"].astype(str).str.contains(r"\(test\)|\(internal copy\)", regex=True, na=False)]
+        _cx = _cx[_cx["subject"].astype(str).str.strip() != ""]
+        if not _cx.empty:
+            st.markdown("#### 🔬 Campaign deep-dive")
+            _cx_opts = (_cx.groupby("subject")["_ts"].max().sort_values(ascending=False).index.tolist())
+            _pick_c = st.selectbox("Campaign", _cx_opts, key="campaign_deepdive")
+            _c = _cx[_cx["subject"] == _pick_c].copy()
+            _n = len(_c)
+            _op = int((_c["open_count"] > 0).sum())
+            _ck = int((_c["click_count"] > 0).sum())
+            _tot_ck = int(_c["click_count"].sum())
+            d1, d2, d3, d4 = st.columns(4)
+            d1.metric("Sent", _n, help=f"{_c['company'].nunique()} companies · "
+                                       f"{_c['_ts'].min().strftime('%d %b')}–{_c['_ts'].max().strftime('%d %b')}")
+            d2.metric("Opened", f"{round(_op / _n * 100)}%" if _n else "—", help=f"{_op} of {_n} sends")
+            d3.metric("Clicked", f"{round(_ck / _n * 100)}%" if _n else "—", help=f"{_ck} of {_n} sends")
+            d4.metric("Total clicks", _tot_ck,
+                      help=f"{_c[_c['click_count'] > 0]['company'].nunique()} companies clicked at least once")
+
+            _dd1, _dd2 = st.columns(2)
+            with _dd1:
+                st.markdown("**By AI segment**")
+                _c["_seg"] = (_c["to_email"].astype(str).str.strip().str.lower()
+                              .map(_email_seg).fillna("Unclassified").apply(_normalize_ai_segment))
+                _sg = (_c.groupby("_seg")
+                         .agg(Sent=("to_email", "size"),
+                              Opened=("open_count", lambda s: int((s > 0).sum())),
+                              Clicked=("click_count", lambda s: int((s > 0).sum())))
+                         .reset_index().rename(columns={"_seg": "Segment"}))
+                _sg["Open %"] = (_sg["Opened"] / _sg["Sent"] * 100).round(0).astype(int)
+                _sg["Click %"] = (_sg["Clicked"] / _sg["Sent"] * 100).round(0).astype(int)
+                st.dataframe(_sg[["Segment", "Sent", "Open %", "Click %"]],
+                             hide_index=True, use_container_width=True)
+                st.caption("A segment clicking more than it opens means images are blocked "
+                           "(common in corporate Outlook) — judge those on clicks.")
+            with _dd2:
+                st.markdown("**Links clicked**")
+                _ids = set(_c["tracking_id"].astype(str).str.strip())
+                if (track_df is not None and not track_df.empty
+                        and "dest_url" in track_df.columns):
+                    _lk = track_df[(track_df["event"] == "click")
+                                   & (track_df["tracking_id"].isin(_ids))].copy()
+                    if _lk.empty:
+                        st.caption("No clicks recorded for this campaign.")
+                    else:
+                        _lk["Link"] = _lk["dest_url"].astype(str).str.split("?").str[0]
+                        _lv = (_lk["Link"].value_counts().reset_index())
+                        _lv.columns = ["Link", "Clicks"]
+                        st.dataframe(_lv.head(8), hide_index=True, use_container_width=True)
+                else:
+                    st.caption("No tracking data.")
+
+            with st.expander(f"🏢 Companies that engaged ({_c[_c['click_count'] > 0]['company'].nunique()} clicked)"):
+                _eng = (_c.groupby("company")
+                          .agg(Contacts=("to_email", "nunique"),
+                               Opens=("open_count", "sum"),
+                               Clicks=("click_count", "sum"))
+                          .reset_index().rename(columns={"company": "Company"})
+                          .sort_values(["Clicks", "Opens"], ascending=False))
+                st.dataframe(_eng[_eng["Opens"] + _eng["Clicks"] > 0],
+                             hide_index=True, use_container_width=True, height=340)
+
         # ── Recent sends table ────────────────────────────────────────────────
         st.markdown("#### 📬 Recent sends")
         recent_view = log_df.sort_values("_ts", ascending=False).head(50).copy()
