@@ -1379,7 +1379,8 @@ def _cached_bounces(_v: int = 1):
 _STYLE_BLOCK_RE = re.compile(r"<style[^>]*>(.*?)</style>", re.S | re.I)
 _CLASS_RULE_RE = re.compile(r"\.([\w-]+)\s*\{([^}]*)\}")
 _INLINE_PROPS = ("color", "background-color", "font-size", "font-weight",
-                 "line-height", "font-style")
+                 "line-height", "font-style", "padding", "max-width", "width",
+                 "text-align", "letter-spacing")
 
 
 def _style_class_map(html: str) -> dict:
@@ -1426,6 +1427,36 @@ def _forward_safety_issues(html: str) -> list:
     return issues
 
 
+def _mobile_safety_issues(html: str) -> list:
+    """Most of these emails are read on a phone — catch what breaks there."""
+    issues = []
+    if not html or "<" not in html:
+        return issues
+    if not re.search(r'name=["\']viewport', html, re.I):
+        issues.append(("error", "No `viewport` meta tag — phones render the desktop layout "
+                                "zoomed out and the text becomes unreadable."))
+    wide = set()
+    for m in re.finditer(r'width\s*=\s*["\']?(\d{3,4})', html, re.I):
+        if int(m.group(1)) > 640:
+            wide.add(m.group(1))
+    for m in re.finditer(r"width\s*:\s*(\d{3,4})px", html, re.I):
+        if int(m.group(1)) > 640:
+            wide.add(m.group(1))
+    if wide:
+        issues.append(("error", f"Fixed width(s) of {', '.join(sorted(wide))}px — wider than a "
+                                "phone screen, so the email scrolls sideways. Use "
+                                "`width=\"100%\"` with `max-width` instead."))
+    tiny = len(re.findall(r"font-size\s*:\s*(?:[0-9]|1[01])(?:\.\d+)?px", html, re.I))
+    if tiny:
+        issues.append(("warn", f"{tiny} declaration(s) under 12px — small text on mobile; "
+                               "iOS may auto-zoom. Body copy should be 14px+."))
+    if not re.search(r"@media", html, re.I) and re.search(r"max-width\s*:\s*\d{3}px", html, re.I):
+        issues.append(("warn", "No `@media` rules — the layout is fixed rather than responsive. "
+                               "Fluid widths (`width:100%` + `max-width`) work everywhere, "
+                               "including forwards where `<style>` is stripped."))
+    return issues
+
+
 def _inline_critical_styles(html: str) -> tuple:
     """Copy <style> class declarations onto the elements themselves.
 
@@ -1454,6 +1485,15 @@ def _inline_critical_styles(html: str) -> tuple:
     fixed = re.sub(r'<[a-zA-Z][^>]*class="([^"]+)"[^>]*>', _add, html)
     fixed = re.sub(r'(<td(?![^>]*bgcolor)[^>]*?)style="([^"]*background-color:\s*(#[0-9a-fA-F]{3,6})[^"]*)"',
                    r'\1bgcolor="\3" style="\2"', fixed, flags=re.I)
+
+    # Inline styles beat @media rules, which would freeze the layout at one
+    # breakpoint — so give every declaration inside a media query !important
+    # and the responsive behaviour still wins where <style> survives.
+    def _important(m):
+        block = m.group(0)
+        return re.sub(r":\s*([^;{}!]+)(;|\s*\})",
+                      lambda d: f": {d.group(1).strip()} !important{d.group(2)}", block)
+    fixed = re.sub(r"@media[^{]*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}", _important, fixed)
     return fixed, changed
 
 
@@ -1676,6 +1716,9 @@ with tab_compose, _tab_guard("Email Composer"):
                      "strip `data:` URIs, so pasted base64 images won't show.",
             )
             _fw = _forward_safety_issues(body)
+            _mb = _mobile_safety_issues(body)
+            for _lvl, _msg in _mb:
+                (st.error if _lvl == "error" else st.warning)(f"📱 Mobile: {_msg}")
             if _fw:
                 for _lvl, _msg in _fw:
                     (st.error if _lvl == "error" else st.warning)(f"📤 Forwarding: {_msg}")
@@ -1687,8 +1730,8 @@ with tab_compose, _tab_guard("Email Composer"):
                     st.session_state["email_body"] = _fixed
                     st.success(f"✅ Inlined styles on {_n} element(s) — re-check the preview.")
                     st.rerun()
-            elif body.strip() and "<" in body:
-                st.caption("📤 Forward-safe: styles are inline, so the design survives forwarding.")
+            elif body.strip() and "<" in body and not _mb:
+                st.caption("✅ Forward-safe and mobile-ready: styles are inline, widths are fluid.")
             if body.strip() and "<" not in body:
                 st.warning(
                     "⚠️ This looks like plain text, not HTML — in raw mode it sends as one "
