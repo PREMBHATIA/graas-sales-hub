@@ -1450,10 +1450,13 @@ def _mobile_safety_issues(html: str) -> list:
     if tiny:
         issues.append(("warn", f"{tiny} declaration(s) under 12px — small text on mobile; "
                                "iOS may auto-zoom. Body copy should be 14px+."))
-    if not re.search(r"@media", html, re.I) and re.search(r"max-width\s*:\s*\d{3}px", html, re.I):
-        issues.append(("warn", "No `@media` rules — the layout is fixed rather than responsive. "
-                               "Fluid widths (`width:100%` + `max-width`) work everywhere, "
-                               "including forwards where `<style>` is stripped."))
+    if not re.search(r"@media", html, re.I):
+        _fluid = (re.search(r'width\s*=\s*["\']?100%', html, re.I)
+                  or re.search(r"width\s*:\s*100%", html, re.I))
+        if not _fluid:
+            issues.append(("warn", "No `@media` rules and no fluid widths — the layout is fixed. "
+                                   "Use `width:100%` with `max-width` so it adapts on phones "
+                                   "(and still works in forwards, where `<style>` is stripped)."))
     return issues
 
 
