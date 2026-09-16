@@ -1371,6 +1371,92 @@ def _cached_bounces(_v: int = 1):
         return []
 
 
+# ── Forward-safety for pasted HTML ───────────────────────────────────────────
+# Gmail strips <style> blocks in quoted/forwarded content (Outlook and Yahoo
+# strip them outright). If text colour lives only in a CSS class while the
+# background is set inline, a forwarded copy renders black-on-black — which is
+# exactly what happened to the Aug-26 campaign when a recipient forwarded it.
+_STYLE_BLOCK_RE = re.compile(r"<style[^>]*>(.*?)</style>", re.S | re.I)
+_CLASS_RULE_RE = re.compile(r"\.([\w-]+)\s*\{([^}]*)\}")
+_INLINE_PROPS = ("color", "background-color", "font-size", "font-weight",
+                 "line-height", "font-style")
+
+
+def _style_class_map(html: str) -> dict:
+    """{class: [inline-able declarations]} from the document's <style> blocks."""
+    rules = {}
+    for body in _STYLE_BLOCK_RE.findall(html):
+        for cls, decls in _CLASS_RULE_RE.findall(body):
+            keep = []
+            for prop in _INLINE_PROPS:
+                m = re.search(rf"(?<![-\w]){prop}\s*:\s*([^;]+);?", decls)
+                if m and "gradient" not in m.group(1):
+                    keep.append(f"{prop}:{m.group(1).strip()}")
+            if keep:
+                rules.setdefault(cls, []).extend(keep)
+    return rules
+
+
+def _forward_safety_issues(html: str) -> list:
+    """Problems that only appear once a recipient forwards the email."""
+    issues = []
+    if not html or "<" not in html:
+        return issues
+    rules = _style_class_map(html)
+    risky = 0
+    for m in re.finditer(r'<[a-zA-Z][^>]*class="([^"]+)"[^>]*>', html):
+        tag, classes = m.group(0), m.group(1).split()
+        if not any(c in rules and any(d.startswith("color:") for d in rules[c]) for c in classes):
+            continue
+        inline = re.search(r'\sstyle\s*=\s*"([^"]*)"', tag)
+        if not inline or "color:" not in inline.group(1):
+            risky += 1
+    if risky:
+        issues.append(("error", f"{risky} element(s) take their text colour from a "
+                                "`<style>` class with no inline colour — forwarded copies "
+                                "(and Outlook) will drop it. Dark panels render black-on-black."))
+    if re.search(r'src\s*=\s*["\']cid:', html, re.I):
+        issues.append(("error", "Uses `cid:` attached images — these break entirely when forwarded. "
+                                "Host images at absolute https:// URLs."))
+    if re.search(r'src\s*=\s*["\']data:', html, re.I):
+        issues.append(("error", "Uses `data:` image URIs — Gmail and Outlook strip these."))
+    if len(html.encode("utf-8")) > 100_000:
+        issues.append(("warn", f"HTML is {len(html.encode('utf-8'))//1024}KB — Gmail clips over ~102KB, "
+                               "and a forward adds quoted text on top."))
+    return issues
+
+
+def _inline_critical_styles(html: str) -> tuple:
+    """Copy <style> class declarations onto the elements themselves.
+
+    Existing inline styles keep priority (class declarations are prepended), the
+    <style> block is left intact for media queries, and dark cells also get a
+    bgcolor attribute for Outlook. Returns (fixed_html, elements_changed).
+    """
+    rules = _style_class_map(html)
+    if not rules:
+        return html, 0
+    changed = 0
+
+    def _add(m):
+        nonlocal changed
+        tag, classes = m.group(0), m.group(1).split()
+        decl = ";".join(dict.fromkeys(d for c in classes if c in rules for d in rules[c]))
+        if not decl:
+            return tag
+        if re.search(r'\sstyle\s*=\s*"', tag):
+            new = re.sub(r'(\sstyle\s*=\s*")', r"\1" + decl + ";", tag, count=1)
+        else:
+            new = tag[:-1] + f' style="{decl}">'
+        changed += 1
+        return new
+
+    fixed = re.sub(r'<[a-zA-Z][^>]*class="([^"]+)"[^>]*>', _add, html)
+    fixed = re.sub(r'(<td(?![^>]*bgcolor)[^>]*?)style="([^"]*background-color:\s*(#[0-9a-fA-F]{3,6})[^"]*)"',
+                   r'\1bgcolor="\3" style="\2"', fixed, flags=re.I)
+    return fixed, changed
+
+
 def _fetch_watchers_page() -> list:
     """Internal watcher emails from the Outreach Log's 'Watchers' tab.
 
@@ -1589,6 +1675,20 @@ with tab_compose, _tab_guard("Email Composer"):
                      "⚠️ Images must be hosted at absolute https:// URLs — Gmail/Outlook "
                      "strip `data:` URIs, so pasted base64 images won't show.",
             )
+            _fw = _forward_safety_issues(body)
+            if _fw:
+                for _lvl, _msg in _fw:
+                    (st.error if _lvl == "error" else st.warning)(f"📤 Forwarding: {_msg}")
+                if st.button("🛠️ Make forward-safe (inline the styles)", key="fix_fwd_safe",
+                             help="Copies colours/sizes from the <style> block onto each element "
+                                  "so the design survives forwarding, Outlook and Yahoo. "
+                                  "Nothing about how it looks changes."):
+                    _fixed, _n = _inline_critical_styles(body)
+                    st.session_state["email_body"] = _fixed
+                    st.success(f"✅ Inlined styles on {_n} element(s) — re-check the preview.")
+                    st.rerun()
+            elif body.strip() and "<" in body:
+                st.caption("📤 Forward-safe: styles are inline, so the design survives forwarding.")
             if body.strip() and "<" not in body:
                 st.warning(
                     "⚠️ This looks like plain text, not HTML — in raw mode it sends as one "
