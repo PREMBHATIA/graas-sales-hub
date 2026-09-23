@@ -68,7 +68,7 @@ WATCHERS_TAB_NAME = "Watchers"
 # watcher copies are excluded so these folks aren't double-copied. Override
 # via env AUDIT_BCC (comma-separated); set AUDIT_BCC="" to disable.
 AUDIT_BCC_DEFAULT = ("prem@graas.ai,amruta@graas.ai,"
-                     "dhanashree.mohite@graas.ai,ajinkya.patil@graas.ai")
+                     "eunice.sarah@graas.ai,ajinkya.patil@graas.ai")
 
 
 def _audit_bcc() -> list:
@@ -92,6 +92,30 @@ _URL_RE = re.compile(r'(https?://[^\s<>"]+)')
 
 def _tracking_base() -> str:
     return (os.getenv("PIXEL_BASE_URL") or "").strip()
+
+
+# ── Click tracking: OFF by default (2026-09-23) ──────────────────────────────
+# Routing clicks through the Apps Script web app STRANDS THE RECIPIENT. Apps
+# Script serves HtmlService output inside an iframe sandboxed with
+# `allow-top-navigation-by-user-activation`, so the redirect it emits —
+#   (window.top||window).location.replace(dest)
+# — is blocked by the browser: there is no user gesture, the script runs on
+# load. The fallback navigates the hidden inner frame instead, so the visitor
+# is left sitting on the bare script.google.com shell and never reaches the
+# destination. Reproduced in a real browser 23 Sep 2026.
+#
+# Worse, it fails SILENTLY in our favour: doGet still runs and still writes the
+# click row, so Analytics reported healthy click numbers for journeys that
+# actually dead-ended. Every click figure recorded while this was on is
+# "someone tried to reach the page", not "someone reached it".
+#
+# Until a redirector that can issue a real 302 is in place, links ship pointing
+# at their true destination. Opens (a plain image fetch — no redirect, so
+# unaffected) keep working. Flip CLICK_TRACKING=1 to re-enable once the
+# redirect host can actually redirect.
+def _click_tracking_on() -> bool:
+    return (os.getenv("CLICK_TRACKING", "0").strip().lower()
+            in ("1", "true", "yes", "on"))
 
 
 def _tracking_pixel_html(tracking_id: str) -> str:
@@ -154,7 +178,7 @@ def _linkify_bare_text(text: str, tracking_id: str, base: str) -> str:
         while raw and raw[-1] in ".,);:":       # don't swallow trailing punctuation
             trail, raw = raw[-1] + trail, raw[:-1]
         dest = raw.replace("&amp;", "&")
-        if base and tracking_id:
+        if base and tracking_id and _click_tracking_on():
             href = f'{base}?t={tracking_id}&e=click&u={quote(dest, safe="")}'
         else:
             href = raw
@@ -175,8 +199,15 @@ def _track_anchor_href(tag: str, tracking_id: str, base: str) -> str:
     Aug 21 campaign's CTA clicks were invisible: raw mode used to leave author
     anchors alone, so the composer could never count them.
     """
+    if not _click_tracking_on():
+        return tag                               # links keep their true href
+
     def _sub(m: "re.Match") -> str:
-        dest = m.group(3)
+        # The href comes from HTML source, so `&` arrives as `&amp;`. Without
+        # this the entity is percent-encoded verbatim and the visitor lands on
+        # …?utm_source=x&amp;utm_content=y — a junk param, and broken
+        # attribution. _linkify_bare_text has always unescaped; this didn't.
+        dest = m.group(3).replace("&amp;", "&")
         return f'{m.group(1)}{m.group(2)}{base}?t={tracking_id}&e=click&u={quote(dest, safe="")}{m.group(2)}'
     return _HREF_RE.sub(_sub, tag)
 

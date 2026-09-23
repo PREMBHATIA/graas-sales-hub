@@ -19,7 +19,7 @@ load_dotenv(_env_path, override=True)
 
 # ── Per-segment email suggestions (item 5) ───────────────────────────────────
 # Replaces the static "playbook Google Doc" link. Suggestions are LIVE-READ from
-# Dhanashree's re-engagement audience sheet: each account carries an AI Maturity
+# the re-engagement audience sheet: each account carries an AI Maturity
 # and an "Email Theme" (the recommended angle, by maturity × reason stalled). We
 # reduce that to segment (AI Maturity) · account (Company) · suggestion (Email
 # Theme). Single source of truth — she edits the sheet, the composer follows.
@@ -43,7 +43,7 @@ SEGMENT_THEME_PLAN_GID = os.getenv("SEGMENT_THEME_PLAN_GID", "1357660099")
 _VOICE_HOLD_MARKERS = ("voice", "hold until demo")
 
 # AI-maturity segmentation (the 1-to-many campaign axis). Labels match the
-# pipeline sheet's "AI Maturity" column + Dhanashree's audience sheet exactly.
+# pipeline sheet's "AI Maturity" column + the audience sheet exactly.
 # Blank → "Unclassified" (kept out of the campaign picker).
 AI_SEGMENTS = ["AI Laggard", "AI Exploring", "AI Mature"]
 
@@ -102,7 +102,7 @@ def _extract_suggestions(vals) -> pd.DataFrame:
 
 
 def _open_suggestions_sheet():
-    """gspread handle on Dhanashree's sheet, or None (not shared / no creds)."""
+    """gspread handle on the audience sheet, or None (not shared / no creds)."""
     from services.sheets_client import _get_client
     if not SEGMENT_SUGGESTIONS_SHEET_ID:
         return None
@@ -117,10 +117,10 @@ def _open_suggestions_sheet():
 
 @st.cache_data(ttl=1800, show_spinner=False)
 def _load_segment_suggestions() -> pd.DataFrame:
-    """Live-read Dhanashree's audience sheet → segment/account/suggestion.
+    """Live-read the audience sheet → segment/account/suggestion.
 
     Tries the linked gid first (cheap), then scans worksheets for the audience
-    header. Dhanashree restructures this workbook freely (tabs renamed, added,
+    header. The content owner restructures this workbook freely (tabs renamed, added,
     repurposed — the original linked gid is now a copy deck), so NOTHING is
     keyed on tab name/position: a tab counts only if its header carries both
     'AI Maturity' and 'Email Theme'. Empty frame if the sheet isn't shared with
@@ -149,7 +149,7 @@ def _load_segment_suggestions() -> pd.DataFrame:
 
 
 # ── 3-month content plan ("Theme - 3 Months" tab) ────────────────────────────
-# Dhanashree's nurture arc: TWO content buckets — "AI MATURE" (M1–M9) and
+# The nurture arc: TWO content buckets — "AI MATURE" (M1–M9) and
 # "AI EXPLORERS + LAGGARDS" (E1–E9) — each email numbered with a theme, core
 # question, new belief, and Graas POV. Located by content signature (a header
 # row containing 'email theme' + 'core question'), never by tab name/gid, so
@@ -1084,7 +1084,7 @@ with tab_contacts, _tab_guard("Contacts"):
 
             # 📋 Prospect Brief link — surface the latest brief Doc for this
             # company if one exists in the SalesHub Drive folder. Lets
-            # Dhanashree open verified research without leaving the page.
+            # the operator open verified research without leaving the page.
             from services.sheets_client import find_briefs_for_company as _find_briefs
             _saleshub_folder = os.getenv(
                 "PROSPECT_BRIEF_DRIVE_FOLDER",
@@ -1596,7 +1596,7 @@ with tab_compose, _tab_guard("Email Composer"):
             if not _render_theme_plan(comp_ai_seg):
                 st.caption(
                     "Context arc not readable yet — check the 'Context arc - v2' tab in "
-                    "Dhanashree's workbook is shared with the app's service account."
+                    "the content calendar workbook is shared with the app's service account."
                 )
 
     # View / edit recipient greeting names — feeds {name} in sends.
@@ -1944,7 +1944,7 @@ with tab_compose, _tab_guard("Email Composer"):
                         # Known internal testers — extend this list as needed.
                         TEST_RECIPIENTS = {
                             "Prem (prem@graas.ai)":                     "prem@graas.ai",
-                            "Dhanashree (dhanashree.mohite@graas.ai)":  "dhanashree.mohite@graas.ai",
+                            "Eunice (eunice.sarah@graas.ai)":           "eunice.sarah@graas.ai",
                             "Amruta (amruta@graas.ai)":                 "amruta@graas.ai",
                             "Gaurav (gaurav@graas.ai)":                 "gaurav@graas.ai",
                             "Insights (insights@graas.ai)":             "insights@graas.ai",
@@ -2029,7 +2029,7 @@ with tab_compose, _tab_guard("Email Composer"):
                         )
 
                     # Voice-hold — block real sends to accounts flagged
-                    # "Voice — Hold Until Demo" in Dhanashree's audience sheet (held
+                    # "Voice — Hold Until Demo" in the audience sheet (held
                     # until the voice demo ships). Test mode is allowed (internal only).
                     voice_hold_block = False
                     if (not test_mode
@@ -2159,7 +2159,7 @@ with tab_compose, _tab_guard("Email Composer"):
                 stage_after_nt = len(after_no_touch)
 
                 # Stage 2b: remove voice-hold accounts (flagged "Voice — Hold Until
-                # Demo" in Dhanashree's audience sheet — held until the voice demo).
+                # Demo" in the audience sheet — held until the voice demo).
                 _vh_set = _voice_hold_companies()
                 if _vh_set:
                     vh_mask = after_no_touch["company"].apply(
@@ -2298,7 +2298,7 @@ with tab_compose, _tab_guard("Email Composer"):
                 if bulk_blocked_reason:
                     st.error(f"⚠️ {bulk_blocked_reason}")
 
-                # Internal copies — optional per campaign (Dhanashree: watchers
+                # Internal copies — optional per campaign (watchers
                 # shouldn't get every batch). Default ON for the first batch of a
                 # campaign; untick for follow-up batches of the same campaign.
                 watchers_selected = []
@@ -2500,7 +2500,7 @@ with tab_compose, _tab_guard("Email Composer"):
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB: CALENDAR — the Context arc content calendar (Sept–Dec), live from the
 # workbook tab (rename-proof: matched by header signature). Read-only mirror;
-# editing stays in the sheet so Dhanashree keeps full flexibility.
+# editing stays in the sheet so the content owner keeps full flexibility.
 # ══════════════════════════════════════════════════════════════════════════════
 
 with tab_calendar, _tab_guard("Calendar"):
@@ -2510,7 +2510,7 @@ with tab_calendar, _tab_guard("Calendar"):
         "Index receipt. Emails 1–2 go to everyone; Mature gets the architecture track, "
         "Explorers + Laggards get the show-don't-tell track. Edit in "
         "[the workbook tab ↗](https://docs.google.com/spreadsheets/d/11uhucHZ6099LysoifJRmeGCx5DQ57ZxEa94Q0HjpaPo/edit?gid=1357660099) "
-        "— Target window + Status columns are Dhanashree's to fill."
+        "— Target window + Status columns are the content owner's to fill."
     )
     _cal = _load_theme_plan()
     if not _cal.empty and "audience" not in _cal.columns:
