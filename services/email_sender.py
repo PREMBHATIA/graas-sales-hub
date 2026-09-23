@@ -118,6 +118,18 @@ def _click_tracking_on() -> bool:
             in ("1", "true", "yes", "on"))
 
 
+def _click_base() -> str:
+    """Host for the click hop — deliberately separate from the open pixel.
+
+    Opens are an image fetch and work fine on Apps Script; only the redirect
+    was broken. CLICK_BASE_URL points at the Cloudflare Worker in
+    tracking/click-worker.js, which 302s properly and logs via the same Apps
+    Script endpoint, so the Tracking tab and Analytics are unchanged.
+    Falls back to PIXEL_BASE_URL so nothing breaks if it's unset.
+    """
+    return (os.getenv("CLICK_BASE_URL") or "").strip() or _tracking_base()
+
+
 def _tracking_pixel_html(tracking_id: str) -> str:
     """1x1 hidden beacon appended to the HTML part."""
     base = _tracking_base()
@@ -144,8 +156,8 @@ def _linkify_with_tracking(html: str, tracking_id: str) -> str:
         while raw and raw[-1] in ".,);:":       # don't swallow sentence punctuation
             trail, raw = raw[-1] + trail, raw[:-1]
         dest = raw.replace("&amp;", "&")        # undo the body escaping for the real URL
-        if base and tracking_id:
-            href = f'{base}?t={tracking_id}&e=click&u={quote(dest, safe="")}'
+        if base and tracking_id and _click_tracking_on():
+            href = f'{_click_base()}?t={tracking_id}&e=click&u={quote(dest, safe="")}'
         else:
             href = raw
         return f'<a href="{href}">{raw}</a>{trail}'
@@ -179,7 +191,7 @@ def _linkify_bare_text(text: str, tracking_id: str, base: str) -> str:
             trail, raw = raw[-1] + trail, raw[:-1]
         dest = raw.replace("&amp;", "&")
         if base and tracking_id and _click_tracking_on():
-            href = f'{base}?t={tracking_id}&e=click&u={quote(dest, safe="")}'
+            href = f'{_click_base()}?t={tracking_id}&e=click&u={quote(dest, safe="")}'
         else:
             href = raw
         return f'<a href="{href}">{raw}</a>{trail}'
@@ -208,7 +220,7 @@ def _track_anchor_href(tag: str, tracking_id: str, base: str) -> str:
         # …?utm_source=x&amp;utm_content=y — a junk param, and broken
         # attribution. _linkify_bare_text has always unescaped; this didn't.
         dest = m.group(3).replace("&amp;", "&")
-        return f'{m.group(1)}{m.group(2)}{base}?t={tracking_id}&e=click&u={quote(dest, safe="")}{m.group(2)}'
+        return f'{m.group(1)}{m.group(2)}{_click_base()}?t={tracking_id}&e=click&u={quote(dest, safe="")}{m.group(2)}'
     return _HREF_RE.sub(_sub, tag)
 
 
