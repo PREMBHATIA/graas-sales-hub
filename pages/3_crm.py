@@ -1314,8 +1314,14 @@ _OPEN_PREFETCH_SEC = 60
 _OPEN_BUCKET_MIN = 10
 
 
-def _human_open_counts(track_df, sends_df):
-    """{tracking_id: human_open_count} — prefetch burst removed, repeats collapsed."""
+def _human_open_counts(track_df, sends_df, within_hours=None):
+    """{tracking_id: human_open_count} — prefetch burst removed, repeats collapsed.
+
+    within_hours caps how long after the send an open still counts. Comparing a
+    campaign sent this morning against one sent a month ago on lifetime opens
+    flatters the old one purely for having been around longer; capping both at
+    the same age makes them like-for-like.
+    """
     import pandas as _pd
     if (track_df is None or track_df.empty or sends_df is None or sends_df.empty
             or "tracking_id" not in track_df.columns or "tracking_id" not in sends_df.columns):
@@ -1332,6 +1338,8 @@ def _human_open_counts(track_df, sends_df):
         return {}
     ev["_lag"] = (ev["_ev_ts"] - ev["_ts"]).dt.total_seconds()
     ev = ev[ev["_lag"] > _OPEN_PREFETCH_SEC]
+    if within_hours is not None:
+        ev = ev[ev["_lag"] <= within_hours * 3600]
     if ev.empty:
         return {}
     ev["_bucket"] = (ev["_lag"] // (_OPEN_BUCKET_MIN * 60)).astype(int)
@@ -2940,31 +2948,82 @@ with tab_analytics, _tab_guard("Analytics"):
 
         st.markdown("---")
 
-        # ── Campaign performance — one row per campaign (subject), externals ──
-        st.markdown("#### 📮 Campaign performance (last 30d)")
-        if _rl.empty:
-            st.caption("No campaign sends in the last 30 days.")
+        # ── Campaign comparison — every campaign, like-for-like ──────────────
+        # Deliberately NOT windowed to 30 days: email 1 went out in August and
+        # has to stay comparable against what ships now. "Open % @24h" is the
+        # column to judge on — lifetime opens flatter whichever campaign has
+        # been in the world longest.
+        st.markdown("#### 📮 Campaign comparison")
+        _cmp = _exp[_exp["status"] == "sent"].copy()
+        _cmp = _cmp[~_cmp["company"].astype(str).str.contains(r"\[INTERNAL WATCHER\]|\[TEST\]", regex=True, na=False)]
+        _cmp = _cmp[~_cmp["template"].astype(str).str.contains(r"\(test\)|\(internal copy\)", regex=True, na=False)]
+        _cmp["subject"] = _cmp["subject"].astype(str).str.strip()
+        _cmp = _cmp[_cmp["subject"] != ""]
+        if _cmp.empty:
+            st.caption("No campaigns sent yet.")
         else:
-            _cp = (_rl.groupby("subject")
-                     .agg(**{"First sent": ("_ts", "min"), "Sent": ("to_email", "size"),
-                             "Opened": ("opened", "sum"), "Clicks": ("click_count", "sum"),
-                             "_clicked_sends": ("clicked", "sum")})
-                     .reset_index().rename(columns={"subject": "Campaign"}))
-            _cp["Open %"] = (_cp["Opened"] / _cp["Sent"] * 100).round(0).astype(int)
-            _cp["Click %"] = (_cp["_clicked_sends"] / _cp["Sent"] * 100).round(0).astype(int)
-            _cp = _cp.sort_values("First sent", ascending=False)
-            _cp["First sent"] = _cp["First sent"].dt.strftime("%d %b")
-            _cp = _cp[["Campaign", "First sent", "Sent", "Opened", "Open %", "Clicks", "Click %"]]
-            _psty = (_cp.style
-                     .set_properties(subset=["Clicks", "Click %"],
-                                     **{"background-color": "#DBEAFE", "color": "#1D4ED8", "font-weight": "700"})
-                     .set_properties(subset=["Opened", "Open %"],
-                                     **{"background-color": "#F5F3FF", "color": "#6D28D9", "font-weight": "600"}))
-            st.dataframe(_psty, use_container_width=True, hide_index=True,
-                         height=min(400, 80 + 35 * len(_cp)))
-            st.caption("Campaigns are identified by subject line. Judge on **Click %** — opens are "
-                       "inflated by Apple Mail/Gmail prefetch. Tests and internal copies are excluded "
-                       "from every number on this page.")
+            _ctid = _cmp["tracking_id"].astype(str).str.strip()
+            _o24 = _human_open_counts(track_df, _cmp, within_hours=24)
+            _cmp["_reads"] = _ctid.map(pd.Series(_human_opens, dtype="int64")).fillna(0).astype(int)
+            _cmp["_r24"] = _ctid.map(pd.Series(_o24, dtype="int64")).fillna(0).astype(int)
+
+            _crows = []
+            for _subj, _g in _cmp.groupby("subject"):
+                _n = len(_g)
+                _first = _g["_ts"].min()
+                _age_d = (now_utc - _first).total_seconds() / 86400
+                _tracked = (_g["tracking_id"].astype(str).str.strip()
+                            .replace("nan", "").ne("").any())
+                _crows.append({
+                    "Campaign": str(_subj)[:58],
+                    "Sent": _n,
+                    "Cos": int(_g["company"].nunique()),
+                    "Age": f"{_age_d:.1f}d" if _age_d < 2 else f"{int(round(_age_d))}d",
+                    "Open %": f"{int(round((_g['_reads'] > 0).sum() / _n * 100))}%" if _tracked else "—",
+                    "Open % @24h": f"{int(round((_g['_r24'] > 0).sum() / _n * 100))}%" if _tracked else "—",
+                    "Clicks": int(_g["click_count"].sum()) if _tracked else "—",
+                    "Click %": f"{int(round((_g['click_count'] > 0).sum() / _n * 100))}%" if _tracked else "—",
+                    "Circulated": int((_g["_reads"] >= 3).sum()) if _tracked else "—",
+                    "_first": _first, "_age": _age_d,
+                })
+            _cdf = pd.DataFrame(_crows).sort_values("_first", ascending=False)
+            _young = _cdf[_cdf["_age"] < 1]["Campaign"].tolist()
+            _cdf = _cdf.drop(columns=["_first", "_age"])
+            _csty2 = (_cdf.style
+                      .set_properties(subset=["Clicks", "Click %"],
+                                      **{"background-color": "#DBEAFE", "color": "#1D4ED8", "font-weight": "700"})
+                      .set_properties(subset=["Open % @24h"],
+                                      **{"background-color": "#EDE9FE", "color": "#5B21B6", "font-weight": "700"})
+                      .set_properties(subset=["Open %", "Circulated"],
+                                      **{"background-color": "#F5F3FF", "color": "#6D28D9", "font-weight": "600"}))
+            st.dataframe(_csty2, use_container_width=True, hide_index=True,
+                         height=min(420, 80 + 35 * len(_cdf)))
+            _warn = ("  ⏳ **" + ", ".join(_young) + "** is less than a day old — its @24h "
+                     "column is still filling." if _young else "")
+            st.caption(
+                "Campaigns are identified by subject line. **Open % @24h** is the like-for-like "
+                "column: the same 24-hour window for every campaign, so an older one isn't "
+                "rewarded for age. **Circulated** = recipients who read it 3+ separate times, "
+                "the closest proxy for it being passed around internally. Tests and internal "
+                "copies are excluded throughout. An em dash means the campaign predates open "
+                "tracking — not that nobody opened it." + _warn)
+
+            # Segment x campaign: which message landed with which audience.
+            _cmp["_seg"] = _cmp["to_email"].astype(str).str.strip().str.lower().map(_email_seg).fillna("Unclassified")
+            _mrows = []
+            for _subj, _g in _cmp.groupby("subject"):
+                _row = {"Campaign": str(_subj)[:58]}
+                for _sg in _seg_order:
+                    _sgg = _g[_g["_seg"] == _sg]
+                    _row[_sg] = (str(int(round((_sgg["_reads"] > 0).sum() / len(_sgg) * 100))) + "%  (" + str(len(_sgg)) + ")"
+                                 if len(_sgg) else "—")
+                _mrows.append((_g["_ts"].min(), _row))
+            _mdf = pd.DataFrame([r for _, r in sorted(_mrows, key=lambda x: x[0], reverse=True)])
+            with st.expander("📊 Open rate by AI segment, per campaign"):
+                st.dataframe(_mdf, use_container_width=True, hide_index=True,
+                             height=min(320, 80 + 35 * len(_mdf)))
+                st.caption("Open rate (and audience size) per segment. Tells you which argument "
+                           "landed with Mature vs Explorers vs Laggards.")
 
         st.markdown("---")
 
