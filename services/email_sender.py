@@ -574,7 +574,12 @@ def send_email(
                     # four colleagues on visible CC of every audit copy — noisy,
                     # and it leaked the internal list into anything forwarded on.
                     _amsg["To"] = formataddr(("Graas Insights", smtp_user))
-                    _amsg["Reply-To"] = formataddr((sender_name, reply_to))
+                    # Reply-To is the PROSPECT, not the sender: the point of an
+                    # audit copy is to follow up with that person, so Reply and
+                    # Forward should reach them without hunting for the address.
+                    # The banner below says so in plain sight, because replying
+                    # here mails a customer.
+                    _amsg["Reply-To"] = formataddr((to_name or "", to_email))
                     _amsg["X-Graas-Audit-Copy"] = f"to={to_email}; company={company}"
                     if layout == "raw":
                         _ahtml = _linkify_raw_html(body, "")
@@ -589,7 +594,23 @@ def send_email(
                         _atext = body
                     _amsg.attach(MIMEText(f"[Audit copy — sent to {to_email} ({company})]\n\n{_atext}",
                                           "plain", "utf-8"))
-                    _amsg.attach(MIMEText(_ahtml, "html", "utf-8"))
+                    # Gmail renders the HTML part, so the recipient line has to
+                    # live there too — the text/plain header above was never
+                    # visible, which made 40+ audit copies indistinguishable.
+                    _banner = (
+                        '<div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;'
+                        'line-height:1.55;color:#1f2933;background-color:#FFF4D6;'
+                        'border-left:4px solid #C8890B;padding:10px 14px;margin:0 0 12px;">'
+                        '<span style="font-weight:700;color:#8A5B00;">AUDIT COPY</span>'
+                        '&nbsp;&#183;&nbsp;sent to '
+                        f'<a href="mailto:{to_email}" style="color:#1D4ED8;font-weight:700;">'
+                        f'{(to_name or to_email)} &lt;{to_email}&gt;</a>'
+                        f'{" at <strong>" + company + "</strong>" if company else ""}'
+                        f'{" &#183; " + bucket if bucket else ""}'
+                        '<br><span style="color:#6b5417;">Reply or Forward goes to them, '
+                        'not to the team.</span></div>'
+                    )
+                    _amsg.attach(MIMEText(_banner + _ahtml, "html", "utf-8"))
                     server.sendmail(smtp_user, _audit_to, _amsg.as_string())
                 except Exception:
                     pass  # audit copy is best-effort; never fail a real send

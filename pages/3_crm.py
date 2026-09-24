@@ -2661,6 +2661,35 @@ with tab_analytics, _tab_guard("Analytics"):
         if not failed_7d.empty:
             st.error(f"⚠️ {len(failed_7d)} send failure(s) in the last 7 days — see Recent sends below for details.")
 
+        # ── Campaign lens ─────────────────────────────────────────────────────
+        # Segments and Account heat roll up 30 days across every campaign, which
+        # answers "who engages with us" but not "who engaged with email 2".
+        # Picking a campaign scopes both tables to that send. Campaign identity
+        # is the subject line — the same key Campaign performance groups on.
+        _camp_counts = (_ext30.groupby("subject").size().sort_values(ascending=False)
+                        if ("subject" in _ext30.columns and len(_ext30)) else pd.Series(dtype=int))
+        _ALL_CAMPAIGNS = "All campaigns (last 30d)"
+        _camp_pick = st.selectbox(
+            "Lens", [_ALL_CAMPAIGNS] + [f"{sub}  ·  {n} sent" for sub, n in _camp_counts.items()],
+            key="analytics_campaign_lens",
+            help="Scopes Segments at a glance and Account heat below to one campaign. "
+                 "Audience counts (Companies, Contacts) always show the full segment — "
+                 "only the engagement columns narrow.",
+        )
+        _camp_subject = None if _camp_pick == _ALL_CAMPAIGNS else _camp_pick.rsplit("  ·  ", 1)[0]
+        _scope_label = "last 30d" if _camp_subject is None else "this campaign"
+
+        def _scope(df):
+            """Narrow a sends frame to the chosen campaign (no-op when All)."""
+            if _camp_subject is None or "subject" not in df.columns:
+                return df
+            return df[df["subject"].astype(str) == _camp_subject]
+
+        _ext30v = _scope(_ext30)
+        if _camp_subject is not None:
+            st.caption(f"Showing **{len(_ext30v)}** external send(s) from "
+                       f"*{_camp_subject}* — clear the lens to see all 30 days.")
+
         # ── Segments at a glance — audience size + engagement per AI segment ──
         st.markdown("---")
         st.markdown("#### 🎯 Segments at a glance")
@@ -2668,7 +2697,7 @@ with tab_analytics, _tab_guard("Analytics"):
         _aud = contacts[contacts["has_email"]].copy() if "has_email" in contacts.columns else contacts.copy()
         _aud["ai_segment"] = _aud["ai_segment"].fillna("Unclassified").replace("", "Unclassified")
         _email_seg = {str(e).strip().lower(): sgm for e, sgm in zip(_aud["email"], _aud["ai_segment"])}
-        _e30 = _ext30.copy()
+        _e30 = _ext30v.copy()
         _e30["_seg"] = _e30["to_email"].astype(str).str.strip().str.lower().map(_email_seg).fillna("Unclassified")
         _e30["_tid"] = _tid_series(_e30)
         _seg_rows = []
@@ -2679,7 +2708,7 @@ with tab_analytics, _tab_guard("Analytics"):
                 "Segment": _sg,
                 "Companies": int(_a["company"].nunique()),
                 "Contacts": int(len(_a)),
-                "Sends (30d)": int(len(_sv)),
+                "Sends": int(len(_sv)),
                 "Opened": int(_sv["_tid"].isin(_op_ids).sum()),
                 "Clicks": int(sum(_cl_counts.get(t, 0) for t in _sv["_tid"])),
             })
@@ -2691,8 +2720,8 @@ with tab_analytics, _tab_guard("Analytics"):
                                  **{"background-color": "#F5F3FF", "color": "#6D28D9", "font-weight": "600"}))
         st.dataframe(_ssty, use_container_width=True, hide_index=True,
                      height=min(260, 80 + 35 * len(_seg_df)))
-        st.caption("Audience = contacts with an email in the pipeline sheet, by AI segment. "
-                   "Engagement = external campaign sends in the last 30 days, attributed via each recipient's segment.")
+        st.caption(f"Audience = contacts with an email in the pipeline sheet, by AI segment. "
+                   f"Engagement = external campaign sends ({_scope_label}), attributed via each recipient's segment.")
 
         # Full export WITH engagement — sends joined to the Tracking beacons so
         # the CSV answers "who opened / who clicked" without cross-referencing.
@@ -2720,6 +2749,7 @@ with tab_analytics, _tab_guard("Analytics"):
         # tests and internal watcher copies excluded.
         _rl = _exp[(_exp["status"] == "sent")
                    & (_exp["_ts"] >= now_utc - pd.Timedelta(days=30))].copy()
+        _rl = _scope(_rl)          # campaign lens
         _rl = _rl[~_rl["company"].astype(str).str.contains(r"\[INTERNAL WATCHER\]|\[TEST\]", regex=True, na=False)]
         _rl = _rl[~_rl["template"].astype(str).str.contains(r"\(test\)|\(internal copy\)", regex=True, na=False)]
 
@@ -2850,7 +2880,7 @@ with tab_analytics, _tab_guard("Analytics"):
             st.dataframe(_bshow, hide_index=True, use_container_width=True,
                          height=min(320, 80 + 35 * len(_bshow)))
 
-        st.markdown("#### 🔥 Account heat (last 30d)")
+        st.markdown(f"#### 🔥 Account heat ({_scope_label})")
         st.caption(
             "Engagement rolled up per company — multiple stakeholders opening is a "
             "buying-committee signal. Sorted hottest first: clicks, then sends opened, "
