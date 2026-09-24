@@ -2953,6 +2953,16 @@ with tab_analytics, _tab_guard("Analytics"):
         # has to stay comparable against what ships now. "Open % @24h" is the
         # column to judge on — lifetime opens flatter whichever campaign has
         # been in the world longest.
+        # Click tracking was disabled 23 Sep 2026 — routing clicks through the
+        # Apps Script redirect stranded recipients on a blank google page (its
+        # iframe sandbox blocks the top-level navigation). Links now ship
+        # pointing at their real destination, so nothing records a click. A
+        # campaign sent after that date with zero click events therefore means
+        # "not measured", NOT "nobody clicked" — same trap as the pre-pixel
+        # sends. Self-healing: once a redirector that can 302 is in place and
+        # clicks start landing again, campaigns with events show real numbers.
+        _CLICKS_OFF_FROM = pd.Timestamp("2026-09-23", tz="UTC")
+
         st.markdown("#### 📮 Campaign comparison")
         _cmp = _exp[_exp["status"] == "sent"].copy()
         _cmp = _cmp[~_cmp["company"].astype(str).str.contains(r"\[INTERNAL WATCHER\]|\[TEST\]", regex=True, na=False)]
@@ -2974,6 +2984,10 @@ with tab_analytics, _tab_guard("Analytics"):
                 _age_d = (now_utc - _first).total_seconds() / 86400
                 _tracked = (_g["tracking_id"].astype(str).str.strip()
                             .replace("nan", "").ne("").any())
+                # Clicks are only meaningful if the campaign predates the
+                # cutover, or actually recorded clicks (i.e. it was re-enabled).
+                _clicks_ok = _tracked and (_first < _CLICKS_OFF_FROM
+                                           or int(_g["click_count"].sum()) > 0)
                 _crows.append({
                     "Campaign": str(_subj)[:58],
                     "Sent": _n,
@@ -2981,8 +2995,9 @@ with tab_analytics, _tab_guard("Analytics"):
                     "Age": f"{_age_d:.1f}d" if _age_d < 2 else f"{int(round(_age_d))}d",
                     "Open %": f"{int(round((_g['_reads'] > 0).sum() / _n * 100))}%" if _tracked else "—",
                     "Open % @24h": f"{int(round((_g['_r24'] > 0).sum() / _n * 100))}%" if _tracked else "—",
-                    "Clicks": int(_g["click_count"].sum()) if _tracked else "—",
-                    "Click %": f"{int(round((_g['click_count'] > 0).sum() / _n * 100))}%" if _tracked else "—",
+                    "Clicks": int(_g["click_count"].sum()) if _clicks_ok else "—",
+                    "Click %": (f"{int(round((_g['click_count'] > 0).sum() / _n * 100))}%"
+                                if _clicks_ok else "—"),
                     "Circulated": int((_g["_reads"] >= 3).sum()) if _tracked else "—",
                     "_first": _first, "_age": _age_d,
                 })
@@ -3005,8 +3020,9 @@ with tab_analytics, _tab_guard("Analytics"):
                 "column: the same 24-hour window for every campaign, so an older one isn't "
                 "rewarded for age. **Circulated** = recipients who read it 3+ separate times, "
                 "the closest proxy for it being passed around internally. Tests and internal "
-                "copies are excluded throughout. An em dash means the campaign predates open "
-                "tracking — not that nobody opened it." + _warn)
+                "copies are excluded throughout. An em dash means it was never measured, not "
+                "that it was zero: opens predate the tracking pixel, clicks were disabled "
+                "on 23 Sep so links stop routing through a broken redirect." + _warn)
 
             # Segment x campaign: which message landed with which audience.
             _cmp["_seg"] = _cmp["to_email"].astype(str).str.strip().str.lower().map(_email_seg).fillna("Unclassified")
