@@ -568,7 +568,12 @@ def send_email(
                     _amsg = MIMEMultipart("alternative")
                     _amsg["Subject"] = f"[Audit] {subject}"
                     _amsg["From"] = formataddr((from_display, smtp_user))
-                    _amsg["To"] = ", ".join(_audit_to)
+                    # Blind copy: the envelope (server.sendmail below) carries
+                    # the real audit recipients, so each one receives it while
+                    # the header shows only insights@. Listing them in To: put
+                    # four colleagues on visible CC of every audit copy — noisy,
+                    # and it leaked the internal list into anything forwarded on.
+                    _amsg["To"] = formataddr(("Graas Insights", smtp_user))
                     _amsg["Reply-To"] = formataddr((sender_name, reply_to))
                     _amsg["X-Graas-Audit-Copy"] = f"to={to_email}; company={company}"
                     if layout == "raw":
