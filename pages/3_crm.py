@@ -2856,8 +2856,13 @@ with tab_analytics, _tab_guard("Analytics"):
                                 right_on="_tid", how="inner")
                          .assign(_lag=lambda d: (d["_ev"] - d["_ts"]).dt.total_seconds())
                          .groupby("tracking_id")["_lag"].min())
+            # First band is 60s on purpose: it is exactly what the de-noising
+            # discards elsewhere, and the live data shows the machine mass sits
+            # almost entirely inside it (47% Aug, 51% Sep) — splitting here
+            # isolates gateway scans instead of blurring them into real readers.
             _bands = [
-                ("Under 5 min",      lambda x: x <= 300),
+                ("Under 60 sec",     lambda x: x <= 60),
+                ("1 - 5 min",        lambda x: (x > 60) & (x <= 300)),
                 ("5 - 60 min",       lambda x: (x > 300) & (x <= 3600)),
                 ("1 - 6 hours",      lambda x: (x > 3600) & (x <= 21600)),
                 ("6 - 24 hours",     lambda x: (x > 21600) & (x <= 86400)),
@@ -2877,10 +2882,11 @@ with tab_analytics, _tab_guard("Analytics"):
                              height=240, color="#7C3AED")
             with _c2:
                 st.dataframe(_cur, use_container_width=True, hide_index=True, height=250)
-            _fast = int(_cur.loc[_cur["When they first opened"] == "Under 5 min", "Recipients"].iloc[0])
+            _fast = int(_cur.loc[_cur["When they first opened"] == "Under 60 sec", "Recipients"].iloc[0])
             if _n and _fast / _n >= 0.4:
                 st.error(
-                    f"⚠️ **{round(_fast / _n * 100)}% opened within five minutes.** That is a "
+                    f"⚠️ **{round(_fast / _n * 100)}% 'opened' within 60 seconds.** Nobody reads "
+                    "an email that fast — that is a "
                     "mail-gateway scan, not readers — treat this campaign's open rate as an "
                     "upper bound, and judge it on the later bands instead.", icon="🤖")
             else:
