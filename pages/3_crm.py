@@ -2642,9 +2642,10 @@ with tab_calendar, _tab_guard("Calendar"):
 
 with tab_analytics, _tab_guard("Analytics"):
     st.markdown("### 📊 Outreach Analytics")
-    st.caption("Email outreach metrics from the Graas Outreach Log. "
-               "Sent, opens and clicks are tracked. Replies and unsubscribes are not yet — "
-               "they need Gmail reply-polling and a hosted unsubscribe endpoint.")
+    st.caption("Every figure below is per campaign, not a rolling average — "
+               "campaigns sent weeks apart are not comparable in aggregate. "
+               "Unsubscribes and bounces are read from the insights@ mailbox on demand "
+               "(**Drill down** below). Replies are not tracked.")
 
     from services.email_sender import (
         get_weekly_cap as _get_weekly_cap,
@@ -2701,25 +2702,20 @@ with tab_analytics, _tab_guard("Analytics"):
                 out = out[~out["template"].astype(str).str.contains(r"\(test\)|\(internal copy\)", regex=True, na=False)]
             return out
 
-        _ext7 = _externals(sent_7d)
         _ext30 = _externals(sent_30d)
         _human_opens = _human_open_counts(track_df, sent_df)
-        _op_ids, _cl_ids, _cl_counts = set(), set(), {}
+        _op_ids, _cl_counts = set(), {}
         if track_df is not None and not track_df.empty and "tracking_id" in track_df.columns:
             _op_ids = {t for t, n in _human_opens.items() if n > 0}
             _cl_counts = _human_click_counts(track_df, sent_df)
-            _cl_ids = {t for t, n in _cl_counts.items() if n > 0}
 
         def _tid_series(df):
             return (df["tracking_id"].astype(str).str.strip()
                     if "tracking_id" in df.columns else pd.Series([], dtype=str))
 
-        _t7 = _tid_series(_ext7)
-        _delivered7 = len(_ext7)
-        _opened7 = int(_t7.isin(_op_ids).sum())
-        _clicks7 = int(sum(_cl_counts.get(t, 0) for t in _t7))
-        _t30 = _tid_series(_ext30)
-        _hot30 = int(_ext30.loc[_t30.isin(_cl_ids)]["company"].nunique()) if len(_ext30) else 0
+        # _delivered7 / _opened7 / _clicks7 / _hot30 went with the KPI tiles.
+        # They were rolling-window aggregates across campaigns, which is the
+        # comparison that misleads; the per-campaign table replaces them.
 
         supp_df = _fetch_suppressions()
         _unsub_n = 0
@@ -2728,24 +2724,20 @@ with tab_analytics, _tab_guard("Analytics"):
                            .str.contains("unsub").sum())
         _supp_total = 0 if supp_df.empty else len(supp_df)
 
-        k1, k2, k3, k4, k5 = st.columns(5)
-        _b7 = {b["email"] for b in _inbox_scan_results()["bounces"]}
-        _bounced7 = int(_tid_series(_ext7).index.isin(
-            _ext7[_ext7["to_email"].astype(str).str.lower().isin(_b7)].index).sum()) if _b7 else 0
-        k1.metric("📤 Delivered (7d)", _delivered7 - _bounced7,
-                  help=f"External sends accepted by Gmail, minus {_bounced7} known bounce(s) in the window. "
-                       f"{len(_ext30)} sent in last 30d. See Delivery issues below.")
-        k2.metric("👀 Open rate (7d)", f"{round(_opened7 / _delivered7 * 100)}%" if _delivered7 else "—",
-                  help=f"Share of external sends with at least one human open — the "
-                       f"first-{_OPEN_PREFETCH_SEC}s prefetch burst is discarded and repeat "
-                       f"fetches within {_OPEN_BUCKET_MIN} min count once.")
-        k3.metric("🔗 Clicks (7d)", _clicks7,
-                  help="Human link clicks on external sends. Mail-filter link scanners are removed: clicks inside the first 60s, and any recipient whose clicks touch 2+ links within 3 minutes (a scanner walking the email).")
-        k4.metric("🔥 Hot accounts (30d)", _hot30,
-                  help="Companies with at least one click in the last 30 days — see Account heat below.")
-        k5.metric("🚫 Unsubscribed", _unsub_n,
-                  help=f"Suppression-list entries whose reason mentions unsubscribe "
-                       f"(added when someone replies 'unsubscribe'). Total suppressed: {_supp_total}.")
+        # The five KPI tiles that used to sit here were aggregates over 7- and
+        # 30-day windows, which MIXES campaigns together — the exact shape of
+        # number that had us comparing a day-old campaign against a month-old
+        # one and concluding the new email had failed. Campaign comparison
+        # directly below answers the same questions per campaign, honestly.
+        # What survives is the operational line: how much cap is left, and
+        # whether anything needs attention.
+        _ops = []
+        if _unsub_n:
+            _ops.append(f"**{_unsub_n}** unsubscribe request(s) honoured")
+        if _supp_total:
+            _ops.append(f"**{_supp_total}** address(es) suppressed")
+        if _ops:
+            st.caption(" · ".join(_ops) + " — see **Drill down** below.")
 
         # Weekly cap row — computed from the already-fetched frame (mirrors
         # get_sends_this_week incl. the internal-copy exclusion) instead of
