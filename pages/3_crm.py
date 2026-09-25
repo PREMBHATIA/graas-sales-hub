@@ -1391,6 +1391,44 @@ def _human_click_counts(track_df, sends_df):
     return ev.groupby("tracking_id").size().to_dict()
 
 
+# A "real read" is a first open that is more than 60s after the send AND not
+# part of a synchronised burst. The burst rule catches what the 60s cut cannot:
+# a mail gateway that sweeps a few minutes AFTER delivery. On 26 Aug, 92 of 132
+# recipients first opened inside the same 10-minute wall-clock window — 92
+# people at 92 companies do not do that, software does.
+# Threshold: a 10-minute window holding >=10% of the campaign's recipients. There
+# are 144 such windows in a day, so 10% in one is a ~14x concentration.
+_BURST_WINDOW = "10min"
+_BURST_SHARE = 0.10
+
+
+def _real_read_ids(track_df, sends_df):
+    """Set of tracking_ids whose first open looks like a person, not software."""
+    import pandas as _pd
+    if (track_df is None or track_df.empty or sends_df is None or sends_df.empty
+            or "tracking_id" not in track_df.columns or "tracking_id" not in sends_df.columns):
+        return set()
+    ev = track_df[track_df["event"] == "open"].copy()
+    if ev.empty:
+        return set()
+    ev["_ev_ts"] = _pd.to_datetime(ev.get("ts_utc"), errors="coerce", utc=True)
+    base = sends_df[["tracking_id", "_ts"]].copy()
+    base["tracking_id"] = base["tracking_id"].astype(str).str.strip()
+    ev = ev.merge(base, on="tracking_id", how="inner")
+    ev = ev[ev["_ev_ts"].notna() & ev["_ts"].notna()]
+    if ev.empty:
+        return set()
+    ev = ev[(ev["_ev_ts"] - ev["_ts"]).dt.total_seconds() > _OPEN_PREFETCH_SEC]
+    if ev.empty:
+        return set()
+    first = ev.groupby("tracking_id")["_ev_ts"].min().to_frame("t")
+    first["w"] = first["t"].dt.floor(_BURST_WINDOW)
+    n = max(1, len(base))
+    counts = first.groupby("w").size()
+    burst = set(counts[counts >= max(3, int(n * _BURST_SHARE))].index)
+    return set(first[~first["w"].isin(burst)].index)
+
+
 def _inbox_scan_results() -> dict:
     """Bounce/unsubscribe scan results from THIS session only.
 
@@ -2822,6 +2860,12 @@ with tab_analytics, _tab_guard("Analytics"):
                 _mo["_lag"] = (_mo["_ev"] - _mo["_ts"]).dt.total_seconds()
                 _mach = (_mo.groupby("tracking_id")["_lag"].min() <= 60).to_dict()
             _cmp["_machine"] = _ctid.map(_mach).fillna(False).astype(int)
+            # Per campaign, because the burst threshold is a share of THAT
+            # campaign's audience — pooling them would hide a small send's burst.
+            _real_ids = set()
+            for _sb, _gg in _cmp.groupby("subject"):
+                _real_ids |= _real_read_ids(track_df, _gg)
+            _cmp["_real"] = _ctid.isin(_real_ids).astype(int)
 
             _crows = []
             for _subj, _g in _cmp.groupby("subject"):
@@ -2844,10 +2888,10 @@ with tab_analytics, _tab_guard("Analytics"):
                     # delivery, which is what inflated Aug — so this is still
                     # an upper bound. "Machine" sits beside it so the reader
                     # can see how much of the list never chose to open at all.
-                    "Open %": f"{int(round((_g['_reads'] > 0).sum() / _n * 100))}%" if _tracked else "—",
-                    "Machine": (f"{int(round(_g['_machine'].sum() / _n * 100))}%"
+                    "Real reads": f"{int(round(_g['_real'].sum() / _n * 100))}%" if _tracked else "—",
+                    "Machine (<60s)": (f"{int(round(_g['_machine'].sum() / _n * 100))}%"
                                 if _tracked else "—"),
-                    "Open @24h": f"{int(round((_g['_r24'] > 0).sum() / _n * 100))}%" if _tracked else "—",
+                    "Real @24h": f"{int(round((_g['_r24'] > 0).sum() / _n * 100))}%" if _tracked else "—",
                     "Clicks": int(_g["click_count"].sum()) if _clicks_ok else "—",
                     "Click %": (f"{int(round((_g['click_count'] > 0).sum() / _n * 100))}%"
                                 if _clicks_ok else "—"),
@@ -2867,9 +2911,9 @@ with tab_analytics, _tab_guard("Analytics"):
             _csty2 = (_cdf.style
                       .set_properties(subset=["Clicks", "Click %"],
                                       **{"background-color": "#DBEAFE", "color": "#1D4ED8", "font-weight": "700"})
-                      .set_properties(subset=["Open @24h"],
+                      .set_properties(subset=["Real @24h"],
                                       **{"background-color": "#EDE9FE", "color": "#5B21B6", "font-weight": "700"})
-                      .set_properties(subset=["Open %", "Circulated"],
+                      .set_properties(subset=["Real reads", "Circulated"],
                                       **{"background-color": "#F5F3FF", "color": "#6D28D9", "font-weight": "600"}))
             st.dataframe(_csty2, use_container_width=True, hide_index=True,
                          height=min(420, 80 + 35 * len(_cdf)))
@@ -2880,10 +2924,11 @@ with tab_analytics, _tab_guard("Analytics"):
                  "existed, or one-off 1:1 mails rather than campaigns. "
                  if len(_hidden) else "")
                 + "Campaigns are identified by subject line. **Open % @24h** is the "
-                "**Machine** = the share whose pixel fired within 60 seconds of sending — "
-                "gateway scanning, not readers. Where it is high, treat **Open %** as an "
-                "upper bound and use *When people opened* below to see the real shape. "
-                "**Open @24h** is the "
+                "**Real reads** = recipients whose first open was more than 60 seconds after "
+                "the send AND not inside a synchronised burst (a 10-minute window holding "
+                "10%+ of that campaign's list — software sweeping, not people). "
+                "**Machine (<60s)** = the share whose pixel fired within 60 seconds of "
+                "sending: pure gateway scanning. **Real @24h** applies the same "
                 "like-for-like column: the same 24-hour window for every campaign, so an "
                 "older one isn't rewarded for age. **Circulated** = recipients who read it "
                 "3+ separate times, the closest proxy for it being passed around "
@@ -2978,28 +3023,46 @@ with tab_analytics, _tab_guard("Analytics"):
         _e30 = _ext30v.copy()
         _e30["_seg"] = _e30["to_email"].astype(str).str.strip().str.lower().map(_email_seg).fillna("Unclassified")
         _e30["_tid"] = _tid_series(_e30)
+        _seg_real = _real_read_ids(track_df, _e30)
         _seg_rows = []
         for _sg in _seg_order:
             _a = _aud[_aud["ai_segment"] == _sg]
             _sv = _e30[_e30["_seg"] == _sg]
+            # When this segment was actually mailed. Send time plausibly drives
+            # performance — a batch that lands at 03:00 local reads very
+            # differently from one that lands mid-morning — and until now the
+            # dashboard gave no way to see it. IST because the list is India
+            # and SE Asia.
+            if _sv.empty:
+                _when = "—"
+            else:
+                _lo = (_sv["_ts"].min() + pd.Timedelta(hours=5, minutes=30))
+                _hi = (_sv["_ts"].max() + pd.Timedelta(hours=5, minutes=30))
+                _when = (f"{_lo.strftime('%d %b %H:%M')}"
+                         + (f"–{_hi.strftime('%H:%M')}" if _hi.strftime('%H:%M') != _lo.strftime('%H:%M') else ""))
             _seg_rows.append({
                 "Segment": _sg,
                 "Companies": int(_a["company"].nunique()),
                 "Contacts": int(len(_a)),
+                "Sent at (IST)": _when,
                 "Sends": int(len(_sv)),
-                "Opened": int(_sv["_tid"].isin(_op_ids).sum()),
+                "Real reads": int(_sv["_tid"].isin(_seg_real).sum()),
                 "Clicks": _clicks_cell(_sv, sum(_cl_counts.get(t, 0) for t in _sv["_tid"])),
             })
         _seg_df = pd.DataFrame(_seg_rows)
         _ssty = (_seg_df.style
                  .set_properties(subset=["Clicks"],
                                  **{"background-color": "#DBEAFE", "color": "#1D4ED8", "font-weight": "700"})
-                 .set_properties(subset=["Opened"],
+                 .set_properties(subset=["Real reads"],
                                  **{"background-color": "#F5F3FF", "color": "#6D28D9", "font-weight": "600"}))
         st.dataframe(_ssty, use_container_width=True, hide_index=True,
                      height=min(260, 80 + 35 * len(_seg_df)))
-        st.caption(f"Audience = contacts with an email in the pipeline sheet, by AI segment. "
-                   f"Engagement = external campaign sends ({_scope_label}), attributed via each recipient's segment.")
+        st.caption(
+            f"**Companies / Contacts** = everyone in that segment in the pipeline sheet, "
+            f"whether or not they were mailed. **Sent at** = when this segment actually "
+            f"received it, Indian Standard Time. **Sends / Real reads / Clicks** cover "
+            f"{_scope_label}. **Real reads** excludes opens inside 60 seconds and "
+            f"synchronised gateway sweeps. An em dash means never measured, not zero.")
 
         # Full export WITH engagement — sends joined to the Tracking beacons so
         # the CSV answers "who opened / who clicked" without cross-referencing.
