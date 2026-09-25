@@ -2837,6 +2837,58 @@ with tab_analytics, _tab_guard("Analytics"):
             if _urls is not None:
                 _exp["clicked_urls"] = _tid.map(_urls).fillna("")
 
+        # ── When people opened ───────────────────────────────────────────────
+        # Deliberately UNFILTERED: this is the one place the machine traffic
+        # should be visible rather than removed. A human audience produces a
+        # spread — some within the hour, more across the working day, a tail
+        # over days. A gateway scan produces a spike in the first minutes. If
+        # the first bar dwarfs the rest, the open rate is measuring software.
+        st.markdown("---")
+        st.markdown(f"#### ⏱️ When people opened ({_scope_label})")
+        _tl = _scope(_ext30).copy()
+        if _tl.empty or track_df is None or track_df.empty:
+            st.caption("No sends in scope, or tracking data is unavailable.")
+        else:
+            _tl["_tid"] = _tid_series(_tl)
+            _ob = track_df[track_df["event"] == "open"].copy()
+            _ob["_ev"] = pd.to_datetime(_ob.get("ts_utc"), errors="coerce", utc=True)
+            _first = (_ob.merge(_tl[["_tid", "_ts"]], left_on="tracking_id",
+                                right_on="_tid", how="inner")
+                         .assign(_lag=lambda d: (d["_ev"] - d["_ts"]).dt.total_seconds())
+                         .groupby("tracking_id")["_lag"].min())
+            _bands = [
+                ("Under 5 min",      lambda x: x <= 300),
+                ("5 - 60 min",       lambda x: (x > 300) & (x <= 3600)),
+                ("1 - 6 hours",      lambda x: (x > 3600) & (x <= 21600)),
+                ("6 - 24 hours",     lambda x: (x > 21600) & (x <= 86400)),
+                ("After 24 hours",   lambda x: x > 86400),
+            ]
+            _n = len(_tl)
+            _rows = [{"When they first opened": _lbl,
+                      "Recipients": int(_f(_first).sum()) if len(_first) else 0}
+                     for _lbl, _f in _bands]
+            _never = _n - (len(_first) if len(_first) else 0)
+            _rows.append({"When they first opened": "Never opened", "Recipients": max(0, _never)})
+            _cur = pd.DataFrame(_rows)
+            _cur["Share"] = (_cur["Recipients"] / _n * 100).round(0).astype(int).astype(str) + "%"
+            _c1, _c2 = st.columns([3, 2])
+            with _c1:
+                st.bar_chart(_cur.set_index("When they first opened")["Recipients"],
+                             height=240, color="#7C3AED")
+            with _c2:
+                st.dataframe(_cur, use_container_width=True, hide_index=True, height=250)
+            _fast = int(_cur.loc[_cur["When they first opened"] == "Under 5 min", "Recipients"].iloc[0])
+            if _n and _fast / _n >= 0.4:
+                st.error(
+                    f"⚠️ **{round(_fast / _n * 100)}% opened within five minutes.** That is a "
+                    "mail-gateway scan, not readers — treat this campaign's open rate as an "
+                    "upper bound, and judge it on the later bands instead.", icon="🤖")
+            else:
+                st.caption(
+                    "A human audience spreads across the day. A large first bar means "
+                    "software fetched the tracking pixel on delivery, which inflates the "
+                    "open rate. Unfiltered on purpose — everywhere else removes this.")
+
         # ── Account heat + circulating sends ─────────────────────────────────
         # Built on the engagement-joined frame above. Real campaign sends only —
         # tests and internal watcher copies excluded.
