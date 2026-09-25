@@ -2767,6 +2767,22 @@ with tab_analytics, _tab_guard("Analytics"):
 
         _ext30v = _scope(_ext30)
 
+        # Clicks are only a real zero if tracking was on for those sends. After
+        # the 23 Sep cutover nothing records a click, so a 0 in this column
+        # means "not measured" — show an em dash, same rule as the comparison
+        # table. Absence must never render as a measured zero.
+        _CLICKS_OFF_FROM_TAB = pd.Timestamp("2026-09-23", tz="UTC")
+
+        def _clicks_cell(frame, total):
+            """Total clicks for a slice, or '—' when they were never measured."""
+            if frame.empty:
+                return 0
+            _tot = int(total)
+            if _tot > 0:
+                return _tot
+            _all_after = (frame["_ts"] >= _CLICKS_OFF_FROM_TAB).all()
+            return "—" if _all_after else 0
+
         # ── Segments at a glance — audience size + engagement per AI segment ──
         st.markdown("---")
         st.markdown("#### 🎯 Segments at a glance")
@@ -2787,7 +2803,7 @@ with tab_analytics, _tab_guard("Analytics"):
                 "Contacts": int(len(_a)),
                 "Sends": int(len(_sv)),
                 "Opened": int(_sv["_tid"].isin(_op_ids).sum()),
-                "Clicks": int(sum(_cl_counts.get(t, 0) for t in _sv["_tid"])),
+                "Clicks": _clicks_cell(_sv, sum(_cl_counts.get(t, 0) for t in _sv["_tid"])),
             })
         _seg_df = pd.DataFrame(_seg_rows)
         _ssty = (_seg_df.style
@@ -2979,6 +2995,15 @@ with tab_analytics, _tab_guard("Analytics"):
                        })
                        .reset_index()
                        .rename(columns={"company": "Company"}))
+            # Same rule as everywhere else: a 0 in Clicks after the cutover is
+            # "not measured", not "nobody clicked".
+            _heat_last = _rl.groupby("company")["_ts"].max()
+            _heat["Clicks"] = [
+                (_c if int(_c) > 0
+                 else ("—" if _heat_last.get(_co, pd.Timestamp("2000-01-01", tz="UTC"))
+                       >= _CLICKS_OFF_FROM_TAB else 0))
+                for _co, _c in zip(_heat["Company"], _heat["Clicks"])
+            ]
             _heat["Last send"] = _heat["Last send"].dt.strftime("%d %b")
             _heat = _heat.sort_values(["Clicks", "Sends opened", "Total opens"],
                                       ascending=False).reset_index(drop=True)
