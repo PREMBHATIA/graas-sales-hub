@@ -1347,6 +1347,50 @@ def _human_open_counts(track_df, sends_df, within_hours=None):
               .groupby("tracking_id").size().to_dict())
 
 
+# Clicks were counted raw while opens were de-noised — so every corporate mail
+# filter that follows links to check them safe registered as engagement. It is
+# unmistakable in the data: median lag from send to "click" was 69 seconds, and
+# 84 recipients hit the footer link and 82 the CTA — every link in the email,
+# once each. Two rules, mirroring the open logic:
+#   1. drop anything inside the prefetch window (nobody reads and clicks in 60s)
+#   2. drop a recipient whose clicks touch 2+ distinct links inside 3 minutes —
+#      that is a scanner walking the email, not a person choosing a link
+# On the Aug campaign this takes 202 raw events down to 13 genuine human clicks.
+_CLICK_SWEEP_URLS = 2
+_CLICK_SWEEP_WIN_SEC = 180
+
+
+def _human_click_counts(track_df, sends_df):
+    """{tracking_id: human_click_count} — scanner sweeps and prefetch removed."""
+    import pandas as _pd
+    if (track_df is None or track_df.empty or sends_df is None or sends_df.empty
+            or "tracking_id" not in track_df.columns or "tracking_id" not in sends_df.columns):
+        return {}
+    ev = track_df[track_df["event"] == "click"].copy()
+    if ev.empty:
+        return {}
+    ev["_ev_ts"] = _pd.to_datetime(ev.get("ts_utc"), errors="coerce", utc=True)
+    base = sends_df[["tracking_id", "_ts"]].copy()
+    base["tracking_id"] = base["tracking_id"].astype(str).str.strip()
+    ev = ev.merge(base, on="tracking_id", how="inner")
+    ev = ev[ev["_ev_ts"].notna() & ev["_ts"].notna()]
+    if ev.empty:
+        return {}
+    ev["_lag"] = (ev["_ev_ts"] - ev["_ts"]).dt.total_seconds()
+    ev = ev[ev["_lag"] > _OPEN_PREFETCH_SEC]
+    if ev.empty:
+        return {}
+    if "dest_url" in ev.columns:
+        _g = ev.groupby("tracking_id")["dest_url"].nunique()
+        _span = ev.groupby("tracking_id")["_lag"].agg(lambda x: x.max() - x.min())
+        _sweeps = set(_g[(_g >= _CLICK_SWEEP_URLS)
+                         & (_span <= _CLICK_SWEEP_WIN_SEC)].index)
+        ev = ev[~ev["tracking_id"].isin(_sweeps)]
+    if ev.empty:
+        return {}
+    return ev.groupby("tracking_id").size().to_dict()
+
+
 def _inbox_scan_results() -> dict:
     """Bounce/unsubscribe scan results from THIS session only.
 
@@ -2579,6 +2623,18 @@ with tab_analytics, _tab_guard("Analytics"):
     # below reuses these two frames instead of re-reading the sheet.
     log_df = _cached_log_df()
     track_df = _cached_tracking_df()
+    # None = the Tracking tab could not be READ (Sheets is rate-limited after a
+    # send burst, most often). Empty = there genuinely are no beacons. Treating
+    # the two the same rendered every open and click as a confident 0, which is
+    # how you end up doubting a campaign that was actually fine.
+    if track_df is None:
+        st.error(
+            "⚠️ **Couldn't read the Tracking tab just now** — so opens and clicks "
+            "below are **unavailable, not zero**. This is usually Google rate-limiting "
+            "us for a minute after a big send. Wait a moment and hit **🔄 Refresh CRM "
+            "Data** at the top; nothing is wrong with the campaign.",
+            icon="📡",
+        )
     if track_df is not None and not track_df.empty and "tracking_id" in track_df.columns:
         track_df = track_df.copy()
         track_df["tracking_id"] = track_df["tracking_id"].astype(str).str.strip()
@@ -2613,9 +2669,8 @@ with tab_analytics, _tab_guard("Analytics"):
         _op_ids, _cl_ids, _cl_counts = set(), set(), {}
         if track_df is not None and not track_df.empty and "tracking_id" in track_df.columns:
             _op_ids = {t for t, n in _human_opens.items() if n > 0}
-            _cl_ev = track_df[track_df["event"] == "click"]
-            _cl_ids = set(_cl_ev["tracking_id"])
-            _cl_counts = _cl_ev.groupby("tracking_id").size().to_dict()
+            _cl_counts = _human_click_counts(track_df, sent_df)
+            _cl_ids = {t for t, n in _cl_counts.items() if n > 0}
 
         def _tid_series(df):
             return (df["tracking_id"].astype(str).str.strip()
@@ -2647,7 +2702,7 @@ with tab_analytics, _tab_guard("Analytics"):
                        f"first-{_OPEN_PREFETCH_SEC}s prefetch burst is discarded and repeat "
                        f"fetches within {_OPEN_BUCKET_MIN} min count once.")
         k3.metric("🔗 Clicks (7d)", _clicks7,
-                  help="Total link clicks on external sends — a deliberate action, the number to trust.")
+                  help="Human link clicks on external sends. Mail-filter link scanners are removed: clicks inside the first 60s, and any recipient whose clicks touch 2+ links within 3 minutes (a scanner walking the email).")
         k4.metric("🔥 Hot accounts (30d)", _hot30,
                   help="Companies with at least one click in the last 30 days — see Account heat below.")
         k5.metric("🚫 Unsubscribed", _unsub_n,
@@ -2754,7 +2809,7 @@ with tab_analytics, _tab_guard("Analytics"):
         _ev = track_df if track_df is not None else pd.DataFrame()
         if not _ev.empty and "tracking_id" in _ev.columns and "tracking_id" in _exp.columns:
             _opens = pd.Series(_human_opens, dtype="int64")
-            _clicks = _ev[_ev["event"] == "click"].groupby("tracking_id").size()
+            _clicks = pd.Series(_human_click_counts(_ev, log_df), dtype="int64")
             _urls = (_ev[_ev["event"] == "click"].groupby("tracking_id")["dest_url"]
                      .apply(lambda s: " | ".join(sorted(set(str(x) for x in s if str(x).strip()))))
                      if "dest_url" in _ev.columns else None)

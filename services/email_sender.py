@@ -675,13 +675,23 @@ def fetch_tracking_events():
     Columns: ts_utc | tracking_id | event | dest_url.
     """
     import pandas as pd
+    import time
     sheet_id = os.getenv("EMAIL_LOG_SHEET_ID", "")
     if not sheet_id:
         return pd.DataFrame()
-    try:
-        return fetch_log_rows(sheet_id, TRACKING_TAB_NAME)
-    except Exception:
-        return pd.DataFrame()
+    # Returns None when the read FAILS, an empty frame when there is genuinely
+    # nothing to report. Swallowing the error and returning empty made every
+    # engagement figure render as a confident 0 — a transient Sheets rate-limit
+    # (likely right after a send burst appends 160 rows to this same workbook)
+    # looked exactly like "nobody opened it". Retry first; the limit is brief.
+    for _attempt in range(3):
+        try:
+            return fetch_log_rows(sheet_id, TRACKING_TAB_NAME)
+        except Exception:
+            if _attempt == 2:
+                return None
+            time.sleep(1.5 * (_attempt + 1))
+    return None
 
 
 def engagement_by_template(days: int = 30):
