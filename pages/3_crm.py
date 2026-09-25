@@ -3121,10 +3121,17 @@ with tab_analytics, _tab_guard("Analytics"):
                                 if _clicks_ok else "—"),
                     "Circulated": int((_g["_reads"] >= 3).sum()) if _tracked else "—",
                     "_first": _first, "_age": _age_d,
+                    "_tracked": _tracked, "_n": _n,
                 })
             _cdf = pd.DataFrame(_crows).sort_values("_first", ascending=False)
+            # Hide rows that can never say anything: sends from before the
+            # tracking pixel existed, and one-off 1:1 mails that aren't
+            # campaigns. They were nine rows of em dashes pushing the two real
+            # campaigns off the top of the table.
+            _hidden = _cdf[~_cdf["_tracked"] | (_cdf["_n"] < 3)]
+            _cdf = _cdf[_cdf["_tracked"] & (_cdf["_n"] >= 3)]
             _young = _cdf[_cdf["_age"] < 1]["Campaign"].tolist()
-            _cdf = _cdf.drop(columns=["_first", "_age"])
+            _cdf = _cdf.drop(columns=["_first", "_age", "_tracked", "_n"])
             _csty2 = (_cdf.style
                       .set_properties(subset=["Clicks", "Click %"],
                                       **{"background-color": "#DBEAFE", "color": "#1D4ED8", "font-weight": "700"})
@@ -3137,13 +3144,16 @@ with tab_analytics, _tab_guard("Analytics"):
             _warn = ("  ⏳ **" + ", ".join(_young) + "** is less than a day old — its @24h "
                      "column is still filling." if _young else "")
             st.caption(
-                "Campaigns are identified by subject line. **Open % @24h** is the like-for-like "
-                "column: the same 24-hour window for every campaign, so an older one isn't "
-                "rewarded for age. **Circulated** = recipients who read it 3+ separate times, "
-                "the closest proxy for it being passed around internally. Tests and internal "
-                "copies are excluded throughout. An em dash means it was never measured, not "
-                "that it was zero: opens predate the tracking pixel, clicks were disabled "
-                "on 23 Sep so links stop routing through a broken redirect." + _warn)
+                (f"{len(_hidden)} older send(s) hidden — from before open tracking "
+                 "existed, or one-off 1:1 mails rather than campaigns. "
+                 if len(_hidden) else "")
+                + "Campaigns are identified by subject line. **Open % @24h** is the "
+                "like-for-like column: the same 24-hour window for every campaign, so an "
+                "older one isn't rewarded for age. **Circulated** = recipients who read it "
+                "3+ separate times, the closest proxy for it being passed around "
+                "internally. Tests and internal copies are excluded throughout. An em dash "
+                "means it was never measured, not that it was zero."
+                + _warn)
 
             # Segment x campaign: which message landed with which audience.
             _cmp["_seg"] = _cmp["to_email"].astype(str).str.strip().str.lower().map(_email_seg).fillna("Unclassified")
