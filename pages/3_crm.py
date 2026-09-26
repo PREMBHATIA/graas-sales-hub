@@ -1342,6 +1342,31 @@ def _human_open_counts(track_df, sends_df, within_hours=None):
         ev = ev[ev["_lag"] <= within_hours * 3600]
     if ev.empty:
         return {}
+    # Strip synchronised gateway bursts, per campaign, with the SAME rule as
+    # _real_read_ids — otherwise "read it 3+ times" counts sweep traffic while
+    # "Real reads" beside it doesn't. That mismatch made Aug's Circulated read
+    # 55 when only 15 survive the shared rule: the other 40 were a mail
+    # gateway re-fetching, not people coming back.
+    if "subject" in sends_df.columns:
+        # A window is a burst when many DISTINCT recipients of the same
+        # campaign fire in it — first opens or repeats. The earlier version
+        # flagged on first opens only, so a gateway's second sweep two hours
+        # later (dozens of recipients, same 10 minutes) sailed through and
+        # kept Aug's "came back 3+ times" inflated.
+        _subj = dict(zip(sends_df["tracking_id"].astype(str).str.strip(),
+                         sends_df["subject"].astype(str).str.strip()))
+        _n_by_subj = (sends_df.assign(
+            _sj=sends_df["subject"].astype(str).str.strip())
+            .groupby("_sj")["tracking_id"].size().to_dict())
+        ev["_sj"] = ev["tracking_id"].map(_subj)
+        ev["_w"] = ev["_ev_ts"].dt.floor(_BURST_WINDOW)
+        _win = ev.groupby(["_sj", "_w"])["tracking_id"].nunique()
+        _drop = {(_sj, _w) for (_sj, _w), _c in _win.items()
+                 if _c >= max(3, int(_n_by_subj.get(_sj, 0) * _BURST_SHARE))}
+        if _drop:
+            ev = ev[~ev.set_index(["_sj", "_w"]).index.isin(_drop)]
+        if ev.empty:
+            return {}
     ev["_bucket"] = (ev["_lag"] // (_OPEN_BUCKET_MIN * 60)).astype(int)
     return (ev.drop_duplicates(["tracking_id", "_bucket"])
               .groupby("tracking_id").size().to_dict())
@@ -1403,77 +1428,15 @@ _BURST_SHARE = 0.10
 
 
 def _real_read_ids(track_df, sends_df, within_hours=None):
-    """Set of tracking_ids whose first open looks like a person, not software.
+    """Tracking_ids with at least one de-noised open.
 
-    within_hours caps how long after the send an open still counts, so two
-    campaigns of different ages can be compared over the same window. It must
-    apply the SAME burst rule as the lifetime figure — a "@24h" column computed
-    without it came out at 86% against a lifetime 39%, which is impossible
-    (a subset cannot exceed its whole) and was simply the raw open rate
-    relabelled "Real".
+    Thin wrapper over _human_open_counts so "did they read it" and "how many
+    times did they read it" can never disagree — the audit found Circulated
+    at 55 while Real reads said 39% because the two had drifted onto
+    different burst rules. One counter, one rule, everywhere.
     """
-    import pandas as _pd
-    if (track_df is None or track_df.empty or sends_df is None or sends_df.empty
-            or "tracking_id" not in track_df.columns or "tracking_id" not in sends_df.columns):
-        return set()
-    ev = track_df[track_df["event"] == "open"].copy()
-    if ev.empty:
-        return set()
-    ev["_ev_ts"] = _pd.to_datetime(ev.get("ts_utc"), errors="coerce", utc=True)
-    base = sends_df[["tracking_id", "_ts"]].copy()
-    base["tracking_id"] = base["tracking_id"].astype(str).str.strip()
-    ev = ev.merge(base, on="tracking_id", how="inner")
-    ev = ev[ev["_ev_ts"].notna() & ev["_ts"].notna()]
-    if ev.empty:
-        return set()
-    _lag = (ev["_ev_ts"] - ev["_ts"]).dt.total_seconds()
-    ev = ev[_lag > _OPEN_PREFETCH_SEC]
-    if within_hours is not None:
-        ev = ev[(ev["_ev_ts"] - ev["_ts"]).dt.total_seconds() <= within_hours * 3600]
-    if ev.empty:
-        return set()
-    first = ev.groupby("tracking_id")["_ev_ts"].min().to_frame("t")
-    first["w"] = first["t"].dt.floor(_BURST_WINDOW)
-    n = max(1, len(base))
-    counts = first.groupby("w").size()
-    burst = set(counts[counts >= max(3, int(n * _BURST_SHARE))].index)
-    return set(first[~first["w"].isin(burst)].index)
-
-
-# ── Log integrity ────────────────────────────────────────────────────────────
-# On 26 Sep 2026 the Sends tab was sorted one column at a time, which left
-# timestamp_utc ordered one way and the other thirteen columns the other. Every
-# row then held a mix of two different sends: September timestamps against May
-# recipients and tracking ids. Nothing was lost, but every per-recipient number
-# in this tab became meaningless, and it took a day to notice because the
-# dashboard had no way to say "this data is inconsistent".
-#
-# The tell is arithmetic and unarguable: a tracking beacon cannot predate the
-# email that carries it. Clean, that count is 0. Corrupted, it was 725 of 1648.
-# Anything above a rounding-error share means the columns no longer line up.
-_INTEGRITY_TOLERANCE = 0.02
-
-
-def _log_integrity(track_df, sends_df):
-    """(bad, total, ok) — beacons timestamped before the send they belong to."""
-    import pandas as _pd
-    if (track_df is None or getattr(track_df, "empty", True)
-            or sends_df is None or sends_df.empty
-            or "tracking_id" not in track_df.columns
-            or "tracking_id" not in sends_df.columns):
-        return 0, 0, True
-    ev = track_df.copy()
-    ev["_ev_ts"] = _pd.to_datetime(ev.get("ts_utc"), errors="coerce", utc=True)
-    base = sends_df[["tracking_id", "_ts"]].copy()
-    base["tracking_id"] = base["tracking_id"].astype(str).str.strip()
-    ev["tracking_id"] = ev["tracking_id"].astype(str).str.strip()
-    ev = ev.merge(base, on="tracking_id", how="inner")
-    ev = ev[ev["_ev_ts"].notna() & ev["_ts"].notna()]
-    if ev.empty:
-        return 0, 0, True
-    bad = int(((ev["_ev_ts"] - ev["_ts"]).dt.total_seconds() < 0).sum())
-    total = len(ev)
-    return bad, total, (bad / total) <= _INTEGRITY_TOLERANCE
+    return {t for t, n in _human_open_counts(
+        track_df, sends_df, within_hours=within_hours).items() if n > 0}
 
 
 def _inbox_scan_results() -> dict:
