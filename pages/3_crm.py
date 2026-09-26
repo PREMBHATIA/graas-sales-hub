@@ -2788,16 +2788,86 @@ with tab_analytics, _tab_guard("Analytics"):
         _aud["ai_segment"] = _aud["ai_segment"].fillna("Unclassified").replace("", "Unclassified")
         _email_seg = {str(e).strip().lower(): sgm for e, sgm in zip(_aud["email"], _aud["ai_segment"])}
 
-        # ── Campaign lens ─────────────────────────────────────────────────────
-        # Was a bare selectbox and people walked past it. Now a bordered,
-        # labelled segmented control that states which sections it scopes and
-        # shows the active campaign back to you — a filter you can't see is a
-        # filter you misread the numbers through.
+        # ── Who to contact next ──────────────────────────────────────────────
+        # Every other table answers "how did the campaign do". Nobody acts on
+        # that. This answers "who do I call on Monday", which is the only
+        # question the sales team actually has — so it goes first, and it
+        # states the reason beside each name rather than leaving a number to
+        # be interpreted. Ranked on signals that survived de-noising: how many
+        # separate people at the account read it (a buying committee, not one
+        # curious person), whether they read more than one campaign, whether
+        # anyone came back 3+ times, and whether they read the most recent send.
         st.markdown("---")
-        _camp_meta = (_ext30.groupby("subject")
-                            .agg(n=("to_email", "size"), first=("_ts", "min"))
-                            .sort_values("first", ascending=False)
-                      if ("subject" in _ext30.columns and len(_ext30)) else pd.DataFrame())
+        st.markdown("#### 🎯 Who to contact next")
+        _act = _exp[_exp["status"] == "sent"].copy()
+        _act = _act[~_act["company"].astype(str).str.contains(
+            r"\[INTERNAL WATCHER\]|\[TEST\]", regex=True, na=False)]
+        _act = _act[~_act["template"].astype(str).str.contains(
+            r"\(test\)|\(internal copy\)", regex=True, na=False)]
+        _act["subject"] = _act["subject"].astype(str).str.strip()
+        _act_real = _real_read_ids(track_df, _act)
+        if _act.empty or not _act_real:
+            st.caption("No engagement to act on yet — this fills in once a campaign "
+                       "has been open for a day.")
+        else:
+            _act["_r"] = _act["tracking_id"].astype(str).str.strip().isin(_act_real).astype(int)
+            _latest_sub = _act.loc[_act["_ts"].idxmax(), "subject"]
+            _act_rows = []
+            for _co, _g in _act.groupby("company"):
+                _readers = _g[_g["_r"] == 1]
+                if _readers.empty:
+                    continue
+                _people = int(_readers["to_email"].nunique())
+                _camps = int(_readers["subject"].nunique())
+                _deep = int((_g["open_count"] >= 3).sum())
+                _on_latest = int(_g.loc[_g["subject"] == _latest_sub, "_r"].sum())
+                _why = []
+                if _people >= 2:
+                    _why.append(f"**{_people} people** read it")
+                if _camps >= 2:
+                    _why.append("engaged with **both campaigns**")
+                if _deep:
+                    _why.append(f"**{_deep}** read it 3+ times")
+                if _on_latest:
+                    _why.append("read the **latest** email")
+                _names = ", ".join(sorted({str(x).strip() for x in _readers["to_name"]
+                                           if str(x).strip() and str(x).strip().lower() != "nan"})) or "—"
+                _act_rows.append({
+                    "Company": _co,
+                    "Who read it": _names[:60] + ("…" if len(_names) > 60 else ""),
+                    "Why they're worth a call": " · ".join(_why) or "read it once",
+                    "Last activity": _g["_ts"].max().strftime("%d %b"),
+                    "_score": _people * 3 + _camps * 2 + _deep * 2 + _on_latest * 2,
+                })
+            _act_df = (pd.DataFrame(_act_rows).sort_values("_score", ascending=False)
+                       .drop(columns="_score").reset_index(drop=True))
+            st.dataframe(_act_df.head(8), use_container_width=True, hide_index=True,
+                         height=min(340, 80 + 35 * min(8, len(_act_df))))
+            st.caption(
+                "Ranked on engagement that survived de-noising, strongest signal first. "
+                "Several people at one account reading the same email is a buying "
+                "committee, not curiosity — that is the signal worth acting on.")
+            if len(_act_df) > 8:
+                with st.expander(f"Show the other {len(_act_df) - 8} engaged account(s)"):
+                    st.dataframe(_act_df.iloc[8:], use_container_width=True, hide_index=True,
+                                 height=min(520, 80 + 35 * (len(_act_df) - 8)))
+
+        # ── Campaign lens ─────────────────────────────────────────────────────
+        # The chip list used to come from _ext30, so any campaign older than 30
+        # days simply wasn't offered — the August email, the one you most want
+        # to compare against, was missing. It now lists every campaign that
+        # carried tracking, and picking one scopes from the FULL history rather
+        # than the 30-day window, so an older campaign shows its real numbers
+        # instead of an empty table.
+        st.markdown("---")
+        _ext_all = _externals(sent_df)
+        _camp_meta = (_ext_all[_ext_all["tracking_id"].astype(str).str.strip()
+                               .replace("nan", "").ne("")]
+                      .groupby("subject")
+                      .agg(n=("to_email", "size"), first=("_ts", "min"))
+                      if ("subject" in _ext_all.columns and len(_ext_all)) else pd.DataFrame())
+        if len(_camp_meta):
+            _camp_meta = _camp_meta[_camp_meta["n"] >= 3].sort_values("first", ascending=False)
         _ALL_CAMPAIGNS = "All campaigns"
 
         def _short(sub, when):
@@ -2808,8 +2878,8 @@ with tab_analytics, _tab_guard("Analytics"):
         _label_to_subject = {_short(_sub, _r["first"]): _sub
                              for _sub, _r in _camp_meta.iterrows()}
         with st.container(border=True):
-            st.markdown("**🔍 Campaign lens** — scopes *Segments*, *Account heat* "
-                        "and *Who engaged with what* below. Everything else stays all-time.")
+            st.markdown("**🔍 Campaign lens** — pick one campaign to see who engaged "
+                        "with *that* email.")
             _camp_pick = st.segmented_control(
                 "Campaign lens", [_ALL_CAMPAIGNS] + list(_label_to_subject.keys()),
                 default=_ALL_CAMPAIGNS, key="analytics_campaign_lens",
@@ -2817,11 +2887,17 @@ with tab_analytics, _tab_guard("Analytics"):
             ) or _ALL_CAMPAIGNS
             _camp_subject = _label_to_subject.get(_camp_pick)
             if _camp_subject is None:
-                st.caption("Showing every campaign from the last 30 days combined. "
-                           "Pick one to see who engaged with that specific email.")
+                st.caption("**All campaigns** — the last 30 days added together. "
+                           "Good for 'who is warm right now', not for judging one email: "
+                           "a company that opened three campaigns looks the same as one "
+                           "that opened three copies of the same send.")
             else:
-                st.success(f"Filtered to **{_camp_subject}**", icon="🔍")
-        _scope_label = "last 30d, all campaigns" if _camp_subject is None else _camp_pick
+                st.success(f"Showing **{_camp_subject}** only — "
+                           f"{int(_camp_meta.loc[_camp_subject, 'n'])} recipients, sent "
+                           f"{_camp_meta.loc[_camp_subject, 'first'].strftime('%d %b')}.",
+                           icon="🔍")
+        _scope_label = ("last 30 days, all campaigns" if _camp_subject is None
+                        else _camp_pick)
 
         def _scope(df):
             """Narrow a sends frame to the chosen campaign (no-op when All)."""
@@ -2829,7 +2905,9 @@ with tab_analytics, _tab_guard("Analytics"):
                 return df
             return df[df["subject"].astype(str).str.strip() == str(_camp_subject).strip()]
 
-        _ext30v = _scope(_ext30)
+        # When a campaign is picked, scope from ALL history — otherwise an older
+        # campaign would be filtered against a 30-day frame and come back empty.
+        _ext30v = _scope(_ext_all if _camp_subject is not None else _ext30)
 
         # Two markers, never an em dash: a dash reads as "nothing happened"
         # when it means "we didn't look". CNT is specific about WHICH metric
@@ -3118,8 +3196,12 @@ with tab_analytics, _tab_guard("Analytics"):
         # ── Account heat + circulating sends ─────────────────────────────────
         # Built on the engagement-joined frame above. Real campaign sends only —
         # tests and internal watcher copies excluded.
-        _rl = _exp[(_exp["status"] == "sent")
-                   & (_exp["_ts"] >= now_utc - pd.Timedelta(days=30))].copy()
+        # Same trap as the lens list: with a campaign picked, window to ALL
+        # history, otherwise choosing the August email hands back an empty
+        # Account heat because it falls outside 30 days.
+        _rl = _exp[_exp["status"] == "sent"].copy()
+        if _camp_subject is None:
+            _rl = _rl[_rl["_ts"] >= now_utc - pd.Timedelta(days=30)]
         _rl = _scope(_rl)          # campaign lens
         _rl = _rl[~_rl["company"].astype(str).str.contains(r"\[INTERNAL WATCHER\]|\[TEST\]", regex=True, na=False)]
         _rl = _rl[~_rl["template"].astype(str).str.contains(r"\(test\)|\(internal copy\)", regex=True, na=False)]
