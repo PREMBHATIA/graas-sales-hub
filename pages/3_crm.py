@@ -2831,9 +2831,16 @@ with tab_analytics, _tab_guard("Analytics"):
 
         _ext30v = _scope(_ext30)
 
+        # Two markers, never an em dash: a dash reads as "nothing happened"
+        # when it means "we didn't look". CNT is specific about WHICH metric
+        # is missing, which matters because clicks and opens stopped being
+        # measured for different reasons at different times.
+        _CNT = "CNT"   # clicks not tracked — click tracking off for those sends
+        _NT = "NT"     # not tracked — the send predates the open pixel entirely
+
         # Clicks are only a real zero if tracking was on for those sends. After
         # the 23 Sep cutover nothing records a click, so a 0 in this column
-        # means "not measured" — show an em dash, same rule as the comparison
+        # means "not measured" — show CNT, same rule as the comparison
         # table. Absence must never render as a measured zero.
         _CLICKS_OFF_FROM_TAB = pd.Timestamp("2026-09-23", tz="UTC")
 
@@ -2845,7 +2852,7 @@ with tab_analytics, _tab_guard("Analytics"):
             if _tot > 0:
                 return _tot
             _all_after = (frame["_ts"] >= _CLICKS_OFF_FROM_TAB).all()
-            return "—" if _all_after else 0
+            return _CNT if _all_after else 0
 
         # ── Campaign comparison — every campaign, like-for-like ──────────────
         # Deliberately NOT windowed to 30 days: email 1 went out in August and
@@ -2914,21 +2921,21 @@ with tab_analytics, _tab_guard("Analytics"):
                     # delivery, which is what inflated Aug — so this is still
                     # an upper bound. "Machine" sits beside it so the reader
                     # can see how much of the list never chose to open at all.
-                    "Real reads": f"{int(round(_g['_real'].sum() / _n * 100))}%" if _tracked else "—",
+                    "Real reads": f"{int(round(_g['_real'].sum() / _n * 100))}%" if _tracked else _NT,
                     "Machine (<60s)": (f"{int(round(_g['_machine'].sum() / _n * 100))}%"
-                                if _tracked else "—"),
-                    "Real @24h": f"{int(round((_g['_r24'] > 0).sum() / _n * 100))}%" if _tracked else "—",
-                    "Clicks": int(_g["click_count"].sum()) if _clicks_ok else "—",
+                                if _tracked else _NT),
+                    "Real @24h": f"{int(round((_g['_r24'] > 0).sum() / _n * 100))}%" if _tracked else _NT,
+                    "Clicks": int(_g["click_count"].sum()) if _clicks_ok else _CNT,
                     "Click %": (f"{int(round((_g['click_count'] > 0).sum() / _n * 100))}%"
-                                if _clicks_ok else "—"),
-                    "Circulated": int((_g["_reads"] >= 3).sum()) if _tracked else "—",
+                                if _clicks_ok else _CNT),
+                    "Circulated": int((_g["_reads"] >= 3).sum()) if _tracked else _NT,
                     "_first": _first, "_age": _age_d,
                     "_tracked": _tracked, "_n": _n,
                 })
             _cdf = pd.DataFrame(_crows).sort_values("_first", ascending=False)
             # Hide rows that can never say anything: sends from before the
             # tracking pixel existed, and one-off 1:1 mails that aren't
-            # campaigns. They were nine rows of em dashes pushing the two real
+            # campaigns. They were nine rows of blanks pushing the two real
             # campaigns off the top of the table.
             _hidden = _cdf[~_cdf["_tracked"] | (_cdf["_n"] < 3)]
             _cdf = _cdf[_cdf["_tracked"] & (_cdf["_n"] >= 3)]
@@ -2966,8 +2973,10 @@ with tab_analytics, _tab_guard("Analytics"):
                     "**4 · Circulated** — recipients who read it **3+ separate times**. "
                     "The closest thing we can measure to the email being forwarded or "
                     "revisited internally.\n\n"
-                    "**5 · An em dash (—)** — never measured, *not* zero. Either the send "
-                    "predates open tracking, or click tracking was off at the time.\n\n"
+                    "**5 · CNT** — *clicks not tracked*. Click tracking was switched off "
+                    "for those sends, so a click could not be recorded. It does **not** "
+                    "mean nobody clicked. **NT** means the send predates open tracking "
+                    "altogether.\n\n"
                     "---\n\n"
                     "*A synchronised burst is a 10-minute window in which 10% or more of "
                     "one campaign's recipients first opened. Ninety-two people at "
@@ -3103,7 +3112,7 @@ with tab_analytics, _tab_guard("Analytics"):
                 "**3 · Sends** — how many of that segment this campaign reached.\n\n"
                 "**4 · Real reads** — opens that look human: more than 60 seconds after "
                 "the send, and not part of a synchronised gateway sweep.\n\n"
-                "**5 · An em dash (—)** — never measured, not zero."
+                "**5 · CNT** — *clicks not tracked*, i.e. we couldn't record it. Not the same as zero."
             )
 
         # ── Account heat + circulating sends ─────────────────────────────────
@@ -3168,7 +3177,7 @@ with tab_analytics, _tab_guard("Analytics"):
             _heat_last = _rl.groupby("company")["_ts"].max()
             _heat["Clicks"] = [
                 (_c if int(_c) > 0
-                 else ("—" if _heat_last.get(_co, pd.Timestamp("2000-01-01", tz="UTC"))
+                 else (_CNT if _heat_last.get(_co, pd.Timestamp("2000-01-01", tz="UTC"))
                        >= _CLICKS_OFF_FROM_TAB else 0))
                 for _co, _c in zip(_heat["Company"], _heat["Clicks"])
             ]
