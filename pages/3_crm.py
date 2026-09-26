@@ -2754,6 +2754,40 @@ with tab_analytics, _tab_guard("Analytics"):
         if not failed_7d.empty:
             st.error(f"⚠️ {len(failed_7d)} send failure(s) in the last 7 days — see Recent sends below for details.")
 
+        # _exp (the log joined to engagement) is built HERE, above everything
+        # that reads it. It used to live inside the Segments block, which was
+        # fine only while Segments ran first — reordering the page left
+        # Campaign comparison referencing _exp before it existed. Shared
+        # frames belong above the first thing that uses them.
+        # Full export WITH engagement — sends joined to the Tracking beacons so
+        # the CSV answers "who opened / who clicked" without cross-referencing.
+        _exp = log_df.sort_values("_ts", ascending=False).copy()
+        _exp["timestamp_utc"] = _exp["_ts"].dt.strftime("%Y-%m-%d %H:%M UTC")
+        _exp["opened"], _exp["open_count"] = False, 0
+        _exp["clicked"], _exp["click_count"], _exp["clicked_urls"] = False, 0, ""
+        _ev = track_df if track_df is not None else pd.DataFrame()
+        if not _ev.empty and "tracking_id" in _ev.columns and "tracking_id" in _exp.columns:
+            _opens = pd.Series(_human_opens, dtype="int64")
+            _clicks = pd.Series(_human_click_counts(_ev, log_df), dtype="int64")
+            _urls = (_ev[_ev["event"] == "click"].groupby("tracking_id")["dest_url"]
+                     .apply(lambda s: " | ".join(sorted(set(str(x) for x in s if str(x).strip()))))
+                     if "dest_url" in _ev.columns else None)
+            _tid = _exp["tracking_id"].astype(str).str.strip()
+            _exp["open_count"] = _tid.map(_opens).fillna(0).astype(int)
+            _exp["click_count"] = _tid.map(_clicks).fillna(0).astype(int)
+            _exp["opened"] = _exp["open_count"] > 0
+            _exp["clicked"] = _exp["click_count"] > 0
+            if _urls is not None:
+                _exp["clicked_urls"] = _tid.map(_urls).fillna("")
+
+        # Segment lookup is defined here, not in the Segments section, because
+        # Campaign comparison's segment breakdown reads it first. Same lesson
+        # as _exp: shared state goes above its earliest reader.
+        _seg_order = ["AI Laggard", "AI Exploring", "AI Mature", "Unclassified"]
+        _aud = contacts[contacts["has_email"]].copy() if "has_email" in contacts.columns else contacts.copy()
+        _aud["ai_segment"] = _aud["ai_segment"].fillna("Unclassified").replace("", "Unclassified")
+        _email_seg = {str(e).strip().lower(): sgm for e, sgm in zip(_aud["email"], _aud["ai_segment"])}
+
         # ── Campaign lens ─────────────────────────────────────────────────────
         # Was a bare selectbox and people walked past it. Now a bordered,
         # labelled segmented control that states which sections it scopes and
@@ -3008,10 +3042,6 @@ with tab_analytics, _tab_guard("Analytics"):
         # ── Segments at a glance — audience size + engagement per AI segment ──
         st.markdown("---")
         st.markdown("#### 🎯 Segments at a glance")
-        _seg_order = ["AI Laggard", "AI Exploring", "AI Mature", "Unclassified"]
-        _aud = contacts[contacts["has_email"]].copy() if "has_email" in contacts.columns else contacts.copy()
-        _aud["ai_segment"] = _aud["ai_segment"].fillna("Unclassified").replace("", "Unclassified")
-        _email_seg = {str(e).strip().lower(): sgm for e, sgm in zip(_aud["email"], _aud["ai_segment"])}
         _e30 = _ext30v.copy()
         _e30["_seg"] = _e30["to_email"].astype(str).str.strip().str.lower().map(_email_seg).fillna("Unclassified")
         _e30["_tid"] = _tid_series(_e30)
@@ -3055,27 +3085,6 @@ with tab_analytics, _tab_guard("Analytics"):
             f"received it, Indian Standard Time. **Sends / Real reads / Clicks** cover "
             f"{_scope_label}. **Real reads** excludes opens inside 60 seconds and "
             f"synchronised gateway sweeps. An em dash means never measured, not zero.")
-
-        # Full export WITH engagement — sends joined to the Tracking beacons so
-        # the CSV answers "who opened / who clicked" without cross-referencing.
-        _exp = log_df.sort_values("_ts", ascending=False).copy()
-        _exp["timestamp_utc"] = _exp["_ts"].dt.strftime("%Y-%m-%d %H:%M UTC")
-        _exp["opened"], _exp["open_count"] = False, 0
-        _exp["clicked"], _exp["click_count"], _exp["clicked_urls"] = False, 0, ""
-        _ev = track_df if track_df is not None else pd.DataFrame()
-        if not _ev.empty and "tracking_id" in _ev.columns and "tracking_id" in _exp.columns:
-            _opens = pd.Series(_human_opens, dtype="int64")
-            _clicks = pd.Series(_human_click_counts(_ev, log_df), dtype="int64")
-            _urls = (_ev[_ev["event"] == "click"].groupby("tracking_id")["dest_url"]
-                     .apply(lambda s: " | ".join(sorted(set(str(x) for x in s if str(x).strip()))))
-                     if "dest_url" in _ev.columns else None)
-            _tid = _exp["tracking_id"].astype(str).str.strip()
-            _exp["open_count"] = _tid.map(_opens).fillna(0).astype(int)
-            _exp["click_count"] = _tid.map(_clicks).fillna(0).astype(int)
-            _exp["opened"] = _exp["open_count"] > 0
-            _exp["clicked"] = _exp["click_count"] > 0
-            if _urls is not None:
-                _exp["clicked_urls"] = _tid.map(_urls).fillna("")
 
         # ── Account heat + circulating sends ─────────────────────────────────
         # Built on the engagement-joined frame above. Real campaign sends only —
