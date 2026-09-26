@@ -3020,28 +3020,50 @@ with tab_analytics, _tab_guard("Analytics"):
                 if _z_real.empty:
                     st.caption("Nobody has genuinely read this campaign yet.")
                 else:
+                    # One names column with markers instead of three columns
+                    # that repeated the same names: ↩ = also read another
+                    # campaign, 🔁 = came back 3+ times to this one. The email
+                    # link names its addressee — a button that doesn't say who
+                    # it writes to is a bug, and it targets the strongest
+                    # signal (returning reader first), not whoever happened to
+                    # sit first in the frame.
+                    _opens_s = pd.Series(_human_opens, dtype="int64")
                     _wc_rows = []
                     for _co, _g in _z_real.groupby("company"):
-                        _names = sorted({_person(r) for _, r in _g.iterrows()})
-                        _also = sorted({_person(r) for _, r in _g.iterrows()
-                                        if r["to_email"] in _multi})
-                        _deep = int((_g["_tid"].map(pd.Series(_human_opens, dtype="int64"))
-                                     .fillna(0) >= 3).sum())
+                        _tags, _score, _best = [], 0, None
+                        for _, _r in _g.sort_values("to_email").iterrows():
+                            _t = _person(_r)
+                            _ret = _r["to_email"] in _multi
+                            _dp = int(_opens_s.get(_r["_tid"], 0)) >= 3
+                            if _ret:
+                                _t += " ↩"
+                            if _dp:
+                                _t += " 🔁"
+                            _tags.append(_t)
+                            _score += 1 + 2 * _ret + 2 * _dp
+                            _rank = 2 * _ret + _dp
+                            if _best is None or _rank > _best[0]:
+                                _best = (_rank, _r["to_email"], _person(_r))
                         _wc_rows.append({
                             "Company": _co,
-                            "Who read it": ", ".join(_names)[:60],
-                            "Also read other emails": ", ".join(_also) or "—",
-                            "Came back 3+": _deep or "—",
-                            "Write to them": f"mailto:{_g.iloc[0]['to_email']}",
-                            "_s": len(_names) * 3 + len(_also) * 2 + _deep,
+                            "Who read it": ", ".join(sorted(_tags))[:80],
+                            "Write to them": f"mailto:{_best[1]}",
+                            "_s": _score,
                         })
                     _wc = (pd.DataFrame(_wc_rows).sort_values("_s", ascending=False)
                            .drop(columns="_s").reset_index(drop=True))
                     st.dataframe(
                         _wc.head(10), use_container_width=True, hide_index=True,
                         height=min(400, 80 + 35 * min(10, len(_wc))),
-                        column_config={"Write to them": st.column_config.LinkColumn(
-                            display_text="✉️ email")})
+                        column_config={
+                            "Who read it": st.column_config.Column(
+                                help="↩ = also read another campaign (a returning "
+                                     "reader — the strongest signal here). "
+                                     "🔁 = came back to this email 3+ times."),
+                            "Write to them": st.column_config.LinkColumn(
+                                display_text=r"mailto:([^@]+)@.*",
+                                help="Opens a draft to the account's strongest "
+                                     "reader — returning readers first.")})
                     if len(_wc) > 10:
                         with st.expander(f"Show the other {len(_wc) - 10} account(s)"):
                             st.dataframe(_wc.iloc[10:], use_container_width=True,
