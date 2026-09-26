@@ -1429,6 +1429,42 @@ def _real_read_ids(track_df, sends_df):
     return set(first[~first["w"].isin(burst)].index)
 
 
+# ── Log integrity ────────────────────────────────────────────────────────────
+# On 26 Sep 2026 the Sends tab was sorted one column at a time, which left
+# timestamp_utc ordered one way and the other thirteen columns the other. Every
+# row then held a mix of two different sends: September timestamps against May
+# recipients and tracking ids. Nothing was lost, but every per-recipient number
+# in this tab became meaningless, and it took a day to notice because the
+# dashboard had no way to say "this data is inconsistent".
+#
+# The tell is arithmetic and unarguable: a tracking beacon cannot predate the
+# email that carries it. Clean, that count is 0. Corrupted, it was 725 of 1648.
+# Anything above a rounding-error share means the columns no longer line up.
+_INTEGRITY_TOLERANCE = 0.02
+
+
+def _log_integrity(track_df, sends_df):
+    """(bad, total, ok) — beacons timestamped before the send they belong to."""
+    import pandas as _pd
+    if (track_df is None or getattr(track_df, "empty", True)
+            or sends_df is None or sends_df.empty
+            or "tracking_id" not in track_df.columns
+            or "tracking_id" not in sends_df.columns):
+        return 0, 0, True
+    ev = track_df.copy()
+    ev["_ev_ts"] = _pd.to_datetime(ev.get("ts_utc"), errors="coerce", utc=True)
+    base = sends_df[["tracking_id", "_ts"]].copy()
+    base["tracking_id"] = base["tracking_id"].astype(str).str.strip()
+    ev["tracking_id"] = ev["tracking_id"].astype(str).str.strip()
+    ev = ev.merge(base, on="tracking_id", how="inner")
+    ev = ev[ev["_ev_ts"].notna() & ev["_ts"].notna()]
+    if ev.empty:
+        return 0, 0, True
+    bad = int(((ev["_ev_ts"] - ev["_ts"]).dt.total_seconds() < 0).sum())
+    total = len(ev)
+    return bad, total, (bad / total) <= _INTEGRITY_TOLERANCE
+
+
 def _inbox_scan_results() -> dict:
     """Bounce/unsubscribe scan results from THIS session only.
 
@@ -2688,6 +2724,30 @@ with tab_analytics, _tab_guard("Analytics"):
         log_df = log_df[log_df["_ts"].notna()]
 
         now_utc = pd.Timestamp.now(tz="UTC")
+        # Integrity gate. Runs before any figure is drawn, because a wrong
+        # number shown confidently costs more than no number at all.
+        _bad_n, _bad_total, _log_ok = _log_integrity(track_df, log_df)
+        if not _log_ok:
+            st.error(
+                f"🛑 **The Sends log is inconsistent — every figure below would be "
+                f"wrong, so nothing is shown.**\n\n"
+                f"{_bad_n:,} of {_bad_total:,} tracking beacons "
+                f"({round(_bad_n / _bad_total * 100)}%) are dated *before* the email "
+                f"they belong to, which is impossible. The columns in the **Sends** "
+                f"tab have come out of line with each other — most often because a "
+                f"single column was sorted on its own instead of the whole sheet.\n\n"
+                f"**Fix it:** open the [Outreach Log]"
+                f"(https://docs.google.com/spreadsheets/d/"
+                f"1Vcu7ZkAjGbzpKH2CUGoSuLUGIfwYBT-GlpNN0zMKJMY/edit) → "
+                f"**File → Version history → See version history**, and restore the "
+                f"most recent version where a send dated *today* still shows today's "
+                f"subject line. Nothing is lost — the rows are only out of order. "
+                f"Then press **🔄 Refresh CRM Data**.\n\n"
+                f"Sending is unaffected: it uses the recipient and timestamp columns, "
+                f"which stay aligned with each other."
+            )
+            st.stop()
+
         sent_df = log_df[log_df["status"] == "sent"]
         sent_7d = sent_df[sent_df["_ts"] >= now_utc - pd.Timedelta(days=7)]
         sent_30d = sent_df[sent_df["_ts"] >= now_utc - pd.Timedelta(days=30)]
