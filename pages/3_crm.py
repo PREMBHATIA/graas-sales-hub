@@ -3175,15 +3175,20 @@ with tab_analytics, _tab_guard("Analytics"):
             # Same rule as everywhere else: a 0 in Clicks after the cutover is
             # "not measured", not "nobody clicked".
             _heat_last = _rl.groupby("company")["_ts"].max()
+            _heat["Last send"] = _heat["Last send"].dt.strftime("%d %b")
+            # Sort on the NUMBERS, then swap in the display marker. Doing it the
+            # other way round leaves Clicks holding ints and the string "CNT";
+            # pandas sorts that without complaint but puts every CNT row ABOVE
+            # a company with real clicks, so "hottest first" would be a lie the
+            # day click tracking comes back on.
+            _heat = _heat.sort_values(["Clicks", "Sends opened", "Total opens"],
+                                      ascending=False).reset_index(drop=True)
             _heat["Clicks"] = [
                 (_c if int(_c) > 0
                  else (_CNT if _heat_last.get(_co, pd.Timestamp("2000-01-01", tz="UTC"))
                        >= _CLICKS_OFF_FROM_TAB else 0))
                 for _co, _c in zip(_heat["Company"], _heat["Clicks"])
             ]
-            _heat["Last send"] = _heat["Last send"].dt.strftime("%d %b")
-            _heat = _heat.sort_values(["Clicks", "Sends opened", "Total opens"],
-                                      ascending=False).reset_index(drop=True)
             _hsty = (_heat.style
                      .set_properties(subset=["Clicks"],
                                      **{"background-color": "#DBEAFE", "color": "#1D4ED8", "font-weight": "700"})
@@ -3277,6 +3282,12 @@ with tab_analytics, _tab_guard("Analytics"):
             _circ = (_circ.rename(columns={"company": "Company", "to_email": "Recipient",
                                            "open_count": "Opens", "click_count": "Clicks"})
                          .sort_values("Opens", ascending=False))
+            # Marker applied after the sort, so the column is never mixed types
+            # while pandas is ordering it.
+            _circ["Clicks"] = [
+                (_v if int(_v) > 0 else (_CNT if _t >= _CLICKS_OFF_FROM_TAB else 0))
+                for _v, _t in zip(_circ["Clicks"], _circ["_ts"])
+            ]
             _csty = (_circ[["Company", "Recipient", "Subject", "Opens", "Clicks", "Sent"]].style
                      .set_properties(subset=["Clicks"],
                                      **{"background-color": "#DBEAFE", "color": "#1D4ED8", "font-weight": "700"})
@@ -3420,12 +3431,19 @@ with tab_analytics, _tab_guard("Analytics"):
             _op = int((_c["open_count"] > 0).sum())
             _ck = int((_c["click_count"] > 0).sum())
             _tot_ck = int(_c["click_count"].sum())
+            # Same rule as every other table: after the cutover nothing records
+            # a click, so 0% would be a claim we can't make.
+            _dd_clicks_ok = _tot_ck > 0 or (_c["_ts"].min() < _CLICKS_OFF_FROM_TAB)
             d1, d2, d3, d4 = st.columns(4)
             d1.metric("Sent", _n, help=f"{_c['company'].nunique()} companies · "
                                        f"{_c['_ts'].min().strftime('%d %b')}–{_c['_ts'].max().strftime('%d %b')}")
             d2.metric("Opened", f"{round(_op / _n * 100)}%" if _n else "—", help=f"{_op} of {_n} sends")
-            d3.metric("Clicked", f"{round(_ck / _n * 100)}%" if _n else "—", help=f"{_ck} of {_n} sends")
-            d4.metric("Total clicks", _tot_ck,
+            d3.metric("Clicked",
+                      (f"{round(_ck / _n * 100)}%" if _n else _CNT) if _dd_clicks_ok else _CNT,
+                      help=(f"{_ck} of {_n} sends" if _dd_clicks_ok else
+                            "Clicks not tracked for this campaign — click tracking was "
+                            "off, so a click could not be recorded. Not the same as zero."))
+            d4.metric("Total clicks", _tot_ck if _dd_clicks_ok else _CNT,
                       help=f"{_c[_c['click_count'] > 0]['company'].nunique()} companies clicked at least once")
 
             _dd1, _dd2 = st.columns(2)
@@ -3439,10 +3457,13 @@ with tab_analytics, _tab_guard("Analytics"):
                               Clicked=("click_count", lambda s: int((s > 0).sum())))
                          .reset_index().rename(columns={"_seg": "Segment"}))
                 _sg["Open %"] = (_sg["Opened"] / _sg["Sent"] * 100).round(0).astype(int)
-                _sg["Click %"] = (_sg["Clicked"] / _sg["Sent"] * 100).round(0).astype(int)
+                _sg["Click %"] = ((_sg["Clicked"] / _sg["Sent"] * 100).round(0).astype(int)
+                                  if _dd_clicks_ok else _CNT)
                 st.dataframe(_sg[["Segment", "Sent", "Open %", "Click %"]],
                              hide_index=True, use_container_width=True)
-                st.caption("A segment clicking more than it opens means images are blocked "
+                st.caption("**CNT** = clicks not tracked for this campaign, not zero. "
+                           if not _dd_clicks_ok else
+                           "A segment clicking more than it opens means images are blocked "
                            "(common in corporate Outlook) — judge those on clicks.")
             with _dd2:
                 st.markdown("**Links clicked**")
@@ -3452,7 +3473,10 @@ with tab_analytics, _tab_guard("Analytics"):
                     _lk = track_df[(track_df["event"] == "click")
                                    & (track_df["tracking_id"].isin(_ids))].copy()
                     if _lk.empty:
-                        st.caption("No clicks recorded for this campaign.")
+                        st.caption("Clicks were not tracked for this campaign (CNT) — "
+                                   "no link data to show."
+                                   if not _dd_clicks_ok else
+                                   "No clicks recorded for this campaign.")
                     else:
                         _lk["Link"] = _lk["dest_url"].astype(str).str.split("?").str[0]
                         _lv = (_lk["Link"].value_counts().reset_index())
@@ -3468,6 +3492,8 @@ with tab_analytics, _tab_guard("Analytics"):
                                Clicks=("click_count", "sum"))
                           .reset_index().rename(columns={"company": "Company"})
                           .sort_values(["Clicks", "Opens"], ascending=False))
+                if not _dd_clicks_ok:
+                    _eng["Clicks"] = _CNT
                 st.dataframe(_eng[_eng["Opens"] + _eng["Clicks"] > 0],
                              hide_index=True, use_container_width=True, height=340)
 
