@@ -1439,6 +1439,35 @@ def _real_read_ids(track_df, sends_df, within_hours=None):
         track_df, sends_df, within_hours=within_hours).items() if n > 0}
 
 
+# ── Log integrity ────────────────────────────────────────────────────────────
+# Restored: the burst-rule unification replaced the whole region between
+# _real_read_ids and _inbox_scan_results and silently deleted this function —
+# while every gate stayed green, because none of them EXECUTED the tab body.
+# scripts/smoke_analytics_tab.py now does exactly that on every push.
+_INTEGRITY_TOLERANCE = 0.02
+
+
+def _log_integrity(track_df, sends_df):
+    """(bad, total, ok) — beacons timestamped before the send they belong to."""
+    import pandas as _pd
+    if (track_df is None or getattr(track_df, "empty", True)
+            or sends_df is None or sends_df.empty
+            or "tracking_id" not in track_df.columns
+            or "tracking_id" not in sends_df.columns):
+        return 0, 0, True
+    ev = track_df.copy()
+    ev["_ev_ts"] = _pd.to_datetime(ev.get("ts_utc"), errors="coerce", utc=True)
+    base = sends_df[["tracking_id", "_ts"]].copy()
+    base["tracking_id"] = base["tracking_id"].astype(str).str.strip()
+    ev["tracking_id"] = ev["tracking_id"].astype(str).str.strip()
+    ev = ev.merge(base, on="tracking_id", how="inner")
+    ev = ev[ev["_ev_ts"].notna() & ev["_ts"].notna()]
+    if ev.empty:
+        return 0, 0, True
+    bad = int(((ev["_ev_ts"] - ev["_ts"]).dt.total_seconds() < 0).sum())
+    return bad, len(ev), (bad / len(ev)) <= _INTEGRITY_TOLERANCE
+
+
 def _inbox_scan_results() -> dict:
     """Bounce/unsubscribe scan results from THIS session only.
 
@@ -2822,647 +2851,309 @@ with tab_analytics, _tab_guard("Analytics"):
         _aud["ai_segment"] = _aud["ai_segment"].fillna("Unclassified").replace("", "Unclassified")
         _email_seg = {str(e).strip().lower(): sgm for e, sgm in zip(_aud["email"], _aud["ai_segment"])}
 
-        # ── Who to contact next ──────────────────────────────────────────────
-        # Three things the first version got wrong, all of them the same
-        # mistake — compressing different facts into one sentence:
-        #  1. "engaged with both campaigns" is a COMPANY fact, but it sat beside
-        #     PERSON names, so Castrol read as "Saugata read both". He didn't:
-        #     Uma read September, Saugata read August. One campaign each.
-        #     A person who personally read both is a much stronger signal and
-        #     now gets its own column.
-        #  2. A read from last month scored the same as one from this week.
-        #     Recency is most of the value, so the latest campaign leads.
-        #  3. Markdown bold was written into dataframe cells, which render as
-        #     literal ** because st.dataframe is not markdown.
-        st.markdown("---")
-        st.markdown("#### 🎯 Who to contact next")
-        _act = _exp[_exp["status"] == "sent"].copy()
-        _act = _act[~_act["company"].astype(str).str.contains(
-            r"\[INTERNAL WATCHER\]|\[TEST\]", regex=True, na=False)]
-        _act = _act[~_act["template"].astype(str).str.contains(
-            r"\(test\)|\(internal copy\)", regex=True, na=False)]
-        _act["subject"] = _act["subject"].astype(str).str.strip()
-        _act_real = set()
-        for _sub_k, _sub_g in _act.groupby("subject"):      # per campaign
-            _act_real |= _real_read_ids(track_df, _sub_g)
-        if _act.empty or not _act_real:
-            st.caption("No engagement to act on yet — this fills in once a campaign "
-                       "has been open for a day.")
-        else:
-            _act["_r"] = _act["tracking_id"].astype(str).str.strip().isin(_act_real).astype(int)
-            _latest_sub = _act.loc[_act["_ts"].idxmax(), "subject"]
-            _latest_when = _act.loc[_act["_ts"].idxmax(), "_ts"].strftime("%d %b")
-
-            def _nm(row):
-                _n = str(row.get("to_name", "")).strip()
-                return _n if _n and _n.lower() != "nan" else str(row.get("to_email", "")).strip()
-
-            _rd = _act[_act["_r"] == 1]
-            # People who personally read more than one campaign — the signal the
-            # old wording buried under a company-level claim.
-            _returning = set(_rd.groupby("to_email")["subject"].nunique().pipe(
-                lambda x: x[x >= 2]).index)
-
-            _rows_live, _rows_quiet = [], []
-            for _co, _g in _act.groupby("company"):
-                _gr = _g[_g["_r"] == 1]
-                if _gr.empty:
-                    continue
-                _new = _gr[_gr["subject"] == _latest_sub]
-                _ret = sorted({_nm(r) for _, r in _gr.iterrows()
-                               if r["to_email"] in _returning})
-                _deep = int((_gr["open_count"] >= 3).sum())
-                _row = {
-                    "Company": _co,
-                    f"Read the latest ({_latest_when})":
-                        ", ".join(sorted({_nm(r) for _, r in _new.iterrows()})) or "—",
-                    "Read more than one email": ", ".join(_ret) or "—",
-                    "Came back 3+ times": _deep or "—",
-                    "Last read": _gr["_ts"].max().strftime("%d %b"),
-                    "_score": len(_new) * 4 + len(_ret) * 3 + _deep * 2,
-                }
-                (_rows_live if len(_new) else _rows_quiet).append(_row)
-
-            def _tidy(rows):
-                return (pd.DataFrame(rows).sort_values("_score", ascending=False)
-                        .drop(columns="_score").reset_index(drop=True)) if rows else pd.DataFrame()
-
-            _live_df, _quiet_df = _tidy(_rows_live), _tidy(_rows_quiet)
-            if _live_df.empty:
-                st.caption("Nobody has read the latest campaign yet.")
-            else:
-                st.dataframe(_live_df.head(8), use_container_width=True, hide_index=True,
-                             height=min(340, 80 + 35 * min(8, len(_live_df))))
-                st.caption(
-                    "Accounts where someone read the most recent email, strongest first. "
-                    "Names are the individuals — an account can appear because two "
-                    "different colleagues each read a different campaign, which is not "
-                    "the same as one person reading both. That stronger signal has its "
-                    "own column.")
-                if len(_live_df) > 8:
-                    with st.expander(f"Show the other {len(_live_df) - 8}"):
-                        st.dataframe(_live_df.iloc[8:], use_container_width=True,
-                                     hide_index=True,
-                                     height=min(520, 80 + 35 * (len(_live_df) - 8)))
-            if not _quiet_df.empty:
-                with st.expander(f"💤 Engaged earlier, silent on the latest email "
-                                 f"({len(_quiet_df)})"):
-                    st.dataframe(_quiet_df, use_container_width=True, hide_index=True,
-                                 height=min(420, 80 + 35 * len(_quiet_df)))
-                    st.caption("These read an earlier campaign but not the current one. "
-                               "Worth a different angle rather than the same sequence.")
-
-        # ── Campaign lens ─────────────────────────────────────────────────────
-        # The chip list used to come from _ext30, so any campaign older than 30
-        # days simply wasn't offered — the August email, the one you most want
-        # to compare against, was missing. It now lists every campaign that
-        # carried tracking, and picking one scopes from the FULL history rather
-        # than the 30-day window, so an older campaign shows its real numbers
-        # instead of an empty table.
-        st.markdown("---")
-        _ext_all = _externals(sent_df)
-        _camp_meta = (_ext_all[_ext_all["tracking_id"].astype(str).str.strip()
-                               .replace("nan", "").ne("")]
-                      .groupby("subject")
-                      .agg(n=("to_email", "size"), first=("_ts", "min"))
-                      if ("subject" in _ext_all.columns and len(_ext_all)) else pd.DataFrame())
-        if len(_camp_meta):
-            _camp_meta = _camp_meta[_camp_meta["n"] >= 3].sort_values("first", ascending=False)
-        _ALL_CAMPAIGNS = "All campaigns"
-
-        def _short(sub, when):
-            """'24 Sep · Seven of 100 enterprises…' — short enough for a chip."""
-            _t = str(sub).strip()
-            return f"{when.strftime('%d %b')} · {_t[:26]}{'…' if len(_t) > 26 else ''}"
-
-        _label_to_subject = {_short(_sub, _r["first"]): _sub
-                             for _sub, _r in _camp_meta.iterrows()}
-        with st.container(border=True):
-            st.markdown("**🔍 Campaign lens** — pick one campaign to see who engaged "
-                        "with *that* email.")
-            _camp_pick = st.segmented_control(
-                "Campaign lens", [_ALL_CAMPAIGNS] + list(_label_to_subject.keys()),
-                default=_ALL_CAMPAIGNS, key="analytics_campaign_lens",
-                label_visibility="collapsed",
-            ) or _ALL_CAMPAIGNS
-            _camp_subject = _label_to_subject.get(_camp_pick)
-            if _camp_subject is None:
-                st.caption("**All campaigns** — the last 30 days added together. "
-                           "Good for 'who is warm right now', not for judging one email: "
-                           "a company that opened three campaigns looks the same as one "
-                           "that opened three copies of the same send.")
-            else:
-                st.success(f"Showing **{_camp_subject}** only — "
-                           f"{int(_camp_meta.loc[_camp_subject, 'n'])} recipients, sent "
-                           f"{_camp_meta.loc[_camp_subject, 'first'].strftime('%d %b')}.",
-                           icon="🔍")
-        _scope_label = ("last 30 days, all campaigns" if _camp_subject is None
-                        else _camp_pick)
-
-        def _scope(df):
-            """Narrow a sends frame to the chosen campaign (no-op when All)."""
-            if _camp_subject is None or "subject" not in df.columns:
-                return df
-            return df[df["subject"].astype(str).str.strip() == str(_camp_subject).strip()]
-
-        # When a campaign is picked, scope from ALL history — otherwise an older
-        # campaign would be filtered against a 30-day frame and come back empty.
-        _ext30v = _scope(_ext_all if _camp_subject is not None else _ext30)
-
-        # Two markers, never an em dash: a dash reads as "nothing happened"
-        # when it means "we didn't look". CNT is specific about WHICH metric
-        # is missing, which matters because clicks and opens stopped being
-        # measured for different reasons at different times.
-        _CNT = "CNT"   # clicks not tracked — click tracking off for those sends
-        _NT = "NT"     # not tracked — the send predates the open pixel entirely
-
-        # Clicks are only a real zero if tracking was on for those sends. After
-        # the 23 Sep cutover nothing records a click, so a 0 in this column
-        # means "not measured" — show CNT, same rule as the comparison
-        # table. Absence must never render as a measured zero.
-        _CLICKS_OFF_FROM_TAB = pd.Timestamp("2026-09-23", tz="UTC")
-
-        def _clicks_cell(frame, total):
-            """Total clicks for a slice, or '—' when they were never measured."""
-            if frame.empty:
-                return 0
-            _tot = int(total)
-            if _tot > 0:
-                return _tot
-            _all_after = (frame["_ts"] >= _CLICKS_OFF_FROM_TAB).all()
-            return _CNT if _all_after else 0
-
-        # ── Campaign comparison — every campaign, like-for-like ──────────────
-        # Deliberately NOT windowed to 30 days: email 1 went out in August and
-        # has to stay comparable against what ships now. "Open % @24h" is the
-        # column to judge on — lifetime opens flatter whichever campaign has
-        # been in the world longest.
-        # Click tracking was disabled 23 Sep 2026 — routing clicks through the
-        # Apps Script redirect stranded recipients on a blank google page (its
-        # iframe sandbox blocks the top-level navigation). Links now ship
-        # pointing at their real destination, so nothing records a click. A
-        # campaign sent after that date with zero click events therefore means
-        # "not measured", NOT "nobody clicked" — same trap as the pre-pixel
-        # sends. Self-healing: once a redirector that can 302 is in place and
-        # clicks start landing again, campaigns with events show real numbers.
+        # ══════════════════════════════════════════════════════════════════
+        # ZOOM OUT — campaigns side by side. One bordered container so the
+        # cross-campaign view is visually one thing, distinct from the
+        # zoom-in below. Metric vocabulary is fixed page-wide: Real reads
+        # (de-noised, burst-filtered), Machine (<60s), CNT = clicks not
+        # tracked. Definitions live in header tooltips, not caption walls.
+        # ══════════════════════════════════════════════════════════════════
+        _CNT = "CNT"   # clicks not tracked for those sends
+        _NT = "NT"     # send predates open tracking
         _CLICKS_OFF_FROM = pd.Timestamp("2026-09-23", tz="UTC")
 
-        st.markdown("#### 📮 Campaign comparison")
-        _cmp = _exp[_exp["status"] == "sent"].copy()
-        _cmp = _cmp[~_cmp["company"].astype(str).str.contains(r"\[INTERNAL WATCHER\]|\[TEST\]", regex=True, na=False)]
-        _cmp = _cmp[~_cmp["template"].astype(str).str.contains(r"\(test\)|\(internal copy\)", regex=True, na=False)]
-        _cmp["subject"] = _cmp["subject"].astype(str).str.strip()
-        _cmp = _cmp[_cmp["subject"] != ""]
-        if _cmp.empty:
-            st.caption("No campaigns sent yet.")
-        else:
-            _ctid = _cmp["tracking_id"].astype(str).str.strip()
+        _seg_order = ["AI Laggard", "AI Exploring", "AI Mature", "Unclassified"]
+        _aud = contacts[contacts["has_email"]].copy() if "has_email" in contacts.columns else contacts.copy()
+        _aud["ai_segment"] = _aud["ai_segment"].fillna("Unclassified").replace("", "Unclassified")
+        _email_seg = {str(e).strip().lower(): sgm for e, sgm in zip(_aud["email"], _aud["ai_segment"])}
 
-            _cmp["_reads"] = _ctid.map(pd.Series(_human_opens, dtype="int64")).fillna(0).astype(int)
+        _cf = _exp[_exp["status"] == "sent"].copy()
+        _cf = _cf[~_cf["company"].astype(str).str.contains(
+            r"\[INTERNAL WATCHER\]|\[TEST\]", regex=True, na=False)]
+        _cf = _cf[~_cf["template"].astype(str).str.contains(
+            r"\(test\)|\(internal copy\)", regex=True, na=False)]
+        _cf["subject"] = _cf["subject"].astype(str).str.strip()
+        _cf["_tid"] = _cf["tracking_id"].astype(str).str.strip()
+        _cf = _cf[_cf["subject"].ne("")]
+        _tracked_subj = (_cf[_cf["_tid"].ne("") & _cf["_tid"].ne("nan")]
+                         .groupby("subject").size().pipe(lambda x: x[x >= 3]))
 
-            # Share of the list whose pixel fired inside 60s — gateway scanning.
-            _mach = {}
-            if track_df is not None and not track_df.empty:
-                _mo = track_df[track_df["event"] == "open"].copy()
-                _mo["_ev"] = pd.to_datetime(_mo.get("ts_utc"), errors="coerce", utc=True)
-                _mo = _mo.merge(_cmp[["tracking_id", "_ts"]].assign(
-                    tracking_id=lambda d: d["tracking_id"].astype(str).str.strip()),
-                    on="tracking_id", how="inner")
-                _mo["_lag"] = (_mo["_ev"] - _mo["_ts"]).dt.total_seconds()
-                _mach = (_mo.groupby("tracking_id")["_lag"].min() <= 60).to_dict()
-            _cmp["_machine"] = _ctid.map(_mach).fillna(False).astype(int)
-            # Per campaign, because the burst threshold is a share of THAT
-            # campaign's audience — pooling them would hide a small send's burst.
-            # Both columns, same rule, per campaign. The only difference between
-            # them is the window — anything else and they stop being comparable.
-            _real_ids, _real_ids_24 = set(), set()
-            for _sb, _gg in _cmp.groupby("subject"):
-                _real_ids |= _real_read_ids(track_df, _gg)
-                _real_ids_24 |= _real_read_ids(track_df, _gg, within_hours=24)
-            _cmp["_real"] = _ctid.isin(_real_ids).astype(int)
-            _cmp["_r24"] = _ctid.isin(_real_ids_24).astype(int)
+        _real_by_subj = {}
+        for _sj in _tracked_subj.index:
+            _g = _cf[_cf["subject"] == _sj]
+            _real_by_subj[_sj] = _real_read_ids(track_df, _g)
+        _all_real = set().union(*_real_by_subj.values()) if _real_by_subj else set()
+        _cf["_real"] = _cf["_tid"].isin(_all_real).astype(int)
 
-            _crows = []
-            for _subj, _g in _cmp.groupby("subject"):
-                _n = len(_g)
-                _first = _g["_ts"].min()
-                _age_d = (now_utc - _first).total_seconds() / 86400
-                _tracked = (_g["tracking_id"].astype(str).str.strip()
-                            .replace("nan", "").ne("").any())
-                # Clicks are only meaningful if the campaign predates the
-                # cutover, or actually recorded clicks (i.e. it was re-enabled).
-                _clicks_ok = _tracked and (_first < _CLICKS_OFF_FROM
-                                           or int(_g["click_count"].sum()) > 0)
-                _crows.append({
-                    "Campaign": str(_subj)[:58],
-                    "Sent": _n,
-                    "Cos": int(_g["company"].nunique()),
-                    "Age": f"{_age_d:.1f}d" if _age_d < 2 else f"{int(round(_age_d))}d",
-                    # Open % stays honestly named. The 60s cut removes instant
-                    # scans but NOT a gateway that sweeps minutes after
-                    # delivery, which is what inflated Aug — so this is still
-                    # an upper bound. "Machine" sits beside it so the reader
-                    # can see how much of the list never chose to open at all.
-                    "Real reads": f"{int(round(_g['_real'].sum() / _n * 100))}%" if _tracked else _NT,
-                    "Machine (<60s)": (f"{int(round(_g['_machine'].sum() / _n * 100))}%"
-                                if _tracked else _NT),
-                    "Real @24h": f"{int(round((_g['_r24'] > 0).sum() / _n * 100))}%" if _tracked else _NT,
-                    "Clicks": int(_g["click_count"].sum()) if _clicks_ok else _CNT,
-                    "Click %": (f"{int(round((_g['click_count'] > 0).sum() / _n * 100))}%"
-                                if _clicks_ok else _CNT),
-                    "Circulated": int((_g["_reads"] >= 3).sum()) if _tracked else _NT,
-                    "_first": _first, "_age": _age_d,
-                    "_tracked": _tracked, "_n": _n,
-                })
-            _cdf = pd.DataFrame(_crows).sort_values("_first", ascending=False)
-            # Hide rows that can never say anything: sends from before the
-            # tracking pixel existed, and one-off 1:1 mails that aren't
-            # campaigns. They were nine rows of blanks pushing the two real
-            # campaigns off the top of the table.
-            _hidden = _cdf[~_cdf["_tracked"] | (_cdf["_n"] < 3)]
-            _cdf = _cdf[_cdf["_tracked"] & (_cdf["_n"] >= 3)]
-            _young = _cdf[_cdf["_age"] < 1]["Campaign"].tolist()
-            _cdf = _cdf.drop(columns=["_first", "_age", "_tracked", "_n"])
-            _csty2 = (_cdf.style
-                      .set_properties(subset=["Clicks", "Click %"],
-                                      **{"background-color": "#DBEAFE", "color": "#1D4ED8", "font-weight": "700"})
-                      .set_properties(subset=["Real @24h"],
-                                      **{"background-color": "#EDE9FE", "color": "#5B21B6", "font-weight": "700"})
-                      .set_properties(subset=["Real reads", "Circulated"],
-                                      **{"background-color": "#F5F3FF", "color": "#6D28D9", "font-weight": "600"}))
-            st.dataframe(_csty2, use_container_width=True, hide_index=True,
-                         height=min(420, 80 + 35 * len(_cdf)))
-            _warn = ("  ⏳ **" + ", ".join(_young) + "** is less than a day old — its @24h "
-                     "column is still filling." if _young else "")
-            st.caption(
-                (f"{len(_hidden)} older send(s) hidden — from before open tracking "
-                 "existed, or one-off 1:1 mails rather than campaigns. "
-                 if len(_hidden) else "")
-                + "Campaigns are identified by subject line; tests and internal copies "
-                "are excluded throughout." + _warn)
-            with st.expander("ℹ️ What each column counts"):
-                st.markdown(
-                    "**1 · Real reads** — recipients whose first open came **more than "
-                    "60 seconds** after the send *and* was **not** part of a synchronised "
-                    "burst. This is the number to judge a campaign on.\n\n"
-                    "**2 · Machine (<60s)** — the share whose pixel fired **within 60 "
-                    "seconds** of sending. Nobody reads that fast; this is a mail gateway "
-                    "scanning the message on arrival. When it's high, the raw open rate is "
-                    "mostly software.\n\n"
-                    "**3 · Real @24h** — Real reads, but counted in the **same 24-hour "
-                    "window** for every campaign. Use this to compare a new campaign "
-                    "against an old one fairly — lifetime figures just reward age.\n\n"
-                    "**4 · Circulated** — recipients who read it **3+ separate times**. "
-                    "The closest thing we can measure to the email being forwarded or "
-                    "revisited internally.\n\n"
-                    "**5 · CNT** — *clicks not tracked*. Click tracking was switched off "
-                    "for those sends, so a click could not be recorded. It does **not** "
-                    "mean nobody clicked. **NT** means the send predates open tracking "
-                    "altogether.\n\n"
-                    "---\n\n"
-                    "*A synchronised burst is a 10-minute window in which 10% or more of "
-                    "one campaign's recipients first opened. Ninety-two people at "
-                    "ninety-two companies don't open an email in the same ten minutes — "
-                    "software does, so those opens are excluded.*"
-                )
+        # machine share: first beacon inside 60s of the send
+        _mo = track_df[track_df["event"] == "open"].copy() if (
+            track_df is not None and not track_df.empty) else pd.DataFrame()
+        _mach_ids = set()
+        if not _mo.empty:
+            _mo["_ev"] = pd.to_datetime(_mo.get("ts_utc"), errors="coerce", utc=True)
+            _mo = _mo.merge(_cf[["_tid", "_ts"]].rename(columns={"_tid": "tracking_id"}),
+                            on="tracking_id", how="inner")
+            _mo["_lag"] = (_mo["_ev"] - _mo["_ts"]).dt.total_seconds()
+            _mach_ids = set(_mo.groupby("tracking_id")["_lag"].min()
+                            .pipe(lambda x: x[x <= 60]).index)
 
-            # Segment x campaign: which message landed with which audience.
-            _cmp["_seg"] = _cmp["to_email"].astype(str).str.strip().str.lower().map(_email_seg).fillna("Unclassified")
-            _mrows = []
-            for _subj, _g in _cmp.groupby("subject"):
-                _row = {"Campaign": str(_subj)[:58]}
+        st.markdown("---")
+        with st.container(border=True):
+            st.markdown("### 🔭 Zoom out — campaigns side by side")
+            if _tracked_subj.empty:
+                st.caption("No tracked campaigns yet.")
+                _zo_meta = pd.DataFrame()
+            else:
+                _zo_rows = []
+                for _sj in _tracked_subj.index:
+                    _g = _cf[_cf["subject"] == _sj]
+                    _n = len(_g)
+                    _first = _g["_ts"].min()
+                    _age_d = (now_utc - _first).total_seconds() / 86400
+                    _real_n = int(_g["_real"].sum())
+                    _mach_n = len(_mach_ids & set(_g["_tid"]))
+                    _ck = int(_g["click_count"].sum())
+                    _ck_ok = _ck > 0 or _first < _CLICKS_OFF_FROM
+                    _circ = int((_g["_tid"].map(pd.Series(_human_opens, dtype="int64"))
+                                 .fillna(0) >= 3).sum())
+                    _zo_rows.append({
+                        "Campaign": _sj[:52] + ("…" if len(_sj) > 52 else ""),
+                        "Sent": _n,
+                        "Sent at (IST)": (_first + pd.Timedelta(hours=5, minutes=30)
+                                          ).strftime("%d %b · %H:%M"),
+                        "Age": f"{_age_d:.1f}d" if _age_d < 2 else f"{int(round(_age_d))}d",
+                        "Real reads": f"{int(round(_real_n / _n * 100))}%",
+                        "Machine": f"{int(round(_mach_n / _n * 100))}%",
+                        "Clicks": _ck if _ck_ok else _CNT,
+                        "Circulated": _circ,
+                        "_first": _first, "_subj": _sj,
+                    })
+                _zo_meta = (pd.DataFrame(_zo_rows)
+                            .sort_values("_first", ascending=False).reset_index(drop=True))
+                st.dataframe(
+                    _zo_meta.drop(columns=["_first", "_subj"]),
+                    use_container_width=True, hide_index=True,
+                    height=min(220, 80 + 35 * len(_zo_meta)),
+                    column_config={
+                        "Sent at (IST)": st.column_config.Column(
+                            help="When the first batch left, Indian Standard Time — "
+                                 "a morning send and an afternoon send are different tests."),
+                        "Real reads": st.column_config.Column(
+                            help="Recipients who genuinely opened it: first open more than "
+                                 "60s after the send, synchronised gateway sweeps removed."),
+                        "Machine": st.column_config.Column(
+                            help="Share whose pixel fired within 60s of sending — scanning "
+                                 "software, not readers. Can overlap with Real reads "
+                                 "(scanned on arrival, read later), so columns don't sum."),
+                        "Clicks": st.column_config.Column(
+                            help="Human link clicks. CNT = clicks not tracked for those "
+                                 "sends (tracking was off) — not the same as zero."),
+                        "Circulated": st.column_config.Column(
+                            help="Recipients who came back 3+ separate times — the closest "
+                                 "measurable proxy for the mail being revisited or forwarded."),
+                    })
+
+        # ══════════════════════════════════════════════════════════════════
+        # ZOOM IN — one campaign, insights first. Selector defaults to the
+        # newest campaign; every table inside this box is scoped to it.
+        # ══════════════════════════════════════════════════════════════════
+        if not _tracked_subj.empty:
+            with st.container(border=True):
+                st.markdown("### 🔬 Zoom in — one campaign")
+                _zi_labels = {f"{r['_first'].strftime('%d %b')} · {str(r['_subj'])[:30]}"
+                              f"{'…' if len(str(r['_subj'])) > 30 else ''}": r["_subj"]
+                              for _, r in _zo_meta.iterrows()}
+                _zi_pick = st.segmented_control(
+                    "Campaign", list(_zi_labels.keys()),
+                    default=list(_zi_labels.keys())[0], key="zoom_campaign",
+                    label_visibility="collapsed") or list(_zi_labels.keys())[0]
+                _zc = _zi_labels[_zi_pick]
+                _zs = _cf[_cf["subject"] == _zc]
+                _zn = len(_zs)
+                _z_latest = (_zc == _zo_meta.iloc[0]["_subj"])
+                _z_real = _zs[_zs["_real"] == 1]
+                _z_real_n = len(_z_real)
+                _z_mach_n = len(_mach_ids & set(_zs["_tid"]))
+
+                def _person(row):
+                    _n = str(row.get("to_name", "")).strip()
+                    return _n if _n and _n.lower() != "nan" else str(row.get("to_email", "")).strip()
+
+                # who ALSO read another campaign — cross-campaign context per person
+                _multi = set(_cf[_cf["_real"] == 1].groupby("to_email")["subject"]
+                             .nunique().pipe(lambda x: x[x >= 2]).index)
+
+                # ── Insights: plain sentences before any table ────────────────
+                _ins = [f"**{_z_real_n} of {_zn}** recipients genuinely read this "
+                        f"({int(round(_z_real_n / _zn * 100))}%) — "
+                        f"{int(round(_z_mach_n / _zn * 100))}% was machine scanning."]
+                if _z_real_n:
+                    _co_rank = (_z_real.groupby("company")["to_email"].nunique()
+                                .sort_values(ascending=False))
+                    _top_co = _co_rank.index[0]
+                    _top_people = ", ".join(sorted(
+                        {_person(r) for _, r in
+                         _z_real[_z_real["company"] == _top_co].iterrows()}))
+                    if _co_rank.iloc[0] >= 2:
+                        _ins.append(f"**{_top_co}** is the warmest account — "
+                                    f"{_co_rank.iloc[0]} people read it ({_top_people}).")
+                    _ret_here = sorted({_person(r) for _, r in _z_real.iterrows()
+                                        if r["to_email"] in _multi})
+                    if _ret_here:
+                        _ins.append(f"**{len(_ret_here)}** of these readers have now read "
+                                    f"more than one campaign: {', '.join(_ret_here[:5])}"
+                                    f"{'…' if len(_ret_here) > 5 else ''}.")
+                if _z_latest:
+                    _prev_read_cos = set(_cf[(_cf["_real"] == 1)
+                                             & (_cf["subject"] != _zc)]["company"])
+                    _this_cos = set(_z_real["company"])
+                    _silent = _prev_read_cos - _this_cos
+                    if _silent:
+                        _ins.append(f"**{len(_silent)} accounts** that read an earlier "
+                                    f"campaign are silent on this one — they need a "
+                                    f"different angle, not the next email.")
+                for _i in _ins:
+                    st.markdown(f"• {_i}")
+
+                # ── Who to contact — scoped to this campaign ─────────────────
+                st.markdown("##### 🎯 Who to contact")
+                if _z_real.empty:
+                    st.caption("Nobody has genuinely read this campaign yet.")
+                else:
+                    _wc_rows = []
+                    for _co, _g in _z_real.groupby("company"):
+                        _names = sorted({_person(r) for _, r in _g.iterrows()})
+                        _also = sorted({_person(r) for _, r in _g.iterrows()
+                                        if r["to_email"] in _multi})
+                        _deep = int((_g["_tid"].map(pd.Series(_human_opens, dtype="int64"))
+                                     .fillna(0) >= 3).sum())
+                        _wc_rows.append({
+                            "Company": _co,
+                            "Who read it": ", ".join(_names)[:60],
+                            "Also read other emails": ", ".join(_also) or "—",
+                            "Came back 3+": _deep or "—",
+                            "Write to them": f"mailto:{_g.iloc[0]['to_email']}",
+                            "_s": len(_names) * 3 + len(_also) * 2 + _deep,
+                        })
+                    _wc = (pd.DataFrame(_wc_rows).sort_values("_s", ascending=False)
+                           .drop(columns="_s").reset_index(drop=True))
+                    st.dataframe(
+                        _wc.head(10), use_container_width=True, hide_index=True,
+                        height=min(400, 80 + 35 * min(10, len(_wc))),
+                        column_config={"Write to them": st.column_config.LinkColumn(
+                            display_text="✉️ email")})
+                    if len(_wc) > 10:
+                        with st.expander(f"Show the other {len(_wc) - 10} account(s)"):
+                            st.dataframe(_wc.iloc[10:], use_container_width=True,
+                                         hide_index=True,
+                                         height=min(520, 80 + 35 * (len(_wc) - 10)))
+
+                if _z_latest and _z_real_n:
+                    _sil_df = (_cf[(_cf["_real"] == 1) & (_cf["subject"] != _zc)
+                                   & (~_cf["company"].isin(set(_z_real["company"])))]
+                               .groupby("company")
+                               .agg(**{"Who read earlier": ("to_name", lambda x: ", ".join(
+                                    sorted({str(v).strip() for v in x
+                                            if str(v).strip().lower() not in ("", "nan")})[:3])),
+                                       "Last read": ("_ts", "max")})
+                               .reset_index().rename(columns={"company": "Company"}))
+                    if not _sil_df.empty:
+                        _sil_df["Last read"] = _sil_df["Last read"].dt.strftime("%d %b")
+                        with st.expander(f"💤 Engaged earlier, silent on this one "
+                                         f"({len(_sil_df)})"):
+                            st.dataframe(_sil_df, use_container_width=True, hide_index=True,
+                                         height=min(400, 80 + 35 * len(_sil_df)))
+                            st.caption("Worth a different angle rather than the same sequence.")
+
+                # ── When people opened (this campaign, unfiltered on purpose) ─
+                st.markdown("##### ⏱️ When people opened")
+                if _mo.empty:
+                    st.caption("No tracking data.")
+                else:
+                    _zo_ev = _mo[_mo["tracking_id"].isin(set(_zs["_tid"]))]
+                    _zfirst = _zo_ev.groupby("tracking_id")["_lag"].min()
+                    _bands = [("Under 60 sec", _zfirst <= 60),
+                              ("1 - 5 min", (_zfirst > 60) & (_zfirst <= 300)),
+                              ("5 - 60 min", (_zfirst > 300) & (_zfirst <= 3600)),
+                              ("1 - 6 hours", (_zfirst > 3600) & (_zfirst <= 21600)),
+                              ("6 - 24 hours", (_zfirst > 21600) & (_zfirst <= 86400)),
+                              ("After 24 hours", _zfirst > 86400)]
+                    _cur = pd.DataFrame(
+                        [{"When": _lbl, "Recipients": int(_m.sum())} for _lbl, _m in _bands]
+                        + [{"When": "Never opened", "Recipients": max(0, _zn - len(_zfirst))}])
+                    _b1, _b2 = st.columns([3, 2])
+                    with _b1:
+                        st.bar_chart(_cur.set_index("When")["Recipients"],
+                                     height=220, color="#7C3AED")
+                    with _b2:
+                        _cur["Share"] = (_cur["Recipients"] / _zn * 100).round(0)\
+                            .astype(int).astype(str) + "%"
+                        st.dataframe(_cur, use_container_width=True, hide_index=True,
+                                     height=230)
+                    st.caption("Unfiltered on purpose — the first bar IS the machine "
+                               "traffic every number above excludes. A human audience "
+                               "spreads across the day.")
+
+                # ── Segments (this campaign) ─────────────────────────────────
+                st.markdown("##### 🎯 By segment")
+                _zs2 = _zs.copy()
+                _zs2["_seg"] = (_zs2["to_email"].astype(str).str.strip().str.lower()
+                                .map(_email_seg).fillna("Unclassified"))
+                _sg_rows = []
                 for _sg in _seg_order:
-                    _sgg = _g[_g["_seg"] == _sg]
-                    _row[_sg] = (str(int(round((_sgg["_reads"] > 0).sum() / len(_sgg) * 100))) + "%  (" + str(len(_sgg)) + ")"
-                                 if len(_sgg) else "—")
-                _mrows.append((_g["_ts"].min(), _row))
-            _mdf = pd.DataFrame([r for _, r in sorted(_mrows, key=lambda x: x[0], reverse=True)])
-            with st.expander("📊 Open rate by AI segment, per campaign"):
-                st.dataframe(_mdf, use_container_width=True, hide_index=True,
-                             height=min(320, 80 + 35 * len(_mdf)))
-                st.caption("Open rate (and audience size) per segment. Tells you which argument "
-                           "landed with Mature vs Explorers vs Laggards.")
+                    _sv = _zs2[_zs2["_seg"] == _sg]
+                    if _sv.empty:
+                        continue
+                    _lo = (_sv["_ts"].min() + pd.Timedelta(hours=5, minutes=30))
+                    _sck = int(_sv["click_count"].sum())
+                    _sck_ok = _sck > 0 or _sv["_ts"].min() < _CLICKS_OFF_FROM
+                    _sg_rows.append({
+                        "Segment": _sg, "Sent": len(_sv),
+                        "Sent at (IST)": _lo.strftime("%d %b · %H:%M"),
+                        "Real reads": int(_sv["_real"].sum()),
+                        "Clicks": _sck if _sck_ok else _CNT,
+                    })
+                if _sg_rows:
+                    st.dataframe(pd.DataFrame(_sg_rows), use_container_width=True,
+                                 hide_index=True, height=min(220, 80 + 35 * len(_sg_rows)))
 
-        st.markdown("---")
-
-        # ── When people opened ───────────────────────────────────────────────
-        # Deliberately UNFILTERED: this is the one place the machine traffic
-        # should be visible rather than removed. A human audience produces a
-        # spread — some within the hour, more across the working day, a tail
-        # over days. A gateway scan produces a spike in the first minutes. If
-        # the first bar dwarfs the rest, the open rate is measuring software.
-        st.markdown("---")
-        st.markdown(f"#### ⏱️ When people opened ({_scope_label})")
-        _tl = _scope(_ext30).copy()
-        if _tl.empty or track_df is None or track_df.empty:
-            st.caption("No sends in scope, or tracking data is unavailable.")
-        else:
-            _tl["_tid"] = _tid_series(_tl)
-            _ob = track_df[track_df["event"] == "open"].copy()
-            _ob["_ev"] = pd.to_datetime(_ob.get("ts_utc"), errors="coerce", utc=True)
-            _first = (_ob.merge(_tl[["_tid", "_ts"]], left_on="tracking_id",
-                                right_on="_tid", how="inner")
-                         .assign(_lag=lambda d: (d["_ev"] - d["_ts"]).dt.total_seconds())
-                         .groupby("tracking_id")["_lag"].min())
-            # First band is 60s on purpose: it is exactly what the de-noising
-            # discards elsewhere, and the live data shows the machine mass sits
-            # almost entirely inside it (47% Aug, 51% Sep) — splitting here
-            # isolates gateway scans instead of blurring them into real readers.
-            _bands = [
-                ("Under 60 sec",     lambda x: x <= 60),
-                ("1 - 5 min",        lambda x: (x > 60) & (x <= 300)),
-                ("5 - 60 min",       lambda x: (x > 300) & (x <= 3600)),
-                ("1 - 6 hours",      lambda x: (x > 3600) & (x <= 21600)),
-                ("6 - 24 hours",     lambda x: (x > 21600) & (x <= 86400)),
-                ("After 24 hours",   lambda x: x > 86400),
-            ]
-            _n = len(_tl)
-            _rows = [{"When they first opened": _lbl,
-                      "Recipients": int(_f(_first).sum()) if len(_first) else 0}
-                     for _lbl, _f in _bands]
-            _never = _n - (len(_first) if len(_first) else 0)
-            _rows.append({"When they first opened": "Never opened", "Recipients": max(0, _never)})
-            _cur = pd.DataFrame(_rows)
-            _cur["Share"] = (_cur["Recipients"] / _n * 100).round(0).astype(int).astype(str) + "%"
-            _c1, _c2 = st.columns([3, 2])
-            with _c1:
-                st.bar_chart(_cur.set_index("When they first opened")["Recipients"],
-                             height=240, color="#7C3AED")
-            with _c2:
-                st.dataframe(_cur, use_container_width=True, hide_index=True, height=250)
-            _fast = int(_cur.loc[_cur["When they first opened"] == "Under 60 sec", "Recipients"].iloc[0])
-            if _n and _fast / _n >= 0.4:
-                st.error(
-                    f"⚠️ **{round(_fast / _n * 100)}% 'opened' within 60 seconds.** Nobody reads "
-                    "an email that fast — that is a "
-                    "mail-gateway scan, not readers — treat this campaign's open rate as an "
-                    "upper bound, and judge it on the later bands instead.", icon="🤖")
-            else:
-                st.caption(
-                    "A human audience spreads across the day. A large first bar means "
-                    "software fetched the tracking pixel on delivery, which inflates the "
-                    "open rate. Unfiltered on purpose — everywhere else removes this.")
-
-        # ── Segments at a glance — audience size + engagement per AI segment ──
-        st.markdown("---")
-        st.markdown("#### 🎯 Segments at a glance")
-        _e30 = _ext30v.copy()
-        _e30["_seg"] = _e30["to_email"].astype(str).str.strip().str.lower().map(_email_seg).fillna("Unclassified")
-        _e30["_tid"] = _tid_series(_e30)
-        # Per campaign, for the same reason as Who-to-contact: a pooled
-        # threshold lets a single campaign's burst slip through as real reads.
-        _seg_real = set()
-        for _sk, _sg_g in _e30.groupby("subject"):
-            _seg_real |= _real_read_ids(track_df, _sg_g)
-        _seg_rows = []
-        for _sg in _seg_order:
-            _a = _aud[_aud["ai_segment"] == _sg]
-            _sv = _e30[_e30["_seg"] == _sg]
-            # When this segment was actually mailed. Send time plausibly drives
-            # performance — a batch that lands at 03:00 local reads very
-            # differently from one that lands mid-morning — and until now the
-            # dashboard gave no way to see it. IST because the list is India
-            # and SE Asia.
-            if _sv.empty:
-                _when = "—"
-            else:
-                _lo = (_sv["_ts"].min() + pd.Timedelta(hours=5, minutes=30))
-                _hi = (_sv["_ts"].max() + pd.Timedelta(hours=5, minutes=30))
-                _when = (f"{_lo.strftime('%d %b %H:%M')}"
-                         + (f"–{_hi.strftime('%H:%M')}" if _hi.strftime('%H:%M') != _lo.strftime('%H:%M') else ""))
-            _seg_rows.append({
-                "Segment": _sg,
-                "Companies": int(_a["company"].nunique()),
-                "Contacts": int(len(_a)),
-                "Sent at (IST)": _when,
-                "Sends": int(len(_sv)),
-                "Real reads": int(_sv["_tid"].isin(_seg_real).sum()),
-                "Clicks": _clicks_cell(_sv, sum(_cl_counts.get(t, 0) for t in _sv["_tid"])),
-            })
-        _seg_df = pd.DataFrame(_seg_rows)
-        _ssty = (_seg_df.style
-                 .set_properties(subset=["Clicks"],
-                                 **{"background-color": "#DBEAFE", "color": "#1D4ED8", "font-weight": "700"})
-                 .set_properties(subset=["Real reads"],
-                                 **{"background-color": "#F5F3FF", "color": "#6D28D9", "font-weight": "600"}))
-        st.dataframe(_ssty, use_container_width=True, hide_index=True,
-                     height=min(260, 80 + 35 * len(_seg_df)))
-        st.caption(f"Engagement covers {_scope_label}.")
-        with st.expander("ℹ️ What each column counts"):
-            st.markdown(
-                "**1 · Companies / Contacts** — everyone in that segment in the pipeline "
-                "sheet, whether or not they were mailed.\n\n"
-                "**2 · Sent at** — when this segment actually received it, Indian "
-                "Standard Time. Send time is worth watching: a morning send and an "
-                "afternoon send are not the same test.\n\n"
-                "**3 · Sends** — how many of that segment this campaign reached.\n\n"
-                "**4 · Real reads** — opens that look human: more than 60 seconds after "
-                "the send, and not part of a synchronised gateway sweep.\n\n"
-                "**5 · CNT** — *clicks not tracked*, i.e. we couldn't record it. Not the same as zero."
-            )
-
-        # ── Account heat + circulating sends ─────────────────────────────────
-        # Built on the engagement-joined frame above. Real campaign sends only —
-        # tests and internal watcher copies excluded.
-        # Same trap as the lens list: with a campaign picked, window to ALL
-        # history, otherwise choosing the August email hands back an empty
-        # Account heat because it falls outside 30 days.
-        _rl = _exp[_exp["status"] == "sent"].copy()
-        if _camp_subject is None:
-            _rl = _rl[_rl["_ts"] >= now_utc - pd.Timedelta(days=30)]
-        _rl = _scope(_rl)          # campaign lens
-        _rl = _rl[~_rl["company"].astype(str).str.contains(r"\[INTERNAL WATCHER\]|\[TEST\]", regex=True, na=False)]
-        _rl = _rl[~_rl["template"].astype(str).str.contains(r"\(test\)|\(internal copy\)", regex=True, na=False)]
-
-        # Undeliverable sends can't have been engaged with — any "opens" on them
-        # are our own internal copies or scanners (Wipro's Rejin showed 3 opens
-        # on mail his server rejected). Excluded from heat / circulating /
-        # campaign stats; they live in Delivery issues instead.
-        _undeliv = set()
-        if not supp_df.empty and "email" in supp_df.columns:
-            _sd = supp_df.copy()
-            _sd["email"] = _sd["email"].astype(str).str.lower().str.strip()
-            _rz = _sd.get("reason", pd.Series([""] * len(_sd))).astype(str).str.lower()
-            _undeliv |= set(_sd.loc[_rz.str.contains(
-                r"bounce|no longer|undeliverable|rejected|does not exist|doesn't exist|invalid",
-                regex=True, na=False), "email"])
-        try:
-            _undeliv |= {b["email"] for b in _inbox_scan_results()["bounces"] if b.get("hard")}
-        except Exception:
-            pass
-        try:
-            _undeliv |= {u["email"] for u in _inbox_scan_results()["unsubs"]}
-        except Exception:
-            pass
-        _rl_undeliv = 0
-        if _undeliv:
-            _mask_ud = _rl["to_email"].astype(str).str.lower().str.strip().isin(_undeliv)
-            _rl_undeliv = int(_mask_ud.sum())
-            _rl = _rl[~_mask_ud]
-
-        st.markdown(f"#### 🔥 Account heat ({_scope_label})")
-        st.caption(
-            "Engagement rolled up per company — multiple stakeholders opening is a "
-            "buying-committee signal. Sorted hottest first: clicks, then sends opened, "
-            "then total opens."
-            + (f" {_rl_undeliv} undeliverable send(s) excluded — see Delivery issues."
-               if _rl_undeliv else "")
-        )
-        if _rl.empty:
-            st.caption("No campaign sends in the last 30 days yet.")
-        else:
-            _heat = (_rl.groupby("company")
-                       .agg(**{
-                           "Contacts": ("to_email", "nunique"),
-                           "Sends": ("to_email", "size"),
-                           "Sends opened": ("opened", "sum"),
-                           "Total opens": ("open_count", "sum"),
-                           "Clicks": ("click_count", "sum"),
-                           "Last send": ("_ts", "max"),
-                       })
-                       .reset_index()
-                       .rename(columns={"company": "Company"}))
-            # Same rule as everywhere else: a 0 in Clicks after the cutover is
-            # "not measured", not "nobody clicked".
-            _heat_last = _rl.groupby("company")["_ts"].max()
-            _heat["Last send"] = _heat["Last send"].dt.strftime("%d %b")
-            # Sort on the NUMBERS, then swap in the display marker. Doing it the
-            # other way round leaves Clicks holding ints and the string "CNT";
-            # pandas sorts that without complaint but puts every CNT row ABOVE
-            # a company with real clicks, so "hottest first" would be a lie the
-            # day click tracking comes back on.
-            _heat = _heat.sort_values(["Clicks", "Sends opened", "Total opens"],
-                                      ascending=False).reset_index(drop=True)
-            _heat["Clicks"] = [
-                (_c if int(_c) > 0
-                 else (_CNT if _heat_last.get(_co, pd.Timestamp("2000-01-01", tz="UTC"))
-                       >= _CLICKS_OFF_FROM_TAB else 0))
-                for _co, _c in zip(_heat["Company"], _heat["Clicks"])
-            ]
-            _hsty = (_heat.style
-                     .set_properties(subset=["Clicks"],
-                                     **{"background-color": "#DBEAFE", "color": "#1D4ED8", "font-weight": "700"})
-                     .set_properties(subset=["Sends opened", "Total opens"],
-                                     **{"background-color": "#F5F3FF", "color": "#6D28D9", "font-weight": "600"}))
-            _heat_top = _heat.head(10)
-            st.dataframe(_heat_top.style
-                         .set_properties(subset=["Clicks"],
-                                         **{"background-color": "#DBEAFE", "color": "#1D4ED8", "font-weight": "700"})
-                         .set_properties(subset=["Sends opened", "Total opens"],
-                                         **{"background-color": "#F5F3FF", "color": "#6D28D9", "font-weight": "600"}),
-                         use_container_width=True, hide_index=True,
-                         height=min(420, 80 + 35 * len(_heat_top)))
-            if len(_heat) > 10:
-                with st.expander(f"Show the other {len(_heat) - 10} account(s)"):
-                    st.dataframe(_heat.iloc[10:], use_container_width=True,
-                                 hide_index=True, height=min(520, 80 + 35 * (len(_heat) - 10)))
-
-            # ── Who engaged with what ────────────────────────────────────────
-            # Account heat rolls every campaign into one row, so "Castrol: 15
-            # clicks" hides WHICH email earned them. One column per campaign
-            # answers that at a glance, which is what you need before picking up
-            # the phone: the account is warm *about something specific*.
-            _wm = _exp[_exp["status"] == "sent"].copy()
-            _wm = _wm[~_wm["company"].astype(str).str.contains(r"\[INTERNAL WATCHER\]|\[TEST\]", regex=True, na=False)]
-            _wm = _wm[~_wm["template"].astype(str).str.contains(r"\(test\)|\(internal copy\)", regex=True, na=False)]
-            _wm["subject"] = _wm["subject"].astype(str).str.strip()
-            _wm = _wm[_wm["subject"] != ""]
-            _wm_tid = _wm["tracking_id"].astype(str).str.strip()
-            _wm["_reads"] = _wm_tid.map(pd.Series(_human_opens, dtype="int64")).fillna(0).astype(int)
-
-            # Most recent campaigns first, capped so the table stays readable.
-            # Only campaigns that carried a tracking pixel — the pre-July sends
-            # have nothing to report and would fill columns with "not sent".
-            _wm_tracked = (_wm.assign(_has=_wm_tid.replace("nan", "").ne(""))
-                              .groupby("subject")["_has"].any())
-            _wm_order = (_wm[_wm["subject"].isin(_wm_tracked[_wm_tracked].index)]
-                           .groupby("subject")["_ts"].min()
-                           .sort_values(ascending=False).head(4))
-            if len(_wm_order) >= 2 and not _heat.empty:
-                _wm = _wm[_wm["subject"].isin(_wm_order.index)]
-                _cols = {_sub: _short(_sub, _ts) for _sub, _ts in _wm_order.items()}
-                _hot = _heat["Company"].tolist() if "Company" in _heat.columns else []
-                if not _hot:
-                    _hot = (_wm.groupby("company")["_reads"].sum()
-                              .sort_values(ascending=False).head(25).index.tolist())
-                _mx = []
-                for _co in _hot[:25]:
-                    _cg = _wm[_wm["company"] == _co]
-                    _row = {"Company": _co}
-                    for _sub, _lbl in _cols.items():
-                        _cell = _cg[_cg["subject"] == _sub]
-                        if _cell.empty:
-                            _row[_lbl] = "not sent"
+                # ── Drill-down for this campaign ─────────────────────────────
+                _zck = t_clicks = None
+                with st.expander("🔗 Links clicked"):
+                    _ck_ok = (_zs["click_count"].sum() > 0
+                              or _zs["_ts"].min() < _CLICKS_OFF_FROM)
+                    if not _ck_ok:
+                        st.caption("Clicks were not tracked for this campaign (CNT).")
+                    elif track_df is None or track_df.empty:
+                        st.caption("No tracking data.")
+                    else:
+                        _lk = track_df[(track_df["event"] == "click")
+                                       & (track_df["tracking_id"].isin(set(_zs["_tid"])))]
+                        if _lk.empty or "dest_url" not in _lk.columns:
+                            st.caption("No clicks recorded for this campaign.")
                         else:
-                            _op = int((_cell["_reads"] > 0).sum())
-                            _ck = int(_cell["click_count"].sum())
-                            _row[_lbl] = (f"{_op}/{len(_cell)}"
-                                          + (f"  ·  {_ck} clicks" if _ck else ""))
-                    _mx.append(_row)
-                st.markdown("##### 🧭 Who engaged with what")
-                st.dataframe(pd.DataFrame(_mx), use_container_width=True, hide_index=True,
-                             height=min(560, 80 + 35 * len(_mx)))
-                st.caption(
-                    "Each cell is **contacts who opened / contacts sent**, plus clicks where "
-                    "measured. `not sent` means that account wasn't on that campaign — "
-                    "different from 0 opened. Newest campaign first, most-engaged accounts "
-                    "first, top 25. Not affected by the lens: the point is the comparison."
-                )
-
-        st.markdown("#### 🔁 Circulating sends (3+ separate reads)")
-        st.caption("Recipients who came back to the email three or more separate times "
-                   "— the closest thing we can measure to a forward.")
-        with st.expander("ℹ️ How a 'separate read' is counted"):
-            st.markdown(
-                f"**1 ·** Anything in the first **{_OPEN_PREFETCH_SEC} seconds** after "
-                "sending is discarded — that's a machine, not a reader.\n\n"
-                f"**2 ·** Repeat fetches inside a **{_OPEN_BUCKET_MIN}-minute window** "
-                "count once, so one person with the mail open isn't ten readers.\n\n"
-                "**3 ·** What's left is separate reads. Three or more means the message "
-                "was revisited or passed around.\n\n"
-                "**4 ·** Undeliverable sends (bounced or suppressed) are excluded — they "
-                "can't have been read by anyone."
-            )
-        _circ = _rl[_rl["open_count"] >= 3].copy()
-        if _circ.empty:
-            st.caption("None yet — appears once any send is opened 3+ times.")
-        else:
-            _circ["Sent"] = _circ["_ts"].dt.strftime("%d %b")
-            _circ["Subject"] = _circ["subject"].astype(str).str.slice(0, 60)
-            _circ = (_circ.rename(columns={"company": "Company", "to_email": "Recipient",
-                                           "open_count": "Opens", "click_count": "Clicks"})
-                         .sort_values("Opens", ascending=False))
-            # Marker applied after the sort, so the column is never mixed types
-            # while pandas is ordering it.
-            _circ["Clicks"] = [
-                (_v if int(_v) > 0 else (_CNT if _t >= _CLICKS_OFF_FROM_TAB else 0))
-                for _v, _t in zip(_circ["Clicks"], _circ["_ts"])
-            ]
-            _csty = (_circ[["Company", "Recipient", "Subject", "Opens", "Clicks", "Sent"]].style
-                     .set_properties(subset=["Clicks"],
-                                     **{"background-color": "#DBEAFE", "color": "#1D4ED8", "font-weight": "700"})
-                     .set_properties(subset=["Opens"],
-                                     **{"background-color": "#F5F3FF", "color": "#6D28D9", "font-weight": "700"}))
-            _circ_top = _circ.head(5)
-            st.dataframe(_circ_top.style
-                         .set_properties(subset=["Opens"],
-                                         **{"background-color": "#F5F3FF", "color": "#6D28D9", "font-weight": "700"}),
-                         use_container_width=True, hide_index=True,
-                         height=min(260, 80 + 35 * len(_circ_top)))
-            if len(_circ) > 5:
-                with st.expander(f"Show the other {len(_circ) - 5}"):
-                    st.dataframe(_circ.iloc[5:], use_container_width=True, hide_index=True,
-                                 height=min(420, 80 + 35 * (len(_circ) - 5)))
-
-        st.markdown("---")
+                            _lv = (_lk["dest_url"].astype(str).str.slice(0, 80)
+                                   .value_counts().reset_index())
+                            _lv.columns = ["Link", "Clicks"]
+                            st.dataframe(_lv, use_container_width=True, hide_index=True,
+                                         height=min(300, 80 + 35 * len(_lv)))
+                with st.expander("🏢 Every account on this campaign (including silent)"):
+                    _ha = (_zs.groupby("company")
+                           .agg(**{"Contacts": ("to_email", "nunique"),
+                                   "Real reads": ("_real", "sum"),
+                                   "Last send": ("_ts", "max")})
+                           .reset_index().rename(columns={"company": "Company"})
+                           .sort_values("Real reads", ascending=False))
+                    _ha["Last send"] = _ha["Last send"].dt.strftime("%d %b")
+                    st.dataframe(_ha, use_container_width=True, hide_index=True,
+                                 height=min(480, 80 + 35 * len(_ha)))
 
         # ══════════════════════════════════════════════════════════════════
-        # Below the fold: everything you go looking for, not everything you
-        # are shown. The top of this tab answers "how did the campaign do";
-        # this half answers "why" and "who", and stays collapsed until asked.
+        # OPERATIONS — inbox hygiene and records. Nothing here judges a
+        # campaign; it keeps the list clean and the history findable.
         # ══════════════════════════════════════════════════════════════════
         st.markdown("---")
-        st.markdown("### 🔎 Drill down")
+        st.markdown("### 🧰 Operations")
 
         # ── Mailbox scan (on demand) ─────────────────────────────────────────
         _scan = _inbox_scan_results()
@@ -3564,88 +3255,6 @@ with tab_analytics, _tab_guard("Analytics"):
                           [["Address", "Type", "Reason", "Bounced", "Suppressed"]])
             st.dataframe(_bshow, hide_index=True, use_container_width=True,
                          height=min(320, 80 + 35 * len(_bshow)))
-
-        # ── Campaign deep-dive ───────────────────────────────────────────────
-        # One campaign at a time: headline numbers, how each AI segment responded,
-        # which links were clicked, and which companies engaged.
-        _cx = _exp[(_exp["status"] == "sent")].copy()
-        _cx = _cx[~_cx["company"].astype(str).str.contains(r"\[INTERNAL WATCHER\]|\[TEST\]", regex=True, na=False)]
-        _cx = _cx[~_cx["template"].astype(str).str.contains(r"\(test\)|\(internal copy\)", regex=True, na=False)]
-        _cx = _cx[_cx["subject"].astype(str).str.strip() != ""]
-        if not _cx.empty:
-            st.markdown("#### 🔬 Campaign deep-dive")
-            _cx_opts = (_cx.groupby("subject")["_ts"].max().sort_values(ascending=False).index.tolist())
-            _pick_c = st.selectbox("Campaign", _cx_opts, key="campaign_deepdive")
-            _c = _cx[_cx["subject"] == _pick_c].copy()
-            _n = len(_c)
-            _op = int((_c["open_count"] > 0).sum())
-            _ck = int((_c["click_count"] > 0).sum())
-            _tot_ck = int(_c["click_count"].sum())
-            # Same rule as every other table: after the cutover nothing records
-            # a click, so 0% would be a claim we can't make.
-            _dd_clicks_ok = _tot_ck > 0 or (_c["_ts"].min() < _CLICKS_OFF_FROM_TAB)
-            d1, d2, d3, d4 = st.columns(4)
-            d1.metric("Sent", _n, help=f"{_c['company'].nunique()} companies · "
-                                       f"{_c['_ts'].min().strftime('%d %b')}–{_c['_ts'].max().strftime('%d %b')}")
-            d2.metric("Opened", f"{round(_op / _n * 100)}%" if _n else "—", help=f"{_op} of {_n} sends")
-            d3.metric("Clicked",
-                      (f"{round(_ck / _n * 100)}%" if _n else _CNT) if _dd_clicks_ok else _CNT,
-                      help=(f"{_ck} of {_n} sends" if _dd_clicks_ok else
-                            "Clicks not tracked for this campaign — click tracking was "
-                            "off, so a click could not be recorded. Not the same as zero."))
-            d4.metric("Total clicks", _tot_ck if _dd_clicks_ok else _CNT,
-                      help=f"{_c[_c['click_count'] > 0]['company'].nunique()} companies clicked at least once")
-
-            _dd1, _dd2 = st.columns(2)
-            with _dd1:
-                st.markdown("**By AI segment**")
-                _c["_seg"] = (_c["to_email"].astype(str).str.strip().str.lower()
-                              .map(_email_seg).fillna("Unclassified").apply(_normalize_ai_segment))
-                _sg = (_c.groupby("_seg")
-                         .agg(Sent=("to_email", "size"),
-                              Opened=("open_count", lambda s: int((s > 0).sum())),
-                              Clicked=("click_count", lambda s: int((s > 0).sum())))
-                         .reset_index().rename(columns={"_seg": "Segment"}))
-                _sg["Open %"] = (_sg["Opened"] / _sg["Sent"] * 100).round(0).astype(int)
-                _sg["Click %"] = ((_sg["Clicked"] / _sg["Sent"] * 100).round(0).astype(int)
-                                  if _dd_clicks_ok else _CNT)
-                st.dataframe(_sg[["Segment", "Sent", "Open %", "Click %"]],
-                             hide_index=True, use_container_width=True)
-                st.caption("**CNT** = clicks not tracked for this campaign, not zero. "
-                           if not _dd_clicks_ok else
-                           "A segment clicking more than it opens means images are blocked "
-                           "(common in corporate Outlook) — judge those on clicks.")
-            with _dd2:
-                st.markdown("**Links clicked**")
-                _ids = set(_c["tracking_id"].astype(str).str.strip())
-                if (track_df is not None and not track_df.empty
-                        and "dest_url" in track_df.columns):
-                    _lk = track_df[(track_df["event"] == "click")
-                                   & (track_df["tracking_id"].isin(_ids))].copy()
-                    if _lk.empty:
-                        st.caption("Clicks were not tracked for this campaign (CNT) — "
-                                   "no link data to show."
-                                   if not _dd_clicks_ok else
-                                   "No clicks recorded for this campaign.")
-                    else:
-                        _lk["Link"] = _lk["dest_url"].astype(str).str.split("?").str[0]
-                        _lv = (_lk["Link"].value_counts().reset_index())
-                        _lv.columns = ["Link", "Clicks"]
-                        st.dataframe(_lv.head(8), hide_index=True, use_container_width=True)
-                else:
-                    st.caption("No tracking data.")
-
-            with st.expander(f"🏢 Companies that engaged ({_c[_c['click_count'] > 0]['company'].nunique()} clicked)"):
-                _eng = (_c.groupby("company")
-                          .agg(Contacts=("to_email", "nunique"),
-                               Opens=("open_count", "sum"),
-                               Clicks=("click_count", "sum"))
-                          .reset_index().rename(columns={"company": "Company"})
-                          .sort_values(["Clicks", "Opens"], ascending=False))
-                if not _dd_clicks_ok:
-                    _eng["Clicks"] = _CNT
-                st.dataframe(_eng[_eng["Opens"] + _eng["Clicks"] > 0],
-                             hide_index=True, use_container_width=True, height=340)
 
         # ── Recent sends table ────────────────────────────────────────────────
         st.markdown("#### 📬 Recent sends")
