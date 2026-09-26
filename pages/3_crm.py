@@ -1402,8 +1402,16 @@ _BURST_WINDOW = "10min"
 _BURST_SHARE = 0.10
 
 
-def _real_read_ids(track_df, sends_df):
-    """Set of tracking_ids whose first open looks like a person, not software."""
+def _real_read_ids(track_df, sends_df, within_hours=None):
+    """Set of tracking_ids whose first open looks like a person, not software.
+
+    within_hours caps how long after the send an open still counts, so two
+    campaigns of different ages can be compared over the same window. It must
+    apply the SAME burst rule as the lifetime figure — a "@24h" column computed
+    without it came out at 86% against a lifetime 39%, which is impossible
+    (a subset cannot exceed its whole) and was simply the raw open rate
+    relabelled "Real".
+    """
     import pandas as _pd
     if (track_df is None or track_df.empty or sends_df is None or sends_df.empty
             or "tracking_id" not in track_df.columns or "tracking_id" not in sends_df.columns):
@@ -1418,7 +1426,10 @@ def _real_read_ids(track_df, sends_df):
     ev = ev[ev["_ev_ts"].notna() & ev["_ts"].notna()]
     if ev.empty:
         return set()
-    ev = ev[(ev["_ev_ts"] - ev["_ts"]).dt.total_seconds() > _OPEN_PREFETCH_SEC]
+    _lag = (ev["_ev_ts"] - ev["_ts"]).dt.total_seconds()
+    ev = ev[_lag > _OPEN_PREFETCH_SEC]
+    if within_hours is not None:
+        ev = ev[(ev["_ev_ts"] - ev["_ts"]).dt.total_seconds() <= within_hours * 3600]
     if ev.empty:
         return set()
     first = ev.groupby("tracking_id")["_ev_ts"].min().to_frame("t")
@@ -3043,9 +3054,9 @@ with tab_analytics, _tab_guard("Analytics"):
             st.caption("No campaigns sent yet.")
         else:
             _ctid = _cmp["tracking_id"].astype(str).str.strip()
-            _o24 = _human_open_counts(track_df, _cmp, within_hours=24)
+
             _cmp["_reads"] = _ctid.map(pd.Series(_human_opens, dtype="int64")).fillna(0).astype(int)
-            _cmp["_r24"] = _ctid.map(pd.Series(_o24, dtype="int64")).fillna(0).astype(int)
+
             # Share of the list whose pixel fired inside 60s — gateway scanning.
             _mach = {}
             if track_df is not None and not track_df.empty:
@@ -3059,10 +3070,14 @@ with tab_analytics, _tab_guard("Analytics"):
             _cmp["_machine"] = _ctid.map(_mach).fillna(False).astype(int)
             # Per campaign, because the burst threshold is a share of THAT
             # campaign's audience — pooling them would hide a small send's burst.
-            _real_ids = set()
+            # Both columns, same rule, per campaign. The only difference between
+            # them is the window — anything else and they stop being comparable.
+            _real_ids, _real_ids_24 = set(), set()
             for _sb, _gg in _cmp.groupby("subject"):
                 _real_ids |= _real_read_ids(track_df, _gg)
+                _real_ids_24 |= _real_read_ids(track_df, _gg, within_hours=24)
             _cmp["_real"] = _ctid.isin(_real_ids).astype(int)
+            _cmp["_r24"] = _ctid.isin(_real_ids_24).astype(int)
 
             _crows = []
             for _subj, _g in _cmp.groupby("subject"):
