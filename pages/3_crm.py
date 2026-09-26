@@ -2849,14 +2849,17 @@ with tab_analytics, _tab_guard("Analytics"):
         _email_seg = {str(e).strip().lower(): sgm for e, sgm in zip(_aud["email"], _aud["ai_segment"])}
 
         # ── Who to contact next ──────────────────────────────────────────────
-        # Every other table answers "how did the campaign do". Nobody acts on
-        # that. This answers "who do I call on Monday", which is the only
-        # question the sales team actually has — so it goes first, and it
-        # states the reason beside each name rather than leaving a number to
-        # be interpreted. Ranked on signals that survived de-noising: how many
-        # separate people at the account read it (a buying committee, not one
-        # curious person), whether they read more than one campaign, whether
-        # anyone came back 3+ times, and whether they read the most recent send.
+        # Three things the first version got wrong, all of them the same
+        # mistake — compressing different facts into one sentence:
+        #  1. "engaged with both campaigns" is a COMPANY fact, but it sat beside
+        #     PERSON names, so Castrol read as "Saugata read both". He didn't:
+        #     Uma read September, Saugata read August. One campaign each.
+        #     A person who personally read both is a much stronger signal and
+        #     now gets its own column.
+        #  2. A read from last month scored the same as one from this week.
+        #     Recency is most of the value, so the latest campaign leads.
+        #  3. Markdown bold was written into dataframe cells, which render as
+        #     literal ** because st.dataframe is not markdown.
         st.markdown("---")
         st.markdown("#### 🎯 Who to contact next")
         _act = _exp[_exp["status"] == "sent"].copy()
@@ -2865,11 +2868,8 @@ with tab_analytics, _tab_guard("Analytics"):
         _act = _act[~_act["template"].astype(str).str.contains(
             r"\(test\)|\(internal copy\)", regex=True, na=False)]
         _act["subject"] = _act["subject"].astype(str).str.strip()
-        # Burst detection must run PER CAMPAIGN. Pooling every campaign into one
-        # call sets the threshold from the combined recipient count, so a burst
-        # inside a single campaign can sit under it and survive as "real reads".
         _act_real = set()
-        for _sub_k, _sub_g in _act.groupby("subject"):
+        for _sub_k, _sub_g in _act.groupby("subject"):      # per campaign
             _act_real |= _real_read_ids(track_df, _sub_g)
         if _act.empty or not _act_real:
             st.caption("No engagement to act on yet — this fills in once a campaign "
@@ -2877,49 +2877,66 @@ with tab_analytics, _tab_guard("Analytics"):
         else:
             _act["_r"] = _act["tracking_id"].astype(str).str.strip().isin(_act_real).astype(int)
             _latest_sub = _act.loc[_act["_ts"].idxmax(), "subject"]
-            _act_rows = []
+            _latest_when = _act.loc[_act["_ts"].idxmax(), "_ts"].strftime("%d %b")
+
+            def _nm(row):
+                _n = str(row.get("to_name", "")).strip()
+                return _n if _n and _n.lower() != "nan" else str(row.get("to_email", "")).strip()
+
+            _rd = _act[_act["_r"] == 1]
+            # People who personally read more than one campaign — the signal the
+            # old wording buried under a company-level claim.
+            _returning = set(_rd.groupby("to_email")["subject"].nunique().pipe(
+                lambda x: x[x >= 2]).index)
+
+            _rows_live, _rows_quiet = [], []
             for _co, _g in _act.groupby("company"):
-                _readers = _g[_g["_r"] == 1]
-                if _readers.empty:
+                _gr = _g[_g["_r"] == 1]
+                if _gr.empty:
                     continue
-                _people = int(_readers["to_email"].nunique())
-                _camps = int(_readers["subject"].nunique())
-                # Count deep reads only among rows that passed the real-read
-                # filter. Raw open_count let gateway bursts through, so a company
-                # could show "2 readers · 5 read it 3+ times" — two numbers from
-                # two different definitions sitting side by side.
-                _deep = int((_readers["open_count"] >= 3).sum())
-                _on_latest = int(_g.loc[_g["subject"] == _latest_sub, "_r"].sum())
-                _why = []
-                if _people >= 2:
-                    _why.append(f"**{_people} people** read it")
-                if _camps >= 2:
-                    _why.append("engaged with **both campaigns**")
-                if _deep:
-                    _why.append(f"**{_deep}** read it 3+ times")
-                if _on_latest:
-                    _why.append("read the **latest** email")
-                _names = ", ".join(sorted({str(x).strip() for x in _readers["to_name"]
-                                           if str(x).strip() and str(x).strip().lower() != "nan"})) or "—"
-                _act_rows.append({
+                _new = _gr[_gr["subject"] == _latest_sub]
+                _ret = sorted({_nm(r) for _, r in _gr.iterrows()
+                               if r["to_email"] in _returning})
+                _deep = int((_gr["open_count"] >= 3).sum())
+                _row = {
                     "Company": _co,
-                    "Who read it": _names[:60] + ("…" if len(_names) > 60 else ""),
-                    "Why they're worth a call": " · ".join(_why) or "read it once",
-                    "Last activity": _g["_ts"].max().strftime("%d %b"),
-                    "_score": _people * 3 + _camps * 2 + _deep * 2 + _on_latest * 2,
-                })
-            _act_df = (pd.DataFrame(_act_rows).sort_values("_score", ascending=False)
-                       .drop(columns="_score").reset_index(drop=True))
-            st.dataframe(_act_df.head(8), use_container_width=True, hide_index=True,
-                         height=min(340, 80 + 35 * min(8, len(_act_df))))
-            st.caption(
-                "Ranked on engagement that survived de-noising, strongest signal first. "
-                "Several people at one account reading the same email is a buying "
-                "committee, not curiosity — that is the signal worth acting on.")
-            if len(_act_df) > 8:
-                with st.expander(f"Show the other {len(_act_df) - 8} engaged account(s)"):
-                    st.dataframe(_act_df.iloc[8:], use_container_width=True, hide_index=True,
-                                 height=min(520, 80 + 35 * (len(_act_df) - 8)))
+                    f"Read the latest ({_latest_when})":
+                        ", ".join(sorted({_nm(r) for _, r in _new.iterrows()})) or "—",
+                    "Read more than one email": ", ".join(_ret) or "—",
+                    "Came back 3+ times": _deep or "—",
+                    "Last read": _gr["_ts"].max().strftime("%d %b"),
+                    "_score": len(_new) * 4 + len(_ret) * 3 + _deep * 2,
+                }
+                (_rows_live if len(_new) else _rows_quiet).append(_row)
+
+            def _tidy(rows):
+                return (pd.DataFrame(rows).sort_values("_score", ascending=False)
+                        .drop(columns="_score").reset_index(drop=True)) if rows else pd.DataFrame()
+
+            _live_df, _quiet_df = _tidy(_rows_live), _tidy(_rows_quiet)
+            if _live_df.empty:
+                st.caption("Nobody has read the latest campaign yet.")
+            else:
+                st.dataframe(_live_df.head(8), use_container_width=True, hide_index=True,
+                             height=min(340, 80 + 35 * min(8, len(_live_df))))
+                st.caption(
+                    "Accounts where someone read the most recent email, strongest first. "
+                    "Names are the individuals — an account can appear because two "
+                    "different colleagues each read a different campaign, which is not "
+                    "the same as one person reading both. That stronger signal has its "
+                    "own column.")
+                if len(_live_df) > 8:
+                    with st.expander(f"Show the other {len(_live_df) - 8}"):
+                        st.dataframe(_live_df.iloc[8:], use_container_width=True,
+                                     hide_index=True,
+                                     height=min(520, 80 + 35 * (len(_live_df) - 8)))
+            if not _quiet_df.empty:
+                with st.expander(f"💤 Engaged earlier, silent on the latest email "
+                                 f"({len(_quiet_df)})"):
+                    st.dataframe(_quiet_df, use_container_width=True, hide_index=True,
+                                 height=min(420, 80 + 35 * len(_quiet_df)))
+                    st.caption("These read an earlier campaign but not the current one. "
+                               "Worth a different angle rather than the same sequence.")
 
         # ── Campaign lens ─────────────────────────────────────────────────────
         # The chip list used to come from _ext30, so any campaign older than 30
