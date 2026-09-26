@@ -2949,18 +2949,31 @@ with tab_analytics, _tab_guard("Analytics"):
                 (f"{len(_hidden)} older send(s) hidden — from before open tracking "
                  "existed, or one-off 1:1 mails rather than campaigns. "
                  if len(_hidden) else "")
-                + "Campaigns are identified by subject line. **Open % @24h** is the "
-                "**Real reads** = recipients whose first open was more than 60 seconds after "
-                "the send AND not inside a synchronised burst (a 10-minute window holding "
-                "10%+ of that campaign's list — software sweeping, not people). "
-                "**Machine (<60s)** = the share whose pixel fired within 60 seconds of "
-                "sending: pure gateway scanning. **Real @24h** applies the same "
-                "like-for-like column: the same 24-hour window for every campaign, so an "
-                "older one isn't rewarded for age. **Circulated** = recipients who read it "
-                "3+ separate times, the closest proxy for it being passed around "
-                "internally. Tests and internal copies are excluded throughout. An em dash "
-                "means it was never measured, not that it was zero."
-                + _warn)
+                + "Campaigns are identified by subject line; tests and internal copies "
+                "are excluded throughout." + _warn)
+            with st.expander("ℹ️ What each column counts"):
+                st.markdown(
+                    "**1 · Real reads** — recipients whose first open came **more than "
+                    "60 seconds** after the send *and* was **not** part of a synchronised "
+                    "burst. This is the number to judge a campaign on.\n\n"
+                    "**2 · Machine (<60s)** — the share whose pixel fired **within 60 "
+                    "seconds** of sending. Nobody reads that fast; this is a mail gateway "
+                    "scanning the message on arrival. When it's high, the raw open rate is "
+                    "mostly software.\n\n"
+                    "**3 · Real @24h** — Real reads, but counted in the **same 24-hour "
+                    "window** for every campaign. Use this to compare a new campaign "
+                    "against an old one fairly — lifetime figures just reward age.\n\n"
+                    "**4 · Circulated** — recipients who read it **3+ separate times**. "
+                    "The closest thing we can measure to the email being forwarded or "
+                    "revisited internally.\n\n"
+                    "**5 · An em dash (—)** — never measured, *not* zero. Either the send "
+                    "predates open tracking, or click tracking was off at the time.\n\n"
+                    "---\n\n"
+                    "*A synchronised burst is a 10-minute window in which 10% or more of "
+                    "one campaign's recipients first opened. Ninety-two people at "
+                    "ninety-two companies don't open an email in the same ten minutes — "
+                    "software does, so those opens are excluded.*"
+                )
 
             # Segment x campaign: which message landed with which audience.
             _cmp["_seg"] = _cmp["to_email"].astype(str).str.strip().str.lower().map(_email_seg).fillna("Unclassified")
@@ -3079,12 +3092,19 @@ with tab_analytics, _tab_guard("Analytics"):
                                  **{"background-color": "#F5F3FF", "color": "#6D28D9", "font-weight": "600"}))
         st.dataframe(_ssty, use_container_width=True, hide_index=True,
                      height=min(260, 80 + 35 * len(_seg_df)))
-        st.caption(
-            f"**Companies / Contacts** = everyone in that segment in the pipeline sheet, "
-            f"whether or not they were mailed. **Sent at** = when this segment actually "
-            f"received it, Indian Standard Time. **Sends / Real reads / Clicks** cover "
-            f"{_scope_label}. **Real reads** excludes opens inside 60 seconds and "
-            f"synchronised gateway sweeps. An em dash means never measured, not zero.")
+        st.caption(f"Engagement covers {_scope_label}.")
+        with st.expander("ℹ️ What each column counts"):
+            st.markdown(
+                "**1 · Companies / Contacts** — everyone in that segment in the pipeline "
+                "sheet, whether or not they were mailed.\n\n"
+                "**2 · Sent at** — when this segment actually received it, Indian "
+                "Standard Time. Send time is worth watching: a morning send and an "
+                "afternoon send are not the same test.\n\n"
+                "**3 · Sends** — how many of that segment this campaign reached.\n\n"
+                "**4 · Real reads** — opens that look human: more than 60 seconds after "
+                "the send, and not part of a synchronised gateway sweep.\n\n"
+                "**5 · An em dash (—)** — never measured, not zero."
+            )
 
         # ── Account heat + circulating sends ─────────────────────────────────
         # Built on the engagement-joined frame above. Real campaign sends only —
@@ -3226,13 +3246,19 @@ with tab_analytics, _tab_guard("Analytics"):
                 )
 
         st.markdown("#### 🔁 Circulating sends (3+ separate reads)")
-        st.caption(
-            "Opens counted the honest way: the machine prefetch burst in the first "
-            f"{_OPEN_PREFETCH_SEC}s after sending is discarded, and repeat fetches inside a "
-            f"{_OPEN_BUCKET_MIN}-minute window count once. Three or more separate reads means "
-            "the mail is being revisited or passed around — the closest measurable proxy "
-            "for a forward. Undeliverable (bounced/suppressed) sends are excluded."
-        )
+        st.caption("Recipients who came back to the email three or more separate times "
+                   "— the closest thing we can measure to a forward.")
+        with st.expander("ℹ️ How a 'separate read' is counted"):
+            st.markdown(
+                f"**1 ·** Anything in the first **{_OPEN_PREFETCH_SEC} seconds** after "
+                "sending is discarded — that's a machine, not a reader.\n\n"
+                f"**2 ·** Repeat fetches inside a **{_OPEN_BUCKET_MIN}-minute window** "
+                "count once, so one person with the mail open isn't ten readers.\n\n"
+                "**3 ·** What's left is separate reads. Three or more means the message "
+                "was revisited or passed around.\n\n"
+                "**4 ·** Undeliverable sends (bounced or suppressed) are excluded — they "
+                "can't have been read by anyone."
+            )
         _circ = _rl[_rl["open_count"] >= 3].copy()
         if _circ.empty:
             st.caption("None yet — appears once any send is opened 3+ times.")
