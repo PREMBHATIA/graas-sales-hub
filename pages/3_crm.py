@@ -2788,6 +2788,79 @@ with tab_analytics, _tab_guard("Analytics"):
         _aud["ai_segment"] = _aud["ai_segment"].fillna("Unclassified").replace("", "Unclassified")
         _email_seg = {str(e).strip().lower(): sgm for e, sgm in zip(_aud["email"], _aud["ai_segment"])}
 
+        # ── Who to contact next ──────────────────────────────────────────────
+        # Every other table answers "how did the campaign do". Nobody acts on
+        # that. This answers "who do I call on Monday", which is the only
+        # question the sales team actually has — so it goes first, and it
+        # states the reason beside each name rather than leaving a number to
+        # be interpreted. Ranked on signals that survived de-noising: how many
+        # separate people at the account read it (a buying committee, not one
+        # curious person), whether they read more than one campaign, whether
+        # anyone came back 3+ times, and whether they read the most recent send.
+        st.markdown("---")
+        st.markdown("#### 🎯 Who to contact next")
+        _act = _exp[_exp["status"] == "sent"].copy()
+        _act = _act[~_act["company"].astype(str).str.contains(
+            r"\[INTERNAL WATCHER\]|\[TEST\]", regex=True, na=False)]
+        _act = _act[~_act["template"].astype(str).str.contains(
+            r"\(test\)|\(internal copy\)", regex=True, na=False)]
+        _act["subject"] = _act["subject"].astype(str).str.strip()
+        # Burst detection must run PER CAMPAIGN. Pooling every campaign into one
+        # call sets the threshold from the combined recipient count, so a burst
+        # inside a single campaign can sit under it and survive as "real reads".
+        _act_real = set()
+        for _sub_k, _sub_g in _act.groupby("subject"):
+            _act_real |= _real_read_ids(track_df, _sub_g)
+        if _act.empty or not _act_real:
+            st.caption("No engagement to act on yet — this fills in once a campaign "
+                       "has been open for a day.")
+        else:
+            _act["_r"] = _act["tracking_id"].astype(str).str.strip().isin(_act_real).astype(int)
+            _latest_sub = _act.loc[_act["_ts"].idxmax(), "subject"]
+            _act_rows = []
+            for _co, _g in _act.groupby("company"):
+                _readers = _g[_g["_r"] == 1]
+                if _readers.empty:
+                    continue
+                _people = int(_readers["to_email"].nunique())
+                _camps = int(_readers["subject"].nunique())
+                # Count deep reads only among rows that passed the real-read
+                # filter. Raw open_count let gateway bursts through, so a company
+                # could show "2 readers · 5 read it 3+ times" — two numbers from
+                # two different definitions sitting side by side.
+                _deep = int((_readers["open_count"] >= 3).sum())
+                _on_latest = int(_g.loc[_g["subject"] == _latest_sub, "_r"].sum())
+                _why = []
+                if _people >= 2:
+                    _why.append(f"**{_people} people** read it")
+                if _camps >= 2:
+                    _why.append("engaged with **both campaigns**")
+                if _deep:
+                    _why.append(f"**{_deep}** read it 3+ times")
+                if _on_latest:
+                    _why.append("read the **latest** email")
+                _names = ", ".join(sorted({str(x).strip() for x in _readers["to_name"]
+                                           if str(x).strip() and str(x).strip().lower() != "nan"})) or "—"
+                _act_rows.append({
+                    "Company": _co,
+                    "Who read it": _names[:60] + ("…" if len(_names) > 60 else ""),
+                    "Why they're worth a call": " · ".join(_why) or "read it once",
+                    "Last activity": _g["_ts"].max().strftime("%d %b"),
+                    "_score": _people * 3 + _camps * 2 + _deep * 2 + _on_latest * 2,
+                })
+            _act_df = (pd.DataFrame(_act_rows).sort_values("_score", ascending=False)
+                       .drop(columns="_score").reset_index(drop=True))
+            st.dataframe(_act_df.head(8), use_container_width=True, hide_index=True,
+                         height=min(340, 80 + 35 * min(8, len(_act_df))))
+            st.caption(
+                "Ranked on engagement that survived de-noising, strongest signal first. "
+                "Several people at one account reading the same email is a buying "
+                "committee, not curiosity — that is the signal worth acting on.")
+            if len(_act_df) > 8:
+                with st.expander(f"Show the other {len(_act_df) - 8} engaged account(s)"):
+                    st.dataframe(_act_df.iloc[8:], use_container_width=True, hide_index=True,
+                                 height=min(520, 80 + 35 * (len(_act_df) - 8)))
+
         # ── Campaign lens ─────────────────────────────────────────────────────
         # The chip list used to come from _ext30, so any campaign older than 30
         # days simply wasn't offered — the August email, the one you most want
