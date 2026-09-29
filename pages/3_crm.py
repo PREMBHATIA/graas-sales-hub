@@ -2983,35 +2983,69 @@ with tab_analytics, _tab_guard("Analytics"):
                 _multi = set(_cf[_cf["_real"] == 1].groupby("to_email")["subject"]
                              .nunique().pipe(lambda x: x[x >= 2]).index)
 
+                _SEG_PRIO = {"AI Mature": 0, "AI Exploring": 1,
+                             "AI Laggard": 2, "Unclassified": 3}
+
+                def _seg_of(em):
+                    return _email_seg.get(str(em).strip().lower(), "Unclassified")
+
+                # de-noised read count and last human read time, per tracking id
+                _reads_s = pd.Series(_human_opens, dtype="int64")
+                _last_read = (_mo[_mo["_lag"] > 60].groupby("tracking_id")["_ev"].max()
+                              if not _mo.empty else pd.Series(dtype="object"))
+
+                def _last_ist(tids):
+                    _v = _last_read[_last_read.index.isin(set(tids))]
+                    if _v.empty:
+                        return "—"
+                    return (_v.max() + pd.Timedelta(hours=5, minutes=30)
+                            ).strftime("%d %b · %H:%M")
+
+                # the campaign sent immediately before this one (for unreads)
+                _older = _zo_meta[_zo_meta["_first"] < _zs["_ts"].min()]
+                _prev_subj = _older.iloc[0]["_subj"] if len(_older) else None
+
                 # ── Insights: plain sentences before any table ────────────────
+                _z_real_segs = _z_real["to_email"].map(_seg_of)
+                _seg_bits = " · ".join(
+                    f"{int((_z_real_segs == _sg).sum())} {_sg.replace('AI ', '')}"
+                    for _sg in _SEG_PRIO if int((_z_real_segs == _sg).sum()))
                 _ins = [f"**{_z_real_n} of {_zn}** recipients genuinely read this "
-                        f"({int(round(_z_real_n / _zn * 100))}%) — "
-                        f"{int(round(_z_mach_n / _zn * 100))}% was machine scanning."]
+                        f"({int(round(_z_real_n / _zn * 100))}%)"
+                        + (f" — {_seg_bits}" if _seg_bits else "")
+                        + f". {int(round(_z_mach_n / _zn * 100))}% was machine scanning."]
                 if _z_real_n:
                     _co_rank = (_z_real.groupby("company")["to_email"].nunique()
                                 .sort_values(ascending=False))
-                    _top_co = _co_rank.index[0]
-                    _top_people = ", ".join(sorted(
-                        {_person(r) for _, r in
-                         _z_real[_z_real["company"] == _top_co].iterrows()}))
                     if _co_rank.iloc[0] >= 2:
+                        _top_co = _co_rank.index[0]
+                        _top_people = ", ".join(sorted(
+                            {_person(r) for _, r in
+                             _z_real[_z_real["company"] == _top_co].iterrows()}))
                         _ins.append(f"**{_top_co}** is the warmest account — "
-                                    f"{_co_rank.iloc[0]} people read it ({_top_people}).")
-                    _ret_here = sorted({_person(r) for _, r in _z_real.iterrows()
-                                        if r["to_email"] in _multi})
-                    if _ret_here:
-                        _ins.append(f"**{len(_ret_here)}** of these readers have now read "
-                                    f"more than one campaign: {', '.join(_ret_here[:5])}"
-                                    f"{'…' if len(_ret_here) > 5 else ''}.")
-                if _z_latest:
-                    _prev_read_cos = set(_cf[(_cf["_real"] == 1)
-                                             & (_cf["subject"] != _zc)]["company"])
-                    _this_cos = set(_z_real["company"])
-                    _silent = _prev_read_cos - _this_cos
-                    if _silent:
-                        _ins.append(f"**{len(_silent)} accounts** that read an earlier "
-                                    f"campaign are silent on this one — they need a "
-                                    f"different angle, not the next email.")
+                                    f"{_co_rank.iloc[0]} people read it ({_top_people}), "
+                                    f"last at {_last_ist(_z_real[_z_real['company'] == _top_co]['_tid'])} IST.")
+                    _n_multi_read = int((_z_real["_tid"].map(_reads_s).fillna(0) >= 2).sum())
+                    if _n_multi_read:
+                        _ins.append(f"**{_n_multi_read}** read it more than once — "
+                                    f"revisited or forwarded on (🔁 below).")
+                if _prev_subj is not None:
+                    _pv = _cf[(_cf["subject"] == _prev_subj) & (_cf["_real"] == 1)]
+                    _got_this = set(_zs["to_email"])
+                    _read_this = set(_z_real["to_email"])
+                    _pv_sent = _pv[_pv["to_email"].isin(_got_this)]
+                    _pv_silent = _pv_sent[~_pv_sent["to_email"].isin(_read_this)]
+                    _pv_unsent = _pv[~_pv["to_email"].isin(_got_this)]
+                    _pv_me = int(_pv_silent["to_email"].map(_seg_of)
+                                 .isin(["AI Mature", "AI Exploring"]).sum())
+                    if len(_pv_silent):
+                        _ins.append(f"**{len(_pv_silent)} people who read the last email "
+                                    f"haven't opened this one** ({_pv_me} Mature/Exploring) "
+                                    f"— 📪 below. A personal one-liner beats resending.")
+                    if len(_pv_unsent):
+                        _ins.append(f"**{_pv_unsent['to_email'].nunique()}** previous "
+                                    f"readers were never sent this campaign — check the "
+                                    f"segment filters before the next batch.")
                 for _i in _ins:
                     st.markdown(f"• {_i}")
 
@@ -3044,11 +3078,15 @@ with tab_analytics, _tab_guard("Analytics"):
                             _rank = 2 * _ret + _dp
                             if _best is None or _rank > _best[0]:
                                 _best = (_rank, _r["to_email"], _person(_r))
+                        _co_seg = min((_seg_of(r["to_email"]) for _, r in _g.iterrows()),
+                                      key=lambda x: _SEG_PRIO[x])
                         _wc_rows.append({
                             "Company": _co,
+                            "Segment": _co_seg.replace("AI ", ""),
                             "Who read it": ", ".join(sorted(_tags))[:80],
+                            "Last read (IST)": _last_ist(_g["_tid"]),
                             "Write to them": f"mailto:{_best[1]}",
-                            "_s": _score,
+                            "_s": _score + (3 - _SEG_PRIO[_co_seg]),
                         })
                     _wc = (pd.DataFrame(_wc_rows).sort_values("_s", ascending=False)
                            .drop(columns="_s").reset_index(drop=True))
@@ -3056,6 +3094,12 @@ with tab_analytics, _tab_guard("Analytics"):
                         _wc.head(10), use_container_width=True, hide_index=True,
                         height=min(400, 80 + 35 * min(10, len(_wc))),
                         column_config={
+                            "Segment": st.column_config.Column(
+                                help="From the pipeline sheet's AI Maturity column — "
+                                     "a Mature reader outranks a Laggard one."),
+                            "Last read (IST)": st.column_config.Column(
+                                help="Most recent human read at this account. Recent "
+                                     "= warm — call while it is."),
                             "Who read it": st.column_config.Column(
                                 help="↩ = also read another campaign (a returning "
                                      "reader — the strongest signal here). "
@@ -3070,22 +3114,70 @@ with tab_analytics, _tab_guard("Analytics"):
                                          hide_index=True,
                                          height=min(520, 80 + 35 * (len(_wc) - 10)))
 
-                if _z_latest and _z_real_n:
-                    _sil_df = (_cf[(_cf["_real"] == 1) & (_cf["subject"] != _zc)
-                                   & (~_cf["company"].isin(set(_z_real["company"])))]
-                               .groupby("company")
-                               .agg(**{"Who read earlier": ("to_name", lambda x: ", ".join(
-                                    sorted({str(v).strip() for v in x
-                                            if str(v).strip().lower() not in ("", "nan")})[:3])),
-                                       "Last read": ("_ts", "max")})
-                               .reset_index().rename(columns={"company": "Company"}))
-                    if not _sil_df.empty:
-                        _sil_df["Last read"] = _sil_df["Last read"].dt.strftime("%d %b")
-                        with st.expander(f"💤 Engaged earlier, silent on this one "
-                                         f"({len(_sil_df)})"):
-                            st.dataframe(_sil_df, use_container_width=True, hide_index=True,
-                                         height=min(400, 80 + 35 * len(_sil_df)))
-                            st.caption("Worth a different angle rather than the same sequence.")
+                # ── Read it multiple times — revisits and forwards ──────────
+                # A forwarded email fires the ORIGINAL recipient's pixel, so a
+                # forward shows up here as extra reads on their id. Without
+                # device data (Apps Script exposes none; the Cloudflare pixel
+                # would) a forward and a re-read are indistinguishable — the
+                # header says so instead of pretending otherwise.
+                _mr = _zs[_zs["_tid"].map(_reads_s).fillna(0) >= 2]
+                if not _mr.empty:
+                    st.markdown("##### 🔁 Read it multiple times")
+                    _mr_rows = [{
+                        "Who": _person(_r),
+                        "Company": _r["company"],
+                        "Segment": _seg_of(_r["to_email"]).replace("AI ", ""),
+                        "Reads": int(_reads_s.get(_r["_tid"], 0)),
+                        "Last read (IST)": _last_ist([_r["_tid"]]),
+                        "Write to them": f"mailto:{_r['to_email']}",
+                    } for _, _r in _mr.iterrows()]
+                    _mr_df = (pd.DataFrame(_mr_rows)
+                              .sort_values("Reads", ascending=False).reset_index(drop=True))
+                    st.dataframe(
+                        _mr_df, use_container_width=True, hide_index=True,
+                        height=min(300, 80 + 35 * len(_mr_df)),
+                        column_config={
+                            "Reads": st.column_config.Column(
+                                help="Separate de-noised reads. A forwarded email fires "
+                                     "the original recipient's pixel, so forwards appear "
+                                     "here as extra reads — we can't split the two "
+                                     "without device data."),
+                            "Write to them": st.column_config.LinkColumn(
+                                display_text=r"mailto:([^@]+)@.*")})
+
+                # ── Notable unreads — read the last email, silent on this one ─
+                if _prev_subj is not None and len(_pv_silent):
+                    st.markdown("##### 📪 Notable unreads")
+                    st.caption(f"Read *{str(_prev_subj)[:44]}…* but haven't opened this "
+                               f"one. Mature and Exploring first — these are warm people "
+                               f"going cold, and a personal one-liner beats a resend.")
+                    _nu_rows = [{
+                        "Who": _person(_r),
+                        "Company": _r["company"],
+                        "Segment": _seg_of(_r["to_email"]).replace("AI ", ""),
+                        "Last time": (f"read ×{int(_reads_s.get(_r['_tid'], 0))}"
+                                      + (" · clicked" if int(_r.get("click_count", 0)) else "")),
+                        "Write to them": f"mailto:{_r['to_email']}",
+                        "_p": _SEG_PRIO[_seg_of(_r["to_email"])],
+                        "_n": int(_reads_s.get(_r["_tid"], 0)),
+                    } for _, _r in _pv_silent.iterrows()]
+                    _nu = (pd.DataFrame(_nu_rows)
+                           .sort_values(["_p", "_n"], ascending=[True, False])
+                           .drop(columns=["_p", "_n"]).reset_index(drop=True))
+                    st.dataframe(
+                        _nu.head(12), use_container_width=True, hide_index=True,
+                        height=min(460, 80 + 35 * min(12, len(_nu))),
+                        column_config={
+                            "Last time": st.column_config.Column(
+                                help="What they did on the previous campaign — de-noised "
+                                     "reads, and whether they clicked a link."),
+                            "Write to them": st.column_config.LinkColumn(
+                                display_text=r"mailto:([^@]+)@.*")})
+                    if len(_nu) > 12:
+                        with st.expander(f"Show the other {len(_nu) - 12}"):
+                            st.dataframe(_nu.iloc[12:], use_container_width=True,
+                                         hide_index=True,
+                                         height=min(400, 80 + 35 * (len(_nu) - 12)))
 
                 # ── When people opened (this campaign, unfiltered on purpose) ─
                 st.markdown("##### ⏱️ When people opened")
