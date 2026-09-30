@@ -2952,6 +2952,13 @@ with tab_analytics, _tab_guard("Analytics"):
                             help="Recipients who came back 3+ separate times — the closest "
                                  "measurable proxy for the mail being revisited or forwarded."),
                     })
+                st.caption(
+                    "**Real reads** — opened by a person (60s+ after send, gateway sweeps "
+                    "removed). **Machine** — pixel fetched within 60s of sending: security "
+                    "software scanning on arrival, not a reader; someone can be scanned AND "
+                    "read later, so the two don't sum. **CNT** — clicks not tracked for "
+                    "those sends (tracking was off); means unmeasured, not zero. "
+                    "**Circulated** — came back 3+ times: revisited or forwarded on.")
 
         # ══════════════════════════════════════════════════════════════════
         # ZOOM IN — one campaign, insights first. Selector defaults to the
