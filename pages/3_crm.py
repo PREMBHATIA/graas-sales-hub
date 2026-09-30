@@ -3186,6 +3186,10 @@ with tab_analytics, _tab_guard("Analytics"):
                     # here are previous-campaign rows, so map person -> this
                     # campaign's tracking id first). Anyone without evidence is
                     # counted in the caption, not silently shown as "unread".
+                    # Laggards excluded from both 1:1 lists (Prem) — the
+                    # personal-follow-up effort goes to Mature and Exploring.
+                    _pv_silent = _pv_silent[~_pv_silent["to_email"].map(_seg_of)
+                                            .eq("AI Laggard")]
                     _cur_tid = dict(zip(_zs["to_email"], _zs["_tid"]))
                     _pv_evid = _pv_silent["to_email"].map(
                         lambda em: _cur_tid.get(em) in _beacon_ids)
@@ -3193,13 +3197,9 @@ with tab_analytics, _tab_guard("Analytics"):
                     _pv_silent = _pv_silent[_pv_evid]
                 if _prev_subj is not None and len(_pv_silent):
                     st.markdown("##### 📪 Notable unread names — delivered, not opened")
-                    st.caption(f"Read *{str(_prev_subj)[:44]}…*, this one provably "
-                               f"reached their mailbox, and they haven't opened it — "
-                               f"while a **colleague did**, or they're the only contact "
-                               f"there. Whole-quiet accounts live in 🚧 below; nobody is "
-                               f"listed twice."
-                               + (f" ({_pv_unproven} more previous reader(s) have no "
-                                  f"delivery evidence this time — possibly blocked.)"
+                    st.caption("Read the last email; this one reached them and sits "
+                               "unopened. Laggards excluded."
+                               + (f" {_pv_unproven} more possibly blocked."
                                   if _pv_unproven else ""))
                     _nu_rows = [{
                         "Who": _person(_r),
@@ -3251,6 +3251,9 @@ with tab_analytics, _tab_guard("Analytics"):
                 for _co, _g in _zs.groupby("company"):
                     if _g["to_email"].nunique() < 2 or int(_g["_real"].sum()) > 0:
                         continue
+                    if min((_seg_of(r["to_email"]) for _, r in _g.iterrows()),
+                           key=lambda x: _SEG_PRIO[x]) == "AI Laggard":
+                        continue          # Laggard accounts: no 1:1 effort
                     _n_r = len(_g)
                     _n_reach = int(_g["_tid"].isin(_beacon_ids).sum())
                     _blocked = _n_reach == 0
@@ -3283,10 +3286,8 @@ with tab_analytics, _tab_guard("Analytics"):
                     })
                 if _q_rows:
                     st.markdown("##### 🚧 Unread or Blocked, requires 1:1")
-                    st.caption("2+ recipients, zero real reads. **Likely blocked** rows "
-                               "got no pixel fetch from anyone — their gateway is "
-                               "filtering insights@ (they received August fine). The "
-                               "fix is a personal email from the owner, not a resend.")
+                    st.caption("2+ recipients, zero real reads. **Likely blocked** = no "
+                               "pixel fetch from anyone at the domain. Laggards excluded.")
                     _q = (pd.DataFrame(_q_rows).sort_values("_p")
                           .drop(columns="_p").reset_index(drop=True))
                     # One scrollable table — an action list with rows hidden
