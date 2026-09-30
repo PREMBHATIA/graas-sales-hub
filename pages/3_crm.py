@@ -2971,12 +2971,16 @@ with tab_analytics, _tab_guard("Analytics"):
                 # alphabetically.
                 if _mo is not None and not _mo.empty and len(_zo_meta):
                     st.markdown("##### ⏱️ Machine vs human reads — when the pixel first fired")
-                    _BANDS = [("1· <60s = machine", lambda x: x <= 60),
-                              ("2· 1-5 min", lambda x: (x > 60) & (x <= 300)),
-                              ("3· 5-60 min", lambda x: (x > 300) & (x <= 3600)),
-                              ("4· 1-6 h", lambda x: (x > 3600) & (x <= 21600)),
-                              ("5· 6-24 h", lambda x: (x > 21600) & (x <= 86400)),
-                              ("6· >24 h", lambda x: x > 86400)]
+                    # Numbered, worded labels: the number defeats st.bar_chart's
+                    # alphabetical axis, the words mean nobody has to decode
+                    # "4· 1-6 h" (Prem had to ask). horizontal=True keeps them
+                    # unrotated and readable.
+                    _BANDS = [("1. scanned within 1 min (machine)", lambda x: x <= 60),
+                              ("2. read in 1-5 min", lambda x: (x > 60) & (x <= 300)),
+                              ("3. read in 5-60 min", lambda x: (x > 300) & (x <= 3600)),
+                              ("4. read in 1-6 hours", lambda x: (x > 3600) & (x <= 21600)),
+                              ("5. read in 6-24 hours", lambda x: (x > 21600) & (x <= 86400)),
+                              ("6. read after 24 hours", lambda x: x > 86400)]
                     _dist = {}
                     for _, _zr in _zo_meta.head(3).iterrows():
                         _gg = _cf[_cf["subject"] == _zr["_subj"]]
@@ -2989,13 +2993,15 @@ with tab_analytics, _tab_guard("Analytics"):
                         _vals.append(round(max(0, _nn - len(_fl)) / _nn * 100))
                         _dist[_col] = _vals
                     _dist_df = pd.DataFrame(
-                        _dist, index=[_lbl for _lbl, _ in _BANDS] + ["7· never fetched"])
-                    st.bar_chart(_dist_df, height=240)
+                        _dist, index=[_lbl for _lbl, _ in _BANDS]
+                        + ["7. never fetched (delivery unverified)"])
+                    st.bar_chart(_dist_df, height=300, horizontal=True,
+                                 x_label="% of recipients", y_label="")
                     st.caption(
-                        "% of each campaign's recipients by when their pixel FIRST "
-                        "fired — unfiltered, so the machine traffic is visible. Band 1 "
-                        "is scanning software. People spread across bands 3-5. "
-                        "**Never fetched** = delivery unverified (see 🚧 in the zoom-in).")
+                        "Each recipient counted once, by when their pixel first fired. "
+                        "Bar 1 is security software, not people. Real readers spread "
+                        "across bars 3-5. Bar 7 never fetched anything — see 🚧 in the "
+                        "zoom-in.")
 
         # ══════════════════════════════════════════════════════════════════
         # ZOOM IN — one campaign, insights first. Selector defaults to the
