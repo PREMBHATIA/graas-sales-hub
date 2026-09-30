@@ -3029,6 +3029,28 @@ with tab_analytics, _tab_guard("Analytics"):
                     if _n_multi_read:
                         _ins.append(f"**{_n_multi_read}** read it more than once — "
                                     f"revisited or forwarded on (🔁 below).")
+                # Delivery evidence: ANY beacon — even a 9-second machine scan —
+                # proves the mail reached that mailbox's infrastructure. "sent"
+                # only proves Gmail accepted it. No beacon at all = unknown:
+                # images blocked, spam-foldered, or quarantined. Whole-domain
+                # zeros are the signature of a corporate filter, not apathy.
+                _beacon_ids = (set(track_df["tracking_id"]) if track_df is not None
+                               and not track_df.empty else set())
+                _no_evid = _zs[~_zs["_tid"].isin(_beacon_ids)]
+                if len(_no_evid):
+                    _ne_doms = (_no_evid["to_email"].astype(str).str.split("@").str[1]
+                                .value_counts())
+                    _whole = [d for d in _ne_doms.index
+                              if _ne_doms[d] == (_zs["to_email"].astype(str)
+                                                 .str.endswith("@" + d)).sum()
+                              and _ne_doms[d] >= 2]
+                    _ins.append(f"**{len(_no_evid)} sends show no pixel fetch at all** — "
+                                f"delivery unverified (blocked images, spam folder, or "
+                                f"quarantine). "
+                                + (f"Whole domains dark: {', '.join(_whole[:4])} — that "
+                                   f"pattern is a corporate filter, not disinterest. "
+                                   if _whole else "")
+                                + "See 🏢 below.")
                 if _prev_subj is not None:
                     _pv = _cf[(_cf["subject"] == _prev_subj) & (_cf["_real"] == 1)]
                     _got_this = set(_zs["to_email"])
@@ -3251,9 +3273,15 @@ with tab_analytics, _tab_guard("Analytics"):
                             _lv.columns = ["Link", "Clicks"]
                             st.dataframe(_lv, use_container_width=True, hide_index=True,
                                          height=min(300, 80 + 35 * len(_lv)))
-                with st.expander("🏢 Every account on this campaign (including silent)"):
-                    _ha = (_zs.groupby("company")
+                with st.expander("🏢 Every account on this campaign (including silent) "
+                                 "— with delivery evidence"):
+                    st.caption("**Reached mailbox** counts sends with ANY pixel fetch — "
+                               "even a machine scan proves arrival. Contacts minus "
+                               "Reached = delivery unverified for that account.")
+                    _zs_e = _zs.assign(_evid=_zs["_tid"].isin(_beacon_ids))
+                    _ha = (_zs_e.groupby("company")
                            .agg(**{"Contacts": ("to_email", "nunique"),
+                                   "Reached mailbox": ("_evid", "sum"),
                                    "Real reads": ("_real", "sum"),
                                    "Last send": ("_ts", "max")})
                            .reset_index().rename(columns={"company": "Company"})
