@@ -3177,7 +3177,7 @@ with tab_analytics, _tab_guard("Analytics"):
                         "Who": _person(_r),
                         "Company": _r["company"],
                         "Segment": _seg_of(_r["to_email"]).replace("AI ", ""),
-                        "Last time": (f"read ×{int(_reads_s.get(_r['_tid'], 0))}"
+                        "Read Previous Campaign": (f"read ×{int(_reads_s.get(_r['_tid'], 0))}"
                                       + (" · clicked" if int(_r.get("click_count", 0)) else "")),
                         "Write to them": f"mailto:{_r['to_email']}",
                         "_p": _SEG_PRIO[_seg_of(_r["to_email"])],
@@ -3190,7 +3190,7 @@ with tab_analytics, _tab_guard("Analytics"):
                         _nu.head(12), use_container_width=True, hide_index=True,
                         height=min(460, 80 + 35 * min(12, len(_nu))),
                         column_config={
-                            "Last time": st.column_config.Column(
+                            "Read Previous Campaign": st.column_config.Column(
                                 help="What they did on the previous campaign — de-noised "
                                      "reads, and whether they clicked a link."),
                             "Write to them": st.column_config.LinkColumn(
@@ -3244,7 +3244,7 @@ with tab_analytics, _tab_guard("Analytics"):
                         "Evidence": (f"🚧 likely blocked — 0/{_n_r} reached" if _blocked
                                      else f"delivered ({_n_reach}/{_n_r}), nobody opened"),
                         "Contacts": ", ".join(sorted({_person(r) for _, r in _g.iterrows()}))[:56],
-                        "Read last email": (f"{_prev_readers_by_co.get(_co, 0)} of "
+                        "Read Previous Campaign": (f"{_prev_readers_by_co.get(_co, 0)} of "
                                             f"{_g['to_email'].nunique()}"
                                             if _prev_readers_by_co.get(_co, 0) else "—"),
                         "1:1 owner": _own or "Prem / Amruta",
@@ -3274,7 +3274,7 @@ with tab_analytics, _tab_guard("Analytics"):
                             "1:1 owner": st.column_config.Column(
                                 help="Outreach owner from the pipeline sheet; falls back "
                                      "to Prem / Amruta."),
-                            "Read last email": st.column_config.Column(
+                            "Read Previous Campaign": st.column_config.Column(
                                 help="Real readers at this account on the previous "
                                      "campaign. Engaged-then-silent outranks "
                                      "never-engaged — those are warm accounts going "
