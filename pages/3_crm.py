@@ -2960,6 +2960,43 @@ with tab_analytics, _tab_guard("Analytics"):
                     "those sends (tracking was off); means unmeasured, not zero. "
                     "**Circulated** — came back 3+ times: revisited or forwarded on.")
 
+                # ── Machine vs human reads, per campaign ──────────────────────
+                # One chart, no twin table (Prem). Deliberately UNFILTERED —
+                # this is the one view where the machine traffic every number
+                # above excludes should be visible, because the SHAPE is the
+                # diagnostic: a spike in the first band is scanning software, a
+                # spread across the working day is people. Shares of sent, so
+                # campaigns of different sizes compare honestly. Band labels
+                # carry digits because st.bar_chart orders the axis
+                # alphabetically.
+                if _mo is not None and not _mo.empty and len(_zo_meta):
+                    st.markdown("##### ⏱️ Machine vs human reads — when the pixel first fired")
+                    _BANDS = [("1· <60s = machine", lambda x: x <= 60),
+                              ("2· 1-5 min", lambda x: (x > 60) & (x <= 300)),
+                              ("3· 5-60 min", lambda x: (x > 300) & (x <= 3600)),
+                              ("4· 1-6 h", lambda x: (x > 3600) & (x <= 21600)),
+                              ("5· 6-24 h", lambda x: (x > 21600) & (x <= 86400)),
+                              ("6· >24 h", lambda x: x > 86400)]
+                    _dist = {}
+                    for _, _zr in _zo_meta.head(3).iterrows():
+                        _gg = _cf[_cf["subject"] == _zr["_subj"]]
+                        _nn = len(_gg)
+                        _fl = (_mo[_mo["tracking_id"].isin(set(_gg["_tid"]))]
+                               .groupby("tracking_id")["_lag"].min())
+                        _col = _zr["_first"].strftime("%d %b")
+                        _vals = [round(int(_f(_fl).sum()) / _nn * 100)
+                                 for _lbl, _f in _BANDS]
+                        _vals.append(round(max(0, _nn - len(_fl)) / _nn * 100))
+                        _dist[_col] = _vals
+                    _dist_df = pd.DataFrame(
+                        _dist, index=[_lbl for _lbl, _ in _BANDS] + ["7· never fetched"])
+                    st.bar_chart(_dist_df, height=240)
+                    st.caption(
+                        "% of each campaign's recipients by when their pixel FIRST "
+                        "fired — unfiltered, so the machine traffic is visible. Band 1 "
+                        "is scanning software. People spread across bands 3-5. "
+                        "**Never fetched** = delivery unverified (see 🚧 in the zoom-in).")
+
         # ══════════════════════════════════════════════════════════════════
         # ZOOM IN — one campaign, insights first. Selector defaults to the
         # newest campaign; every table inside this box is scoped to it.
@@ -3284,8 +3321,8 @@ with tab_analytics, _tab_guard("Analytics"):
                         "Evidence": (f"🚧 likely blocked — 0/{_n_r} reached" if _blocked
                                      else f"delivered ({_n_reach}/{_n_r}), nobody opened"),
                         "Contacts": ", ".join(sorted({_person(r) for _, r in _g.iterrows()}))[:56],
-                        "Read Previous Campaign": (f"{_prev_readers_by_co.get(_co, 0)} of "
-                                            f"{_g['to_email'].nunique()}"
+                        "Read Previous Campaign": (f"{_prev_readers_by_co.get(_co, 0)} out of "
+                                            f"{_g['to_email'].nunique()} people"
                                             if _prev_readers_by_co.get(_co, 0) else "—"),
                         "1:1 owner": _own or "Prem / Amruta",
                         "Write to them": f"mailto:{_g.iloc[0]['to_email']}",
@@ -3320,35 +3357,6 @@ with tab_analytics, _tab_guard("Analytics"):
                                      "insights@ mail."),
                             "Write to them": st.column_config.LinkColumn(
                                 display_text=r"mailto:([^@]+)@.*")})
-
-                # ── When people opened (this campaign, unfiltered on purpose) ─
-                st.markdown("##### ⏱️ When people opened")
-                if _mo.empty:
-                    st.caption("No tracking data.")
-                else:
-                    _zo_ev = _mo[_mo["tracking_id"].isin(set(_zs["_tid"]))]
-                    _zfirst = _zo_ev.groupby("tracking_id")["_lag"].min()
-                    _bands = [("Under 60 sec", _zfirst <= 60),
-                              ("1 - 5 min", (_zfirst > 60) & (_zfirst <= 300)),
-                              ("5 - 60 min", (_zfirst > 300) & (_zfirst <= 3600)),
-                              ("1 - 6 hours", (_zfirst > 3600) & (_zfirst <= 21600)),
-                              ("6 - 24 hours", (_zfirst > 21600) & (_zfirst <= 86400)),
-                              ("After 24 hours", _zfirst > 86400)]
-                    _cur = pd.DataFrame(
-                        [{"When": _lbl, "Recipients": int(_m.sum())} for _lbl, _m in _bands]
-                        + [{"When": "Never opened", "Recipients": max(0, _zn - len(_zfirst))}])
-                    _b1, _b2 = st.columns([3, 2])
-                    with _b1:
-                        st.bar_chart(_cur.set_index("When")["Recipients"],
-                                     height=220, color="#7C3AED")
-                    with _b2:
-                        _cur["Share"] = (_cur["Recipients"] / _zn * 100).round(0)\
-                            .astype(int).astype(str) + "%"
-                        st.dataframe(_cur, use_container_width=True, hide_index=True,
-                                     height=230)
-                    st.caption("Unfiltered on purpose — the first bar IS the machine "
-                               "traffic every number above excludes. A human audience "
-                               "spreads across the day.")
 
                 # ── Segments (this campaign) ─────────────────────────────────
                 st.markdown("##### 🎯 By segment")
