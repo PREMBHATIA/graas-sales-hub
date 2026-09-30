@@ -3201,6 +3201,70 @@ with tab_analytics, _tab_guard("Analytics"):
                                          hide_index=True,
                                          height=min(400, 80 + 35 * (len(_nu) - 12)))
 
+                # ── Whole accounts gone quiet — the 1:1 to-do list ──────────
+                # Companies with 2+ recipients and ZERO real reads. Two very
+                # different situations share that symptom, so the Evidence
+                # column separates them: no beacon from anyone = the domain is
+                # likely filtering insights@ (August landed there, September
+                # went dark), while reached-but-unopened = delivered and
+                # ignored. Either way the campaign channel has failed for that
+                # account — the to-do is a personal 1:1, not another blast.
+                _q_rows = []
+                for _co, _g in _zs.groupby("company"):
+                    if _g["to_email"].nunique() < 2 or int(_g["_real"].sum()) > 0:
+                        continue
+                    _n_r = len(_g)
+                    _n_reach = int(_g["_tid"].isin(_beacon_ids).sum())
+                    _blocked = _n_reach == 0
+                    _co_seg = min((_seg_of(r["to_email"]) for _, r in _g.iterrows()),
+                                  key=lambda x: _SEG_PRIO[x])
+                    _own = ""
+                    try:
+                        if "outreach_owner" in contacts.columns:
+                            _ov = contacts[contacts["company"] == _co]["outreach_owner"]
+                            _ov = [str(x).strip() for x in _ov
+                                   if str(x).strip() and str(x).strip().lower()
+                                   not in ("nan", "not needed")]
+                            _own = _ov[0] if _ov else ""
+                    except Exception:
+                        pass
+                    _q_rows.append({
+                        "Company": _co,
+                        "Segment": _co_seg.replace("AI ", ""),
+                        "Evidence": (f"🚧 likely blocked — 0/{_n_r} reached" if _blocked
+                                     else f"delivered ({_n_reach}/{_n_r}), nobody opened"),
+                        "Contacts": ", ".join(sorted({_person(r) for _, r in _g.iterrows()}))[:56],
+                        "1:1 owner": _own or "Prem / Amruta",
+                        "Write to them": f"mailto:{_g.iloc[0]['to_email']}",
+                        "_p": (0 if _blocked else 1, _SEG_PRIO[_co_seg], -_n_r),
+                    })
+                if _q_rows:
+                    st.markdown("##### 🚧 Unread or Blocked, requires 1:1")
+                    st.caption("2+ recipients, zero real reads. **Likely blocked** rows "
+                               "got no pixel fetch from anyone — their gateway is "
+                               "filtering insights@ (they received August fine). The "
+                               "fix is a personal email from the owner, not a resend.")
+                    _q = (pd.DataFrame(_q_rows).sort_values("_p")
+                          .drop(columns="_p").reset_index(drop=True))
+                    st.dataframe(
+                        _q.head(12), use_container_width=True, hide_index=True,
+                        height=min(460, 80 + 35 * min(12, len(_q))),
+                        column_config={
+                            "Evidence": st.column_config.Column(
+                                help="Any pixel fetch — even a machine scan — proves "
+                                     "arrival. Zero fetches across every recipient at a "
+                                     "company is a filter, not a coincidence."),
+                            "1:1 owner": st.column_config.Column(
+                                help="Outreach owner from the pipeline sheet; falls back "
+                                     "to Prem / Amruta."),
+                            "Write to them": st.column_config.LinkColumn(
+                                display_text=r"mailto:([^@]+)@.*")})
+                    if len(_q) > 12:
+                        with st.expander(f"Show the other {len(_q) - 12}"):
+                            st.dataframe(_q.iloc[12:], use_container_width=True,
+                                         hide_index=True,
+                                         height=min(400, 80 + 35 * (len(_q) - 12)))
+
                 # ── When people opened (this campaign, unfiltered on purpose) ─
                 st.markdown("##### ⏱️ When people opened")
                 if _mo.empty:
