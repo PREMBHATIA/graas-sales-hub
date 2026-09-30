@@ -3167,12 +3167,26 @@ with tab_analytics, _tab_guard("Analytics"):
                             "Write to them": st.column_config.LinkColumn(
                                 display_text=r"mailto:([^@]+)@.*")})
 
+                # Companies headed for the Unread-or-Blocked table below —
+                # 2+ recipients, zero real reads. Notable unreads excludes
+                # people at these accounts: the whole account is already a
+                # 1:1 to-do there, and the same follow-up listed twice gets
+                # done zero times or twice.
+                _quiet_cos = {str(_co) for _co, _g in _zs.groupby("company")
+                              if _g["to_email"].nunique() >= 2
+                              and int(_g["_real"].sum()) == 0}
+
                 # ── Notable unreads — read the last email, silent on this one ─
+                if _prev_subj is not None and len(_pv_silent):
+                    _pv_silent = _pv_silent[~_pv_silent["company"].astype(str)
+                                            .isin(_quiet_cos)]
                 if _prev_subj is not None and len(_pv_silent):
                     st.markdown("##### 📪 Notable unreads")
                     st.caption(f"Read *{str(_prev_subj)[:44]}…* but haven't opened this "
-                               f"one. Mature and Exploring first — these are warm people "
-                               f"going cold, and a personal one-liner beats a resend.")
+                               f"one — while a **colleague did**, or they're the only "
+                               f"contact there. Whole-quiet accounts live in 🚧 below; "
+                               f"nobody is listed twice. A personal one-liner beats a "
+                               f"resend.")
                     _nu_rows = [{
                         "Who": _person(_r),
                         "Company": _r["company"],
