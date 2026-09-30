@@ -3197,8 +3197,9 @@ with tab_analytics, _tab_guard("Analytics"):
                     _pv_silent = _pv_silent[_pv_evid]
                 if _prev_subj is not None and len(_pv_silent):
                     st.markdown("##### 📪 Notable unread names — delivered, not opened")
-                    st.caption("Read the last email; this one reached them and sits "
-                               "unopened. Laggards excluded."
+                    st.caption("Read the last email. **Their own copy** of this one "
+                               "reached their mailbox — their pixel fired, not a "
+                               "colleague's — but no read yet. Laggards excluded."
                                + (f" {_pv_unproven} more possibly blocked."
                                   if _pv_unproven else ""))
                     _nu_rows = [{
