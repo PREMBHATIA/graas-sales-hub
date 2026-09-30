@@ -3209,6 +3209,16 @@ with tab_analytics, _tab_guard("Analytics"):
                 # went dark), while reached-but-unopened = delivered and
                 # ignored. Either way the campaign channel has failed for that
                 # account — the to-do is a personal 1:1, not another blast.
+                # how hard did this account engage with the PREVIOUS campaign?
+                # A 4/4-reader account going silent outranks a cold one — the
+                # first sort omitted this and buried DKSH (read Aug 4-for-4)
+                # below never-engaged Laggards.
+                _prev_readers_by_co = {}
+                if _prev_subj is not None:
+                    _prev_readers_by_co = (_cf[(_cf["subject"] == _prev_subj)
+                                               & (_cf["_real"] == 1)]
+                                           .groupby("company")["to_email"].nunique()
+                                           .to_dict())
                 _q_rows = []
                 for _co, _g in _zs.groupby("company"):
                     if _g["to_email"].nunique() < 2 or int(_g["_real"].sum()) > 0:
@@ -3234,9 +3244,14 @@ with tab_analytics, _tab_guard("Analytics"):
                         "Evidence": (f"🚧 likely blocked — 0/{_n_r} reached" if _blocked
                                      else f"delivered ({_n_reach}/{_n_r}), nobody opened"),
                         "Contacts": ", ".join(sorted({_person(r) for _, r in _g.iterrows()}))[:56],
+                        "Read last email": (f"{_prev_readers_by_co.get(_co, 0)} of "
+                                            f"{_g['to_email'].nunique()}"
+                                            if _prev_readers_by_co.get(_co, 0) else "—"),
                         "1:1 owner": _own or "Prem / Amruta",
                         "Write to them": f"mailto:{_g.iloc[0]['to_email']}",
-                        "_p": (0 if _blocked else 1, _SEG_PRIO[_co_seg], -_n_r),
+                        "_p": (0 if _blocked else 1,
+                               -_prev_readers_by_co.get(_co, 0),
+                               _SEG_PRIO[_co_seg], -_n_r),
                     })
                 if _q_rows:
                     st.markdown("##### 🚧 Unread or Blocked, requires 1:1")
@@ -3246,9 +3261,11 @@ with tab_analytics, _tab_guard("Analytics"):
                                "fix is a personal email from the owner, not a resend.")
                     _q = (pd.DataFrame(_q_rows).sort_values("_p")
                           .drop(columns="_p").reset_index(drop=True))
+                    # One scrollable table — an action list with rows hidden
+                    # behind an expander is not an action list.
                     st.dataframe(
-                        _q.head(12), use_container_width=True, hide_index=True,
-                        height=min(460, 80 + 35 * min(12, len(_q))),
+                        _q, use_container_width=True, hide_index=True,
+                        height=min(490, 80 + 35 * len(_q)),
                         column_config={
                             "Evidence": st.column_config.Column(
                                 help="Any pixel fetch — even a machine scan — proves "
@@ -3257,13 +3274,14 @@ with tab_analytics, _tab_guard("Analytics"):
                             "1:1 owner": st.column_config.Column(
                                 help="Outreach owner from the pipeline sheet; falls back "
                                      "to Prem / Amruta."),
+                            "Read last email": st.column_config.Column(
+                                help="Real readers at this account on the previous "
+                                     "campaign. Engaged-then-silent outranks "
+                                     "never-engaged — those are warm accounts going "
+                                     "cold, or a filter that has started eating "
+                                     "insights@ mail."),
                             "Write to them": st.column_config.LinkColumn(
                                 display_text=r"mailto:([^@]+)@.*")})
-                    if len(_q) > 12:
-                        with st.expander(f"Show the other {len(_q) - 12}"):
-                            st.dataframe(_q.iloc[12:], use_container_width=True,
-                                         hide_index=True,
-                                         height=min(400, 80 + 35 * (len(_q) - 12)))
 
                 # ── When people opened (this campaign, unfiltered on purpose) ─
                 st.markdown("##### ⏱️ When people opened")
