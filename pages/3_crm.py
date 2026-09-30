@@ -3181,12 +3181,26 @@ with tab_analytics, _tab_guard("Analytics"):
                     _pv_silent = _pv_silent[~_pv_silent["company"].astype(str)
                                             .isin(_quiet_cos)]
                 if _prev_subj is not None and len(_pv_silent):
-                    st.markdown("##### 📪 Notable unreads")
-                    st.caption(f"Read *{str(_prev_subj)[:44]}…* but haven't opened this "
-                               f"one — while a **colleague did**, or they're the only "
-                               f"contact there. Whole-quiet accounts live in 🚧 below; "
-                               f"nobody is listed twice. A personal one-liner beats a "
-                               f"resend.")
+                    # The title claims "delivered", so each row must earn it:
+                    # evidence = a pixel fetch on their CURRENT send (the rows
+                    # here are previous-campaign rows, so map person -> this
+                    # campaign's tracking id first). Anyone without evidence is
+                    # counted in the caption, not silently shown as "unread".
+                    _cur_tid = dict(zip(_zs["to_email"], _zs["_tid"]))
+                    _pv_evid = _pv_silent["to_email"].map(
+                        lambda em: _cur_tid.get(em) in _beacon_ids)
+                    _pv_unproven = int((~_pv_evid).sum())
+                    _pv_silent = _pv_silent[_pv_evid]
+                if _prev_subj is not None and len(_pv_silent):
+                    st.markdown("##### 📪 Notable unread names — delivered, not opened")
+                    st.caption(f"Read *{str(_prev_subj)[:44]}…*, this one provably "
+                               f"reached their mailbox, and they haven't opened it — "
+                               f"while a **colleague did**, or they're the only contact "
+                               f"there. Whole-quiet accounts live in 🚧 below; nobody is "
+                               f"listed twice."
+                               + (f" ({_pv_unproven} more previous reader(s) have no "
+                                  f"delivery evidence this time — possibly blocked.)"
+                                  if _pv_unproven else ""))
                     _nu_rows = [{
                         "Who": _person(_r),
                         "Company": _r["company"],
