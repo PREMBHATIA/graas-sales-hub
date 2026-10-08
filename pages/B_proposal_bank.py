@@ -34,6 +34,10 @@ REFERENCE_PROPOSALS_FOLDER_ID = os.getenv(
 EXTRACT_MODEL = os.getenv("PROPOSAL_BANK_MODEL", "claude-sonnet-4-6")
 
 _SURFACES = ["WhatsApp", "Website", "In-app", "Voice", "Email", "Marketplace"]
+# The Graas offering a proposal primarily maps to — same 4-pillar vocabulary as
+# the Prospect Brief. Single DOMINANT pillar per proposal (keeps the column +
+# filter crisp); the summary carries any secondary pillar.
+_PILLARS = ["Search & Discovery", "Sales & Ordering", "Channel Operations", "Decision Intelligence"]
 
 # Hand corrections that WIN over the LLM extraction — keyed by a distinctive
 # substring of the proposal's filename. The LLM over-tags when a doc mentions
@@ -46,6 +50,7 @@ MANUAL_OVERRIDES = {
         "facing": "External",
         "surfaces": ["Voice", "WhatsApp"],
         "summary": "Voice + WhatsApp agent for 40K rural retailers — order-taking + scheme comms in Hindi/English, writes to Elevate DMS. Revenue-uplift play (~76.8K extra orders/yr).",
+        "pillar": "Sales & Ordering",
     },
     "Castrol COPS": {
         "brand": "Castrol · COPs",
@@ -53,12 +58,14 @@ MANUAL_OVERRIDES = {
         "facing": "Internal",
         "surfaces": ["Email"],
         "summary": "Internal RevOps agent — parses B2B/ILS order emails + POs, runs the 13-point validation against Keris/ODT, preps the COPS sheet for one-click human sign-off before ERP entry. TAT 45min → <10min.",
+        "pillar": "Channel Operations",
     },
     "Canon": {
         "use_case": "Consumer",
         "facing": "External",
         "surfaces": ["Website", "Marketplace"],
         "summary": "Ad/QR-led consumer agent — chat about products & promos, then route to Amazon or nearby stores.",
+        "pillar": "Search & Discovery",
     },
     "LK India": {
         "brand": "Lauritz Knudsen (LK)",
@@ -66,6 +73,7 @@ MANUAL_OVERRIDES = {
         "facing": "External",
         "surfaces": ["WhatsApp", "Website", "Voice"],
         "summary": "WhatsApp ordering + SmartShop search + voice on one Commerce KG; BOQ-to-cart for contractors/retailers/homeowners across 5,000+ electrical SKUs.",
+        "pillar": "Sales & Ordering",
     },
     # The one SEARCH-only proposal — no WhatsApp/ordering. Intent-led search on
     # havells.com via the Adobe Commerce SDK, over the Product KG. Consumer/D2C.
@@ -75,12 +83,14 @@ MANUAL_OVERRIDES = {
         "facing": "External",
         "surfaces": ["Website", "Voice"],
         "summary": "Advanced intent-led search on havells.com (Adobe Commerce SDK) over a Product KG — cut null results ≥50% on Fans/Appliances/Circuit Protection. 6-wk D2C pilot.",
+        "pillar": "Search & Discovery",
         "date": "2026-07-24",
     },
 }
 
 _SCHEMA = """{
   "brand": "the customer / brand the proposal is for (e.g. 'Nippon Paint', 'Tata 1mg', 'Castrol'). Strip 'Copy of', 'All-e', 'Proposal', dates.",
+  "pillar": "The PRIMARY Graas offering this proposal maps to — pick the SINGLE dominant one: 'Search & Discovery' (intent search, product discovery, fitment, compare, cross-sell) | 'Sales & Ordering' (ordering, BOQ/SKU recognition, scheme, credit, pricing, voice/photo order capture) | 'Channel Operations' (OCR/invoice capture, push-to-ERP, order-email processing, fraud, first-contact/triage) | 'Decision Intelligence' (analytics/forecasts that feed a conversational action). A proposal may touch several — name only the dominant one.",
   "use_case": "Who the agent ULTIMATELY serves in the live interaction — pick the SINGLE dominant one: 'Consumer' (end shopper / D2C) | 'Retailer' | 'Distributor / Dealer' | 'Field agent'. Use 'Mixed' ONLY if two are truly co-equal. Do NOT list every party the doc mentions — a consumer agent that happens to route to retailers is still 'Consumer'.",
   "facing": "ONE of: 'External' (customer/partner-facing agent) | 'Internal' (employee/ops-facing) | 'Both'.",
   "surfaces": "array from ['WhatsApp','Website','In-app','Voice','Marketplace'] — the channels the agent runs on. Empty if unclear.",
@@ -119,8 +129,9 @@ def _profile_proposal(doc_id: str, doc_name: str) -> dict:
     """LLM-extract the compact profile for one proposal. Cached 24h per doc."""
     from services.sheets_client import fetch_drive_doc_text
     fallback = {
-        "brand": _clean_brand_from_name(doc_name), "use_case": "Unknown",
-        "facing": "Unknown", "surfaces": [], "summary": "", "date": "",
+        "brand": _clean_brand_from_name(doc_name), "pillar": "Unknown",
+        "use_case": "Unknown", "facing": "Unknown", "surfaces": [],
+        "summary": "", "date": "",
     }
     if not ANTHROPIC_API_KEY:
         fallback["summary"] = "(no ANTHROPIC_API_KEY — can't extract)"
@@ -160,6 +171,12 @@ def _profile_proposal(doc_id: str, doc_name: str) -> dict:
     if isinstance(surf, str):
         surf = [s.strip() for s in re.split(r"[,/]", surf) if s.strip()]
     data["surfaces"] = [s for s in _SURFACES if any(s.lower() in x.lower() for x in surf)]
+    # Normalise pillar to one of the canonical four (tolerant substring match).
+    _pil = (data.get("pillar") or "").strip()
+    data["pillar"] = next(
+        (P for P in _PILLARS if P.lower() in _pil.lower() or _pil.lower() in P.lower()),
+        "Unknown",
+    ) if _pil else "Unknown"
     for k in ("use_case", "facing", "summary", "date"):
         data.setdefault(k, fallback[k])
     return data
@@ -200,6 +217,7 @@ with st.spinner(f"Reading {len(docs)} proposals…"):
                 break
         rows.append({
             "Brand": p["brand"],
+            "Pillar": p.get("pillar", "Unknown"),
             "Use case": p["use_case"],
             "Agent faces": p["facing"],
             "Surfaces": " · ".join(p["surfaces"]) if p["surfaces"] else "—",
@@ -213,7 +231,9 @@ with st.spinner(f"Reading {len(docs)} proposals…"):
 df = pd.DataFrame(rows)
 
 # ── Filters ───────────────────────────────────────────────────────────────────
-fc1, fc2, fc3 = st.columns(3)
+fc0, fc1, fc2, fc3 = st.columns(4)
+with fc0:
+    pil = st.multiselect("Pillar", [p for p in _PILLARS if p in set(df["Pillar"])])
 with fc1:
     uc = st.multiselect("Use case", sorted([x for x in df["Use case"].unique() if x]))
 with fc2:
@@ -222,6 +242,8 @@ with fc3:
     surf = st.multiselect("Surface", _SURFACES)
 
 view = df.copy()
+if pil:
+    view = view[view["Pillar"].isin(pil)]
 if uc:
     view = view[view["Use case"].isin(uc)]
 if fac:
@@ -232,7 +254,7 @@ if surf:
 st.caption(f"**{len(view)}** of {len(df)} proposals")
 
 st.dataframe(
-    view[["Brand", "Use case", "Agent faces", "Surfaces", "What it proposes", "Date", "Doc"]],
+    view[["Brand", "Pillar", "Use case", "Agent faces", "Surfaces", "What it proposes", "Date", "Doc"]],
     use_container_width=True, hide_index=True,
     column_config={
         "Doc": st.column_config.LinkColumn("Doc", display_text="Open ↗"),
@@ -243,7 +265,11 @@ st.dataframe(
 
 # ── At-a-glance rollups ───────────────────────────────────────────────────────
 with st.expander("📊 At a glance", expanded=True):
-    gc1, gc2, gc3 = st.columns(3)
+    gc0, gc1, gc2, gc3 = st.columns(4)
+    with gc0:
+        st.markdown("**By pillar**")
+        st.dataframe(df["Pillar"].value_counts().rename_axis("Pillar").reset_index(name="Proposals"),
+                     hide_index=True, use_container_width=True)
     with gc1:
         st.markdown("**By use case**")
         st.dataframe(df["Use case"].value_counts().rename_axis("Use case").reset_index(name="Proposals"),
