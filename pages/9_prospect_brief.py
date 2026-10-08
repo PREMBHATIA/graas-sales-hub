@@ -1573,6 +1573,23 @@ else:
             "call_count": int(_props.get("brief_call_count", "0") or 0),
         })
 
+    # ── Retrieval controls ───────────────────────────────────────────────
+    # The tile wall outgrew itself: once >12 briefs exist, older ones were
+    # only reachable by leaving for Drive. Search finds a named brief
+    # instantly; the A–Z index below makes EVERY brief openable in-app.
+    _total = len(_parsed)
+    _q = st.text_input(
+        "Find a brief",
+        key="brief_search",
+        placeholder=f"🔎  Find a brief by company name…  ({_total} saved)",
+        label_visibility="collapsed",
+    ).strip()
+
+    _matches = _parsed
+    if _q:
+        _ql = _q.lower()
+        _matches = [_p for _p in _parsed if _ql in _p["company"].lower()]
+
     # Legend above tiles — explains the colour code at a glance.
     st.caption(
         "🆕 <span style='background:#f0f0f0;padding:1px 6px;border-radius:4px;"
@@ -1582,41 +1599,65 @@ else:
         unsafe_allow_html=True,
     )
 
-    # 6-column tiles, 2 rows max = 12 unique-company tiles shown.
-    # Each tile carries a coloured badge for its mode (pre-call vs post-call N)
-    # read from the Doc's Drive appProperties, set at auto-save time.
-    _tiles = _parsed[:12]
-    _rows = [_tiles[i:i + 6] for i in range(0, len(_tiles), 6)]
-    for _row in _rows:
-        _cols = st.columns(6)
-        for _col, _p in zip(_cols, _row):
-            _url = f"https://docs.google.com/document/d/{_p['id']}/edit"
-            _mode = _p.get("mode", "")
-            _cc = _p.get("call_count", 0)
-            if _mode.startswith("Post call") or _cc > 0:
-                _badge_icon = "🔁"
-                _badge_text = _mode or f"Post call-{_cc}"
-                _badge_bg, _badge_border = "#e6efff", "#b6cfff"
-            elif _mode == "Pre-call draft" or not _mode:
-                _badge_icon = "🆕"
-                _badge_text = "Pre-call draft"
-                _badge_bg, _badge_border = "#f0f0f0", "#dddddd"
-            else:
-                _badge_icon = "📄"
-                _badge_text = _mode
-                _badge_bg, _badge_border = "#f0f0f0", "#dddddd"
-            with _col:
-                with st.container(border=True):
-                    st.markdown(
-                        f"<div style='font-size: 0.85em; font-weight: 600; line-height: 1.2; "
-                        f"margin-bottom: 2px;'>{_p['company']}</div>"
-                        f"<div style='font-size: 0.65em; margin: 2px 0;'>"
-                        f"<span style='background:{_badge_bg};border:1px solid {_badge_border};"
-                        f"padding:1px 5px;border-radius:4px;'>"
-                        f"{_badge_icon} {_badge_text}</span></div>"
-                        f"<div style='font-size: 0.7em; color: #888;'>{_p['date']}</div>"
-                        f"<a href='{_url}' target='_blank' style='font-size: 0.75em;'>Open →</a>",
-                        unsafe_allow_html=True,
-                    )
-    if len(_parsed) > 12:
-        st.caption(f"_+{len(_parsed) - 12} older briefs — open the Drive folder to see more._")
+    def _render_brief_tiles(_list):
+        """Render a list of parsed briefs as 6-col badge tiles."""
+        _rows = [_list[i:i + 6] for i in range(0, len(_list), 6)]
+        for _row in _rows:
+            _cols = st.columns(6)
+            for _col, _p in zip(_cols, _row):
+                _url = f"https://docs.google.com/document/d/{_p['id']}/edit"
+                _mode = _p.get("mode", "")
+                _cc = _p.get("call_count", 0)
+                if _mode.startswith("Post call") or _cc > 0:
+                    _badge_icon = "🔁"
+                    _badge_text = _mode or f"Post call-{_cc}"
+                    _badge_bg, _badge_border = "#e6efff", "#b6cfff"
+                elif _mode == "Pre-call draft" or not _mode:
+                    _badge_icon = "🆕"
+                    _badge_text = "Pre-call draft"
+                    _badge_bg, _badge_border = "#f0f0f0", "#dddddd"
+                else:
+                    _badge_icon = "📄"
+                    _badge_text = _mode
+                    _badge_bg, _badge_border = "#f0f0f0", "#dddddd"
+                with _col:
+                    with st.container(border=True):
+                        st.markdown(
+                            f"<div style='font-size: 0.85em; font-weight: 600; line-height: 1.2; "
+                            f"margin-bottom: 2px;'>{_p['company']}</div>"
+                            f"<div style='font-size: 0.65em; margin: 2px 0;'>"
+                            f"<span style='background:{_badge_bg};border:1px solid {_badge_border};"
+                            f"padding:1px 5px;border-radius:4px;'>"
+                            f"{_badge_icon} {_badge_text}</span></div>"
+                            f"<div style='font-size: 0.7em; color: #888;'>{_p['date']}</div>"
+                            f"<a href='{_url}' target='_blank' style='font-size: 0.75em;'>Open →</a>",
+                            unsafe_allow_html=True,
+                        )
+
+    if _q:
+        # Searching → show ALL matches (no 12-cap), newest first.
+        if not _matches:
+            st.info(f"No brief matches “{_q}”. Try fewer letters, or browse the A–Z index below.")
+        else:
+            st.caption(f"**{len(_matches)}** of {_total} match “{_q}” · newest first")
+            _render_brief_tiles(_matches)
+    else:
+        # Default → 12 most-recent tiles (the "what's new" view).
+        _render_brief_tiles(_parsed[:12])
+        if _total > 12:
+            st.caption(f"_Showing the 12 most recent of {_total}. Search above, or browse all ↓_")
+
+    # A–Z index — EVERY brief, openable in-app. Replaces the old dead-end
+    # ("open the Drive folder to see more") with a compact 3-column list.
+    if _total:
+        with st.expander(f"📁  Browse all {_total} briefs (A–Z)"):
+            _az = sorted(_parsed, key=lambda _p: _p["company"].lower())
+            _per = -(-len(_az) // 3)  # ceil-divide into 3 balanced columns
+            _idx_cols = st.columns(3)
+            for _ci, _icol in enumerate(_idx_cols):
+                with _icol:
+                    for _p in _az[_ci * _per:(_ci + 1) * _per]:
+                        _u = f"https://docs.google.com/document/d/{_p['id']}/edit"
+                        _dt = f" · {_p['date']}" if _p['date'] else ""
+                        st.markdown(f"[{_p['company']}]({_u})<span style='color:#999;font-size:0.8em;'>{_dt}</span>",
+                                    unsafe_allow_html=True)
