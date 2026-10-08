@@ -67,6 +67,16 @@ MANUAL_OVERRIDES = {
         "surfaces": ["WhatsApp", "Website", "Voice"],
         "summary": "WhatsApp ordering + SmartShop search + voice on one Commerce KG; BOQ-to-cart for contractors/retailers/homeowners across 5,000+ electrical SKUs.",
     },
+    # The one SEARCH-only proposal — no WhatsApp/ordering. Intent-led search on
+    # havells.com via the Adobe Commerce SDK, over the Product KG. Consumer/D2C.
+    "Havells": {
+        "brand": "Havells (India)",
+        "use_case": "Consumer",
+        "facing": "External",
+        "surfaces": ["Website", "Voice"],
+        "summary": "Advanced intent-led search on havells.com (Adobe Commerce SDK) over a Product KG — cut null results ≥50% on Fans/Appliances/Circuit Protection. 6-wk D2C pilot.",
+        "date": "2026-07-24",
+    },
 }
 
 _SCHEMA = """{
