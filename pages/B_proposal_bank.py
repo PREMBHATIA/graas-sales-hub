@@ -60,6 +60,13 @@ MANUAL_OVERRIDES = {
         "surfaces": ["Website", "Marketplace"],
         "summary": "Ad/QR-led consumer agent — chat about products & promos, then route to Amazon or nearby stores.",
     },
+    "LK India": {
+        "brand": "Lauritz Knudsen (LK)",
+        "use_case": "Mixed",
+        "facing": "External",
+        "surfaces": ["WhatsApp", "Website", "Voice"],
+        "summary": "WhatsApp ordering + SmartShop search + voice on one Commerce KG; BOQ-to-cart for contractors/retailers/homeowners across 5,000+ electrical SKUs.",
+    },
 }
 
 _SCHEMA = """{
