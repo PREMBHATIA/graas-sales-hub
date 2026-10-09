@@ -1128,10 +1128,12 @@ with right:
                 # vs post-call differently.
                 _call_count = 0
                 _brief_mode = "Pre-call draft"
+                _mkt = ((brief_data.get("header", {}) or {}).get("market", "") or "").strip()
                 _props = {
                     "brief_mode": _brief_mode,
                     "brief_call_count": _call_count,
                     "brief_company_key": _co_key,
+                    "brief_market": _mkt,
                 }
 
                 # Compute the expected title up front — used both when
@@ -1379,6 +1381,8 @@ with right:
                     "brief_company_key": _normalize_company_key(
                         st.session_state.get("last_brief_company", "")
                     ),
+                    "brief_market": (((st.session_state.get("last_brief_data", {}) or {})
+                                      .get("header", {}) or {}).get("market", "") or "").strip(),
                 }
                 # Pipeline-sheet write-back parameters (best-effort; matches
                 # the auto-save behaviour so manual saves stay in sync)
@@ -1549,6 +1553,29 @@ else:
     # Parse company + date from each filename, then dedupe by company
     # (case-insensitive) — newest wins since the source list is already
     # sorted modifiedTime-desc.
+    # Country/market per brief. Stamped at save time (brief_market) going
+    # forward; for the briefs saved before that existed, fall back to the CRM
+    # region, then to a country token parsed from the name — so the whole
+    # back-catalogue gets labelled, not just new briefs.
+    _crm_region = {_normalize_company_key(_n): (_dd.get("region") or "").strip()
+                   for _n, _dd in CRM}
+    _COUNTRY_TOKENS = [
+        ("Indonesia", "Indonesia"), ("Vietnam", "Vietnam"), ("Thailand", "Thailand"),
+        ("Thai", "Thailand"), ("Philippines", "Philippines"), ("Malaysia", "Malaysia"),
+        ("Singapore", "Singapore"), ("Australia", "Australia"), ("Dubai", "UAE"),
+        ("UAE", "UAE"), ("AUE", "UAE"), ("KSA", "Saudi"), ("UK", "UK"),
+        ("SEA", "SEA"), ("India", "India"),
+    ]
+
+    def _market_from_name(_nm: str) -> str:
+        # Indonesian legal markers strongly imply Indonesia even with no token.
+        if re.match(r"(?i)^\s*pt\s", _nm) or re.search(r"(?i)\btbk\b", _nm):
+            return "Indonesia"
+        for _tok, _lab in _COUNTRY_TOKENS:
+            if re.search(rf"\b{re.escape(_tok)}\b", _nm, re.IGNORECASE):
+                return _lab
+        return ""
+
     _parsed = []
     _seen_companies: set = set()
     for _d in _recent:
@@ -1565,12 +1592,16 @@ else:
             continue
         _seen_companies.add(_key)
         _props = _d.get("app_properties", {}) or {}
+        _market = ((_props.get("brief_market") or "").strip()
+                   or _crm_region.get(_key, "")
+                   or _market_from_name(_company))
         _parsed.append({
             "company": _company,
             "date": _date_str,
             "id": _d["id"],
             "mode": _props.get("brief_mode", ""),
             "call_count": int(_props.get("brief_call_count", "0") or 0),
+            "market": _market,
         })
 
     # ── Retrieval controls ───────────────────────────────────────────────
@@ -1581,14 +1612,16 @@ else:
     _q = st.text_input(
         "Find a brief",
         key="brief_search",
-        placeholder=f"🔎  Find a brief by company name…  ({_total} saved)",
+        placeholder=f"🔎  Find a brief by company or country…  ({_total} saved)",
         label_visibility="collapsed",
     ).strip()
 
     _matches = _parsed
     if _q:
         _ql = _q.lower()
-        _matches = [_p for _p in _parsed if _ql in _p["company"].lower()]
+        _matches = [_p for _p in _parsed
+                    if _ql in _p["company"].lower()
+                    or _ql in (_p.get("market", "") or "").lower()]
 
     # Legend above tiles — explains the colour code at a glance.
     st.caption(
@@ -1617,6 +1650,9 @@ else:
                     _badge_icon = "🆕"
                 else:
                     _badge_icon = "📄"
+                _mkt = _p.get("market", "")
+                _mkt_html = (f"<span style='color:#5b6472;font-weight:600;'>📍{_mkt}</span> · "
+                             if _mkt else "")
                 with _col:
                     st.markdown(
                         f"<div style='border:1px solid #e3e3e3;border-radius:7px;"
@@ -1627,7 +1663,7 @@ else:
                         f"min-height:2.1em;'>{_p['company']}</div>"
                         f"<div style='font-size:0.64em;color:#8a8a8a;margin-top:4px;"
                         f"white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>"
-                        f"{_badge_icon} {_p['date'] or '—'} · "
+                        f"{_badge_icon} {_mkt_html}{_p['date'] or '—'} · "
                         f"<a href='{_url}' target='_blank' "
                         f"style='text-decoration:none;color:#2742FF;'>Open →</a>"
                         f"</div></div>",
@@ -1661,6 +1697,7 @@ else:
                 with _icol:
                     for _p in _az[_ci * _per:(_ci + 1) * _per]:
                         _u = f"https://docs.google.com/document/d/{_p['id']}/edit"
-                        _dt = f" · {_p['date']}" if _p['date'] else ""
-                        st.markdown(f"[{_p['company']}]({_u})<span style='color:#999;font-size:0.8em;'>{_dt}</span>",
+                        _meta = " · ".join([x for x in (_p.get("market", ""), _p.get("date", "")) if x])
+                        _meta = f" · {_meta}" if _meta else ""
+                        st.markdown(f"[{_p['company']}]({_u})<span style='color:#999;font-size:0.8em;'>{_meta}</span>",
                                     unsafe_allow_html=True)
