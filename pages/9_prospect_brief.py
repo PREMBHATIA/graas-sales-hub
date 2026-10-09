@@ -1599,40 +1599,40 @@ else:
         unsafe_allow_html=True,
     )
 
-    def _render_brief_tiles(_list):
-        """Render a list of parsed briefs as 6-col badge tiles."""
-        _rows = [_list[i:i + 6] for i in range(0, len(_list), 6)]
+    def _render_brief_tiles(_list, _per_row=6):
+        """Render briefs as COMPACT cards — a 2-line-clamped company name + one
+        tiny meta line (mode icon · date · Open). Deliberately small so many
+        fit on screen at once; the badge is reduced to an icon (legend above
+        explains it) to kill a whole line of height."""
+        _rows = [_list[i:i + _per_row] for i in range(0, len(_list), _per_row)]
         for _row in _rows:
-            _cols = st.columns(6)
+            _cols = st.columns(_per_row)
             for _col, _p in zip(_cols, _row):
                 _url = f"https://docs.google.com/document/d/{_p['id']}/edit"
                 _mode = _p.get("mode", "")
                 _cc = _p.get("call_count", 0)
                 if _mode.startswith("Post call") or _cc > 0:
                     _badge_icon = "🔁"
-                    _badge_text = _mode or f"Post call-{_cc}"
-                    _badge_bg, _badge_border = "#e6efff", "#b6cfff"
                 elif _mode == "Pre-call draft" or not _mode:
                     _badge_icon = "🆕"
-                    _badge_text = "Pre-call draft"
-                    _badge_bg, _badge_border = "#f0f0f0", "#dddddd"
                 else:
                     _badge_icon = "📄"
-                    _badge_text = _mode
-                    _badge_bg, _badge_border = "#f0f0f0", "#dddddd"
                 with _col:
-                    with st.container(border=True):
-                        st.markdown(
-                            f"<div style='font-size: 0.85em; font-weight: 600; line-height: 1.2; "
-                            f"margin-bottom: 2px;'>{_p['company']}</div>"
-                            f"<div style='font-size: 0.65em; margin: 2px 0;'>"
-                            f"<span style='background:{_badge_bg};border:1px solid {_badge_border};"
-                            f"padding:1px 5px;border-radius:4px;'>"
-                            f"{_badge_icon} {_badge_text}</span></div>"
-                            f"<div style='font-size: 0.7em; color: #888;'>{_p['date']}</div>"
-                            f"<a href='{_url}' target='_blank' style='font-size: 0.75em;'>Open →</a>",
-                            unsafe_allow_html=True,
-                        )
+                    st.markdown(
+                        f"<div style='border:1px solid #e3e3e3;border-radius:7px;"
+                        f"padding:6px 8px 5px;margin-bottom:7px;'>"
+                        f"<div title=\"{_p['company']}\" style='font-size:0.76em;"
+                        f"font-weight:600;line-height:1.18;overflow:hidden;"
+                        f"display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;"
+                        f"min-height:2.1em;'>{_p['company']}</div>"
+                        f"<div style='font-size:0.64em;color:#8a8a8a;margin-top:4px;"
+                        f"white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>"
+                        f"{_badge_icon} {_p['date'] or '—'} · "
+                        f"<a href='{_url}' target='_blank' "
+                        f"style='text-decoration:none;color:#2742FF;'>Open →</a>"
+                        f"</div></div>",
+                        unsafe_allow_html=True,
+                    )
 
     if _q:
         # Searching → show ALL matches (no 12-cap), newest first.
@@ -1642,10 +1642,13 @@ else:
             st.caption(f"**{len(_matches)}** of {_total} match “{_q}” · newest first")
             _render_brief_tiles(_matches)
     else:
-        # Default → 12 most-recent tiles (the "what's new" view).
-        _render_brief_tiles(_parsed[:12])
-        if _total > 12:
-            st.caption(f"_Showing the 12 most recent of {_total}. Search above, or browse all ↓_")
+        # Default → most-recent tiles (the "what's new" view). Compact tiles
+        # mean more fit without scrolling, so show more than the old 12.
+        _recent_n = 18
+        _render_brief_tiles(_parsed[:_recent_n])
+        if _total > _recent_n:
+            st.caption(f"_Showing the {_recent_n} most recent of {_total}. "
+                       f"Search above, or browse all ↓_")
 
     # A–Z index — EVERY brief, openable in-app. Replaces the old dead-end
     # ("open the Drive folder to see more") with a compact 3-column list.
