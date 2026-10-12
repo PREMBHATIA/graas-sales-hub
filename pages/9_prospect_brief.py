@@ -347,17 +347,17 @@ BRIEF_JSON_SCHEMA = """{
       "verify": "the ONE thing to confirm in the meeting that would make/break this fit. ≤15 words. e.g. 'Is reseller ordering still on WhatsApp + manual, or already digitised?'"
     }
   ],
-  "_graas_fit_NOTE": "0-4 hypotheses. Each hangs off a `stack` row AND maps to a real Graas offering (Pillar › Workflow). FIT IS A QUESTION, NOT A CLAIM. ONLY include a row where a specific Graas workflow genuinely fits — if nothing maps cleanly, return an EMPTY list (that's an honest, valid answer). Forced fitment is the exact failure we're killing.",
+  "_graas_fit_NOTE": "0-2 hypotheses (TWO is the target; a 3rd ONLY if genuinely compelled). RANKED — the first row is the lead play you'd open the meeting with. Each hangs off a `stack` row AND maps to a real Graas offering (Pillar › Workflow). Draw candidates from the DEMO PATTERN LIBRARY in the prompt, matched on business model, with its preconditions checked. FIT IS A QUESTION, NOT A CLAIM. ONLY include a row where a specific Graas workflow genuinely fits — if nothing maps cleanly, return an EMPTY list (that's an honest, valid answer). Forced fitment is the exact failure we're killing.",
   "do_not": [
     "Landmine — ONE phrase each. Things NOT to pitch or fight. e.g. 'Don't pitch search — they resell Algolia to their own SME customers', 'Don't fight the SAP layer — Deloitte owns it, 3-yr contract', 'Don't lead B2C — the storefront is a cost centre they're winding down'.",
     "..."
   ],
   "_do_not_NOTE": "2-4 landmines. The single most valuable output for a rep walking in cold. Draw from stack (contested lanes), from products the prospect SELLS (never pitch someone their own product), and from the logo-wall cross-check (see prompt).",
   "wedges_worth_exploring": [
-    "1-3 SHORT exploratory phrases — the sharpest angles worth a try, NOT a confident recommendation. Question marks welcome. Each absorbs 'where the money/mandate actually is' and hangs off a greenfield/ally-able stack row or a graas_fit hypothesis. e.g. 'Reseller-ordering flow — greenfield, no SI owns it; is it still manual?' or 'The +21%-growth B2B segment looks more open than the contested B2C storefront.'",
+    "1-2 SHORT exploratory phrases — the sharpest angles worth a try, NOT a confident recommendation. Question marks welcome. Each absorbs 'where the money/mandate actually is' and hangs off a greenfield/ally-able stack row or a graas_fit hypothesis. e.g. 'Reseller-ordering flow — greenfield, no SI owns it; is it still manual?' or 'The +21%-growth B2B segment looks more open than the contested B2C storefront.'",
     "..."
   ],
-  "_wedges_worth_exploring_NOTE": "1-3 items MAX, phrases not paragraphs. This REPLACES the old assertive 'wedge' — the tone is 'worth exploring?', not 'plant the flag here'. If nothing looks open, it's honest to have ONE item that says the angle is unclear until discovery. Question marks are encouraged.",
+  "_wedges_worth_exploring_NOTE": "1-2 items MAX, phrases not paragraphs. These must NOT restate the graas_fit rows in other words — if an angle is already a fit row, it does not belong here. Together, fits + wedges should leave the reader with at most three distinct ideas. This REPLACES the old assertive 'wedge' — the tone is 'worth exploring?', not 'plant the flag here'. If nothing looks open, it's honest to have ONE item that says the angle is unclear until discovery. Question marks are encouraged.",
   "discovery": [
     "Up to 5 operational questions for the meeting — flows, metrics, integrations, budgets, ownership. Each ≤20 words. NEVER ask an attendee's role/background. e.g. 'Is reseller ordering digitised or still manual/WhatsApp?', 'Who owns the budget for a digital pilot?', 'What did your own AI build NOT solve that's still a gap?'"
   ],
@@ -373,6 +373,12 @@ BRIEF_JSON_SCHEMA = """{
 
 
 REFERENCE_PROPOSALS_FOLDER_ID = "1tBMrcpiIDVhg5e0-N1ytjuzbDexQyheX"
+
+# Demo Pattern Library (KB bucket 3). Candidate use cases for FIT only — these are
+# demo patterns, NOT delivered deployments, so they must never reach
+# graas_proof_points. Kept deliberately separate from REFERENCE_PROPOSALS for that
+# reason: proposals are citable customers, patterns are hypotheses to test.
+DEMO_PATTERNS_DOC_ID = "1LXmt_XROAjNlJTFP6tKGA2cVPobEk4yXh16CFYzwl0c"
 
 
 def _normalize_company_key(name: str) -> str:
@@ -487,6 +493,24 @@ def _fetch_proof_points_block() -> str:
     return "\n".join(lines)
 
 
+@st.cache_data(ttl=3600, show_spinner=False)
+def _fetch_demo_patterns_block() -> str:
+    """Load the Demo Pattern Library — candidate use cases for FIT only.
+
+    Separate tier from _fetch_proof_points_block(): these are demo patterns, not
+    delivered deployments. They seed graas_fit / wedges hypotheses; they are never
+    citable as customers. Returns "" if unavailable so the brief degrades to its
+    previous behaviour rather than failing.
+    """
+    from services.sheets_client import fetch_drive_doc_text
+
+    try:
+        body = (fetch_drive_doc_text(DEMO_PATTERNS_DOC_ID) or "").strip()
+    except Exception:
+        return ""
+    return body
+
+
 def _build_new_brief_prompt(
     crm_data: dict,
     research: str,
@@ -497,6 +521,7 @@ def _build_new_brief_prompt(
     """Compose the user-turn prompt for a fresh pre-call brief."""
     today = datetime.now().strftime("%Y-%m-%d")
     proof_points_block = _fetch_proof_points_block()
+    demo_patterns_block = _fetch_demo_patterns_block()
     crm_block = ""
     if crm_data:
         crm_block = (
@@ -543,8 +568,12 @@ def _build_new_brief_prompt(
         f"brief force-fit Graas into every section; that's the failure we're fixing. "
         f"Graas has exactly FOUR offerings (below). Every `graas_fit` row MUST set "
         f"`graas_offering` to a specific 'Pillar › Workflow', phrase `fit` as a "
-        f"'could this fit?' question, and give the ONE thing to verify. 0-4 "
-        f"hypotheses — include a row ONLY where a real workflow genuinely fits. If "
+        f"'could this fit?' question, and give the ONE thing to verify. **0-2 "
+        f"hypotheses — TWO is the target; go to 3 ONLY if genuinely compelled.** "
+        f"Order them: the FIRST row is the lead play, the one you'd open the meeting "
+        f"with. A brief that lists five equal-weight angles is a brief that made no "
+        f"choice — the sales motion wants 1-2 candidate use cases out of meeting 1, "
+        f"not a menu. Include a row ONLY where a real workflow genuinely fits. If "
         f"nothing maps cleanly, return an EMPTY graas_fit list and let "
         f"`wedges_worth_exploring` carry the question; a speculative fit stated as "
         f"fact is worse than an honest 'no clean fit yet'.\n"
@@ -665,13 +694,46 @@ def _build_new_brief_prompt(
         f"figures. Use this to sanity-check the logo-wall landmine (are we already "
         f"live with one of their competitors?) and to keep any Graas claim honest.\n\n"
         f"{proof_points_block}\n\n"
+        + (
+            f"**DEMO PATTERN LIBRARY (candidate use cases — for FIT, NEVER for "
+            f"citation).** The doc below is the catalogue of agent patterns we have "
+            f"built and demoed, organised by who holds the conversation. Use it to "
+            f"ANSWER 'which use case could fit this prospect?' — it is the main "
+            f"source for `graas_fit` and `wedges_worth_exploring`.\n"
+            f"  — **These are PATTERNS, NOT DEPLOYMENTS.** They are described by "
+            f"business model on purpose; several came from prospect demos, not "
+            f"customers. **NEVER name an account from this library**, never present a "
+            f"pattern as delivered work, and never let one into `graas_proof_points` "
+            f"(that list comes ONLY from the proposals above).\n"
+            f"  — **Match on business model, then check the PRECONDITIONS** in the doc "
+            f"before proposing a pattern. The nudge patterns in particular require "
+            f"IDENTIFIED customers (a phone number with consent): a broadcast is one "
+            f"message to a segment, a nudge is one message to one person chosen from "
+            f"what's known about them. If this prospect's buyers are unidentified "
+            f"(marketplace-owned, walk-in cash) or their loyalty/POS data can't reach "
+            f"a partner layer, say so — that becomes the thing to VERIFY, or a "
+            f"landmine, not a fit.\n"
+            f"  — **Is there a conversation in the process at all?** Look for email, "
+            f"paper (→ vision) and conversations (→ voice) in their current workflow. "
+            f"No conversation anywhere, or work that is rules rather than reasoning, "
+            f"means our value is diminished — that belongs in `do_not`.\n"
+            f"  — The library's **ANTI-PATTERNS section is a direct source for "
+            f"`do_not`** — especially: never pitch 'give us your data layer'; loyalty "
+            f"is fuel, never the surface (replacing a large member programme loses the "
+            f"deal, enriching it wins the account); not a journey builder; never quote "
+            f"the inference to a customer; no standalone dashboard.\n\n"
+            f"{demo_patterns_block}\n\n"
+            if demo_patterns_block else ""
+        )
+        +
         f"**MANDATORY FIELDS — return every one, populated:** company, header "
         f"(with meeting_context), summary_boxes (all 5, factual), key_people (3-6, "
         f"real names + LinkedIn URLs where found), stack (4-8 rows incl. ERP/CRM/AI — "
         f"system + vendor/SI + owner + verdict + source + confidence; HUNT the real "
-        f"systems), graas_fit (0-4 QUESTION-framed hypotheses off stack rows, each "
+        f"systems), graas_fit (0-2 QUESTION-framed hypotheses — 2 is the target, a "
+        f"3rd only if compelled; RANKED with the lead play first — off stack rows, each "
         f"mapped to a real Graas 'Pillar › Workflow' — empty list if none fits), "
-        f"do_not (2-4 landmines), wedges_worth_exploring (1-3 SHORT exploratory "
+        f"do_not (2-4 landmines), wedges_worth_exploring (1-2 SHORT exploratory "
         f"angles, question marks welcome — NOT a confident recommendation), "
         f"discovery (≤5 operational questions — appendix), appendix_research (0-6 "
         f"CONFIRMED-only overflow facts w/ source — appendix; drop anything merely "
