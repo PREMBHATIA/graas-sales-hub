@@ -137,17 +137,13 @@ st.markdown("---")
 
 # ── Cross-Product ─────────────────────────────────────────────────────────────
 
-st.markdown('<p class="section-label">Cross-Product</p>', unsafe_allow_html=True)
+st.markdown('<p class="section-label">Cross-Product · 🔒 restricted</p>', unsafe_allow_html=True)
 
-xc1, xc2, _ = st.columns([1, 1, 2])
+xc1, _ = st.columns([1, 3])
 with xc1:
-    st.markdown("### 📋 Pipeline")
+    st.markdown("### 📋 Pipeline 🔒")
     st.markdown("Meetings & proposals — All-e + Hoppr")
     st.page_link("pages/1_pipeline.py", label="Open Pipeline →")
-with xc2:
-    st.markdown("### 💬 Ask Graas")
-    st.markdown("Cross-product Q&A — All-e, Extract, MOR, Hoppr")
-    st.page_link("pages/4_ask_graas.py", label="Ask Graas →")
 
 st.markdown("---")
 
@@ -181,12 +177,12 @@ st.markdown("---")
 
 # ── Hoppr ─────────────────────────────────────────────────────────────────────
 
-st.markdown('<p class="section-label">Hoppr</p>', unsafe_allow_html=True)
+st.markdown('<p class="section-label">Hoppr · 🔒 restricted</p>', unsafe_allow_html=True)
 
 h1, _ = st.columns([1, 3])
 with h1:
-    st.markdown("### 📊 Hoppr")
-    st.markdown("Usage, accounts & Ask Hoppr")
+    st.markdown("### 📊 Hoppr 🔒")
+    st.markdown("Usage, accounts & MCP Beta")
     st.page_link("pages/7_hoppr.py", label="Open Hoppr →")
 
 st.markdown("---")

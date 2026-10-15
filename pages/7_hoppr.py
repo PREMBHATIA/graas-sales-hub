@@ -17,6 +17,10 @@ load_dotenv(str(Path(__file__).resolve().parent.parent / ".env"), override=True)
 
 st.set_page_config(page_title="Hoppr | Graas", page_icon="📊", layout="wide")
 
+# Restricted section — gate before any data/API work (covers Hoppr + MCP Beta).
+from services.auth_gate import require_unlock
+require_unlock("Hoppr")
+
 # ── API key ───────────────────────────────────────────────────────────────────
 try:
     ANTHROPIC_API_KEY = st.secrets["ANTHROPIC_API_KEY"]

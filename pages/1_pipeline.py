@@ -16,6 +16,12 @@ load_dotenv(_env_path, override=True)
 from datetime import datetime, timedelta
 
 st.set_page_config(page_title="Pipeline | Graas", page_icon="📋", layout="wide")
+
+# Restricted section — gate before any data loads. Open All-e pages (Prospect
+# Brief etc.) don't call this; only Cross-Product (Pipeline) and Hoppr do.
+from services.auth_gate import require_unlock
+require_unlock("Pipeline")
+
 st.markdown("## 📋 Pipeline — Meetings & Proposals")
 st.caption("Meetings (all products, from All-e Summary of Meetings) → Proposals (by product, from Weekly Revenue Call Sheet)")
 
