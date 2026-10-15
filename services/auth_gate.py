@@ -6,13 +6,11 @@ see — Pipeline (Cross-Product) and Hoppr/MCP. Those pages call `require_unlock
 at the top; everything in the All-e section (Prospect Brief, Emails, Proposal
 Bank), Home and Resources stays open.
 
-One shared password, set once in Streamlit Cloud → Settings → Secrets as
-`SALESHUB_SECTION_PASSWORD` (env var of the same name also works). Unlocking on
-one gated page unlocks all of them for that browser session.
-
-Fails CLOSED: if no password is configured, the gated pages show a config
-notice instead of their content — so widening the viewer list can never
-accidentally expose these sections.
+One shared password for everyone on the viewer list. It resolves in this order:
+env var `SALESHUB_SECTION_PASSWORD` → st.secrets `SALESHUB_SECTION_PASSWORD` →
+the temporary built-in default below. Set the secret to rotate it without a code
+change; until then the built-in default applies. Unlocking on one gated page
+unlocks all of them for that browser session.
 """
 
 import hmac
@@ -22,10 +20,16 @@ import streamlit as st
 
 _SESSION_KEY = "saleshub_restricted_unlocked"
 _SECRET_NAME = "SALESHUB_SECTION_PASSWORD"
+# Temporary shared password. Low-stakes section gate (hides Pipeline/Hoppr from
+# the wider viewer list), not hard security. To rotate it without a code change,
+# set SALESHUB_SECTION_PASSWORD in Streamlit Cloud → Settings → Secrets — that
+# overrides this. Only repo collaborators can see this value, not the app's
+# viewer list.
+_DEFAULT_PASSWORD = "showmethemoney"
 
 
 def _expected_password() -> str:
-    """The configured section password — env first, then st.secrets. '' if unset."""
+    """The section password — env → st.secrets → built-in default."""
     pw = os.getenv(_SECRET_NAME, "")
     if not pw:
         try:
@@ -33,7 +37,7 @@ def _expected_password() -> str:
                 pw = st.secrets[_SECRET_NAME]
         except Exception:
             pw = ""
-    return str(pw or "")
+    return str(pw or _DEFAULT_PASSWORD)
 
 
 def is_unlocked() -> bool:
