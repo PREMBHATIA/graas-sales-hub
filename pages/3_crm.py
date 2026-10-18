@@ -857,7 +857,7 @@ tab_contacts, tab_segments, tab_compose, tab_calendar, tab_analytics = st.tabs([
     "👥 Contacts",
     "🎯 Segments",
     "✉️ Email Composer",
-    "📅 Calendar",
+    "🎨 Creatives",
     "📊 Analytics",
 ])
 
@@ -2632,47 +2632,69 @@ with tab_compose, _tab_guard("Email Composer"):
 # editing stays in the sheet so the content owner keeps full flexibility.
 # ══════════════════════════════════════════════════════════════════════════════
 
-with tab_calendar, _tab_guard("Calendar"):
-    st.markdown("### 📅 Content calendar — the Context arc")
-    st.caption(
-        "One argument, taught in two tracks. Every email carries **Context** and one "
-        "Index receipt. Emails 1–2 go to everyone; Mature gets the architecture track, "
-        "Explorers + Laggards get the show-don't-tell track. Edit in "
-        "[the workbook tab ↗](https://docs.google.com/spreadsheets/d/11uhucHZ6099LysoifJRmeGCx5DQ57ZxEa94Q0HjpaPo/edit?gid=1357660099) "
-        "— Target window + Status columns are the content owner's to fill."
-    )
-    _cal = _load_theme_plan()
-    if not _cal.empty and "audience" not in _cal.columns:
-        _cal = pd.DataFrame()  # stale cache / restructured sheet — treat as unreadable
-    if _cal.empty:
-        st.info("Calendar not readable — check the Context arc tab is shared with the "
-                "app's service account.")
+with tab_calendar, _tab_guard("Creatives"):
+    # The Context-arc calendar mirror that lived here is retired (Prem, Oct 18):
+    # the arc is planned in the workbook, not read in the app, and a mirror
+    # nobody updates is clutter. This tab is now the creatives shelf - the
+    # exact HTML each campaign shipped with (the Sends log archives every
+    # body), plus a local preview slot for the next, unsent creative.
+    st.markdown("### 🎨 Campaign creatives")
+    st.caption("The exact copy each campaign went out with, straight from the send "
+               "log - preview it, download it, or forward it to whoever asks "
+               "\"what did we send?\"")
+    _crv = _cached_log_df()
+    if _crv is None or _crv.empty or "body" not in _crv.columns:
+        st.info("No sends logged yet.")
     else:
-        _cal_view = _cal.rename(columns={
-            "code": "#", "theme": "Email", "question": "Core question",
-            "audience": "Audience", "target": "Target window", "status": "Status"})
-        _tracks = [
-            ("📣 Everyone (both tracks open with these)", _cal_view["Audience"].str.lower().str.contains("all")),
-            ("🏛️ Mature track — architecture", _cal_view["Audience"].str.lower().str.contains("matur")),
-            ("📷 Explorers + Laggards track — show, don't tell", _cal_view["Audience"].str.lower().str.contains("laggard|explor", regex=True)),
-        ]
-        for _title, _mask in _tracks:
-            _t = _cal_view[_mask]
-            if _t.empty:
-                continue
-            st.markdown(f"#### {_title}")
-            _cols_show = [c for c in ["#", "Email", "Core question", "Target window", "Status"]
-                          if c in _t.columns]
-            _tsty = _t[_cols_show].style.set_properties(
-                subset=["Status"] if "Status" in _cols_show else [],
-                **{"background-color": "#DBEAFE", "color": "#1D4ED8", "font-weight": "600"})
-            st.dataframe(_tsty, hide_index=True, use_container_width=True,
-                         height=min(300, 80 + 35 * len(_t)))
-        st.caption(
-            "Blogs: emails 4/5/6 click through to graas.ai articles (the Knowledge Graph "
-            "piece links onward to the technical deep dive). Cadence: fortnightly — "
-            "matches the 14-day dedup window."
-        )
+        _crv = _crv.copy()
+        _crv["_ts"] = pd.to_datetime(_crv["timestamp_utc"], errors="coerce", utc=True)
+        _crv = _crv[(_crv["status"] == "sent") & _crv["_ts"].notna()
+                    & (_crv["body"].astype(str).str.strip() != "")]
+        _crv = _crv[~_crv["template"].astype(str).str.contains(
+            r"\(test\)|\(internal copy\)", regex=True, na=False)]
+        _crv["subject"] = _crv["subject"].astype(str).str.strip()
+        _crv = _crv[_crv["subject"] != ""]
+        # one card per campaign, newest first; only real campaigns (3+ recipients)
+        _cr_groups = [(sub, g) for sub, g in _crv.groupby("subject")
+                      if g["to_email"].nunique() >= 3]
+        _cr_groups.sort(key=lambda x: x[1]["_ts"].min(), reverse=True)
+        if not _cr_groups:
+            st.info("No campaign creatives yet.")
+        import streamlit.components.v1 as _cmp_html
+        for _sub, _g in _cr_groups:
+            _first = _g.sort_values("_ts").iloc[0]
+            _body = str(_first["body"])
+            _slug = re.sub(r"[^a-z0-9]+", "-", _sub.lower()).strip("-")[:60] or "campaign"
+            with st.container(border=True):
+                st.markdown(f"**{_sub}**")
+                st.caption(f"Sent {_g['_ts'].min().strftime('%d %b %Y')} · "
+                           f"{_g['to_email'].nunique()} recipients · "
+                           f"{_g['company'].nunique()} companies")
+                _c1, _c2, _ = st.columns([1, 1, 3])
+                with _c1:
+                    st.download_button("⬇️ HTML", _body.encode("utf-8"),
+                                       file_name=f"{_slug}.html", mime="text/html",
+                                       key=f"cr_dl_{_slug}")
+                with _c2:
+                    _show = st.toggle("Preview", key=f"cr_pv_{_slug}")
+                if _show:
+                    _cmp_html.html(_body, height=640, scrolling=True)
+
+    st.markdown("---")
+    st.markdown("#### 👀 Preview the next creative (not sent yet)")
+    st.caption("Drop in a draft .html to review it here - nothing is stored or "
+               "sent; it's gone on refresh. The composer remains the only way "
+               "to send.")
+    _up_cr = st.file_uploader("Draft .html", type=["html", "htm"],
+                              key="creative_preview_upload",
+                              label_visibility="collapsed")
+    if _up_cr is not None:
+        try:
+            import streamlit.components.v1 as _cmp_html2
+            _cmp_html2.html(_up_cr.getvalue().decode("utf-8", errors="replace"),
+                            height=700, scrolling=True)
+        except Exception as _ce:
+            st.warning(f"Couldn't render that file: {_ce}")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -3558,49 +3580,6 @@ with tab_analytics, _tab_guard("Analytics"):
         )
 
 
-
-        # ── Campaign creatives ───────────────────────────────────────────────
-        # The Sends log stores the full body per send, so every campaign's
-        # creative is already archived — this just makes it findable: pick a
-        # campaign, see the exact copy that went out, download the HTML.
-        if "body" in log_df.columns:
-            st.markdown("#### 🎨 Campaign creatives")
-            _cr = log_df[(log_df["status"] == "sent")
-                         & (log_df["body"].astype(str).str.strip() != "")].copy()
-            _cr = _cr[~_cr["template"].astype(str).str.contains(r"\(test\)|\(internal copy\)", regex=True)]
-            if _cr.empty:
-                st.caption("No campaign sends with stored copy yet.")
-            else:
-                _cr = _cr.sort_values("_ts", ascending=False)
-                _first = _cr.groupby("subject", sort=False).first().reset_index()
-                _counts = _cr.groupby("subject")["to_email"].nunique()
-                _opts = {
-                    f"{r['subject']}  —  {r['_ts'].strftime('%d %b %Y')} · {_counts.get(r['subject'], 0)} recipient(s)": r["subject"]
-                    for _, r in _first.iterrows()
-                }
-                _pick = st.selectbox("Campaign", list(_opts.keys()), key="creative_pick")
-                _row = _first[_first["subject"] == _opts[_pick]].iloc[0]
-                _body = str(_row["body"])
-                _is_html = _body.lstrip()[:200].lower().find("<") != -1 and (
-                    "<html" in _body.lower() or "<table" in _body.lower() or "<div" in _body.lower())
-                _slug = re.sub(r"[^a-z0-9]+", "-", str(_row["subject"]).lower()).strip("-")[:60] or "campaign"
-                st.download_button(
-                    "⬇️ Download creative (.html)" if _is_html else "⬇️ Download copy (.txt)",
-                    _body.encode("utf-8"),
-                    file_name=f"{_slug}.{'html' if _is_html else 'txt'}",
-                    mime="text/html" if _is_html else "text/plain",
-                    key="dl_creative",
-                )
-                with st.expander("Preview the creative as sent", expanded=False):
-                    if _is_html:
-                        import streamlit.components.v1 as _cmp
-                        _cmp.html(_body, height=700, scrolling=True)
-                    else:
-                        st.text(_body)
-                st.caption(
-                    "The stored copy is the personalised version from one recipient of that "
-                    "campaign (tokens like {name} already substituted)."
-                )
 
     # ── Suppression list (always visible, even when no sends yet) ─────────────
     st.markdown("---")
