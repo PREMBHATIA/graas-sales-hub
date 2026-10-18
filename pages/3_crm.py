@@ -2654,9 +2654,12 @@ with tab_calendar, _tab_guard("Creatives"):
             r"\(test\)|\(internal copy\)", regex=True, na=False)]
         _crv["subject"] = _crv["subject"].astype(str).str.strip()
         _crv = _crv[_crv["subject"] != ""]
-        # one card per campaign, newest first; only real campaigns (3+ recipients)
+        # one card per campaign, newest first. Threshold 20: the Index
+        # campaigns run 100+, the old May 1:1 outreach ran 3-10 and was
+        # cluttering the shelf (Prem). Raise/lower here if a genuinely small
+        # campaign ever needs to appear.
         _cr_groups = [(sub, g) for sub, g in _crv.groupby("subject")
-                      if g["to_email"].nunique() >= 3]
+                      if g["to_email"].nunique() >= 20]
         _cr_groups.sort(key=lambda x: x[1]["_ts"].min(), reverse=True)
         if not _cr_groups:
             st.info("No campaign creatives yet.")
