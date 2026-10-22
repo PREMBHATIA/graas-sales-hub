@@ -1600,18 +1600,33 @@ st.caption("Pulled from the SalesHub Shared Drive · click any tile to open the 
 
 
 @st.cache_data(ttl=300)
-def _list_recent_briefs(folder_id: str) -> list:
-    """List recent Prospect Brief Docs in the Shared Drive (5-min cache)."""
+def _list_recent_briefs(folder_id: str) -> dict:
+    """List recent Prospect Brief Docs in the Shared Drive (5-min cache).
+
+    Returns {ok, error, briefs} so the render can tell an empty folder apart
+    from a Drive listing failure — a transient error must never blank the
+    tiles and read as "your briefs are gone"."""
     from services.sheets_client import list_drive_folder_docs
-    docs = list_drive_folder_docs(folder_id)
+    try:
+        docs = list_drive_folder_docs(folder_id, raise_on_error=True)
+    except Exception as e:
+        return {"ok": False, "error": str(e), "briefs": []}
     # Filter to Prospect Brief files only (Architect/Soln files share the folder)
-    return [d for d in docs if d["name"].lower().startswith("prospect brief")]
+    briefs = [d for d in docs if d["name"].lower().startswith("prospect brief")]
+    return {"ok": True, "error": None, "briefs": briefs}
 
 
-_recent = _list_recent_briefs(DEFAULT_DRIVE_FOLDER)
-if not _recent:
+_res = _list_recent_briefs(DEFAULT_DRIVE_FOLDER)
+if not _res["ok"]:
+    st.warning(
+        "⚠️ Couldn't load your briefs from Drive just now — this is a transient "
+        "connection error, **not** lost data. Your briefs are safe in the Shared "
+        "Drive. Click **🔄 Refresh** above to retry."
+    )
+_recent = _res["briefs"]
+if _res["ok"] and not _recent:
     st.caption("_No briefs saved to this Drive folder yet._")
-else:
+if _recent:
     # Parse company + date from each filename, then dedupe by company
     # (case-insensitive) — newest wins since the source list is already
     # sorted modifiedTime-desc.
