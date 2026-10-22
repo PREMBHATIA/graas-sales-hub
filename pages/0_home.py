@@ -171,7 +171,7 @@ with c3:
     st.page_link("pages/3_crm.py", label="Open CRM →")
 
 with c4:
-    st.markdown("### 📚 Resources")
+    st.markdown("### 📚 Resources 🔒")
     st.markdown("Key decks & docs")
     st.page_link("pages/5_resources.py", label="Open Resources →")
 
