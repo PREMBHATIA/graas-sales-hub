@@ -2,10 +2,16 @@
 
 The app itself is reachable by anyone on the Streamlit Cloud viewer list (valid
 email). Some pages hold internal data we don't want the whole audience to see —
-Pipeline (Cross-Product), Hoppr/MCP, and Emails & Segments (real recipient data,
-send log and open/click tracking). Those pages call `require_unlock()` at the
-top; the rest of All-e (Pipeline, Prospect Brief, Proposal Bank), Home and
-Resources stays open.
+Pipeline (Cross-Product), Hoppr/MCP, Emails & Segments (real recipient data,
+send log and open/click tracking) and Resources / the Knowledge Base (internal
+GTM material, commercials, lessons learnt). Those pages call `require_unlock()`
+at the top; Home and the rest of All-e (Pipeline, Prospect Brief, Proposal Bank)
+stay open.
+
+The KB's own Drive folders were made private on 2026-10-22 (the public
+"anyone with link" reader was removed from the "KB (in SalesHub)" wrapper, which
+the whole KB tree inherited from). Gating the Resources page keeps the app
+surface consistent with that.
 
 Note the lock is per PAGE, not per sidebar group: Emails & Segments sits inside
 the otherwise-open All-e group, so its 🔒 marker lives on the page title in
@@ -72,8 +78,8 @@ def require_unlock(section_label: str = "This section") -> None:
     st.caption(
         "Enter the team access password to view this section. The Prospect Brief, "
         "All-e Pipeline and Proposal Bank don't need this — Pipeline "
-        "(Cross-Product), Hoppr and Emails & Segments are gated. Unlocking here "
-        "unlocks all of them for this browser session."
+        "(Cross-Product), Hoppr, Emails & Segments and Resources are gated. "
+        "Unlocking here unlocks all of them for this browser session."
     )
     with st.form("saleshub_unlock_form", clear_on_submit=False):
         pw = st.text_input("Access password", type="password",
