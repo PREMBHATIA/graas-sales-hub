@@ -1,10 +1,15 @@
 """Section-level password gate for SalesHub.
 
 The app itself is reachable by anyone on the Streamlit Cloud viewer list (valid
-email). Some sections hold internal data we don't want the whole audience to
-see — Pipeline (Cross-Product) and Hoppr/MCP. Those pages call `require_unlock()`
-at the top; everything in the All-e section (Prospect Brief, Emails, Proposal
-Bank), Home and Resources stays open.
+email). Some pages hold internal data we don't want the whole audience to see —
+Pipeline (Cross-Product), Hoppr/MCP, and Emails & Segments (real recipient data,
+send log and open/click tracking). Those pages call `require_unlock()` at the
+top; the rest of All-e (Pipeline, Prospect Brief, Proposal Bank), Home and
+Resources stays open.
+
+Note the lock is per PAGE, not per sidebar group: Emails & Segments sits inside
+the otherwise-open All-e group, so its 🔒 marker lives on the page title in
+app.py rather than on the group label.
 
 One shared password for everyone on the viewer list. It resolves in this order:
 env var `SALESHUB_SECTION_PASSWORD` → st.secrets `SALESHUB_SECTION_PASSWORD` →
@@ -66,8 +71,9 @@ def require_unlock(section_label: str = "This section") -> None:
     st.markdown(f"## 🔒 {section_label} is restricted")
     st.caption(
         "Enter the team access password to view this section. The Prospect Brief, "
-        "Emails & Segments and Proposal Bank don't need this — only Pipeline and "
-        "Hoppr are gated."
+        "All-e Pipeline and Proposal Bank don't need this — Pipeline "
+        "(Cross-Product), Hoppr and Emails & Segments are gated. Unlocking here "
+        "unlocks all of them for this browser session."
     )
     with st.form("saleshub_unlock_form", clear_on_submit=False):
         pw = st.text_input("Access password", type="password",
