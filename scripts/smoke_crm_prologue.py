@@ -67,8 +67,10 @@ services.__path__ = []            # mark as package so "services.X" imports reso
 services.sheets_client = sheets
 sys.modules["services"] = services
 sys.modules["services.sheets_client"] = sheets
-# any OTHER services submodule the prologue imports → generic MagicMock
-for sub in ("schema", "email_sender", "email_layout", "commerce_news"):
+# any OTHER services submodule the prologue imports → generic MagicMock.
+# auth_gate is here so the page's require_unlock() call is a no-op under smoke;
+# the real gate is position-checked at the bottom of this script instead.
+for sub in ("schema", "email_sender", "email_layout", "commerce_news", "auth_gate"):
     m = MagicMock(name=f"services.{sub}")
     sys.modules[f"services.{sub}"] = m
     setattr(services, sub, m)
@@ -108,3 +110,19 @@ _tab_idx = _src_full.index("with tab_compose")
 _late = [r for r in _REQUIRED if _src_full.index(r) > _tab_idx]
 assert not _late, f"SMOKE FAIL — defined after tab_compose (NameError at load): {_late}"
 print(f"SYMBOLS OK — {len(_REQUIRED)} module-level definitions present & ordered")
+
+
+# ── Gate guard: the page is password-restricted, and the lock is only real if it
+# runs BEFORE the first render/data load. A gate placed after the sheet reads
+# would still show the prompt but would already have fetched recipient data for a
+# locked viewer. py_compile and the prologue exec (where auth_gate is mocked)
+# both pass either way, so assert the ordering from source.
+assert "require_unlock(" in _src_full, (
+    "SMOKE FAIL — require_unlock() missing: Emails & Segments must stay gated "
+    "(services/auth_gate.py)")
+_gate_idx = _src_full.index("require_unlock(")
+_first_render = _src_full.index('st.markdown("## 📧 CRM & Email Outreach")')
+assert _gate_idx < _first_render, (
+    "SMOKE FAIL — require_unlock() runs AFTER the first render; move it directly "
+    "below st.set_page_config so no data loads for a locked viewer")
+print("GATE OK — require_unlock() precedes the first render")

@@ -20,7 +20,9 @@ pg = st.navigation(
         ],
         "All-e": [
             st.Page("pages/2_alle.py",            title="📊 Pipeline",                url_path="alle"),
-            st.Page("pages/3_crm.py",             title="📧 Emails & Segments",        url_path="crm"),
+            # 🔒 Gated page inside an otherwise-open section — the lock sits on the
+            # page title, not the "All-e" group, because its siblings stay open.
+            st.Page("pages/3_crm.py",             title="📧 Emails & Segments 🔒",     url_path="crm"),
             st.Page("pages/9_prospect_brief.py",  title="📋 Create Prospect Brief  ✨ NEW",   url_path="prospect-brief"),
             st.Page("pages/B_proposal_bank.py",   title="📑 Proposal Bank",            url_path="proposal-bank"),
         ],

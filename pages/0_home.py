@@ -164,7 +164,9 @@ with c2:
     st.page_link("pages/9_prospect_brief.py", label="Create Brief →")
 
 with c3:
-    st.markdown("### 📧 CRM")
+    # Gated page inside the open All-e section — mark the tile so the lock isn't
+    # a surprise on click, the same way the Pipeline and Hoppr tiles do.
+    st.markdown("### 📧 CRM 🔒")
     st.markdown("Contacts & email outreach")
     st.page_link("pages/3_crm.py", label="Open CRM →")
 

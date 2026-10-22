@@ -256,6 +256,13 @@ def _voice_hold_companies() -> set:
 
 
 st.set_page_config(page_title="CRM & Outreach | Graas", page_icon="📧", layout="wide")
+
+# Restricted section — gate BEFORE any data loads, so no sheet read happens for a
+# locked viewer. Everything above this line is defs/constants only (no fetches).
+# The other All-e pages (Pipeline, Prospect Brief, Proposal Bank) stay open.
+from services.auth_gate import require_unlock
+require_unlock("Emails & Segments")
+
 st.markdown("## 📧 CRM & Email Outreach")
 st.caption("All-e Active + Dropped leads (team sheet, read-only) + local overlay (Prem's personal adds) — merged view")
 
