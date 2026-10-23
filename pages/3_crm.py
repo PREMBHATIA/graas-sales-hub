@@ -530,6 +530,44 @@ def load_crm_data():
     active_contacts['_overlay'] = False
     dropped_contacts['_overlay'] = False
 
+    # Ankit's database (Oct 2026) — a SECOND tab in the same pipeline workbook,
+    # same header shape (Lead name / Email of Key Personnel / AI Maturity).
+    # It was invisible to this page: load_crm_data only read the unified
+    # pipeline, so the composer saw 209 of 580 contacts and a "send to
+    # everyone" would have silently reached a third of the list. Read via the
+    # pre-existing fetch_sheet_tab (no new service symbol -> no stale-module
+    # ImportError on Streamlit Cloud). force_refresh because fetch_sheet_tab
+    # otherwise serves a disk cache that can be hours stale.
+    ankit_contacts = pd.DataFrame()
+    try:
+        from services.sheets_client import fetch_sheet_tab as _ft
+        _aid = os.getenv("ALLE_SHEET_ID", "")
+        if _aid:
+            try:
+                _ank_raw = _ft(_aid, "Ankit's", force_refresh=True)
+            except TypeError:
+                _ank_raw = _ft(_aid, "Ankit's")
+            if _ank_raw is not None and not _ank_raw.empty:
+                _ank_df = _standardize_columns(_ank_raw)
+                _parts = []
+                if "Active / Dropped" in _ank_raw.columns:
+                    _state = _ank_raw["Active / Dropped"].astype(str).str.strip().str.lower()
+                    for _seg in ("Active", "Dropped"):
+                        _sub = _ank_df[_state.reindex(_ank_df.index).fillna("") == _seg.lower()]
+                        if not _sub.empty:
+                            _parts.append(_parse_contacts(_sub, _seg))
+                    # rows with a blank/unknown state still belong to the list
+                    _rest = _ank_df[~_state.reindex(_ank_df.index).fillna("").isin(["active", "dropped"])]
+                    if not _rest.empty:
+                        _parts.append(_parse_contacts(_rest, "Active"))
+                else:
+                    _parts.append(_parse_contacts(_ank_df, "Active"))
+                if _parts:
+                    ankit_contacts = pd.concat(_parts, ignore_index=True)
+                    ankit_contacts["_overlay"] = False
+    except Exception:
+        ankit_contacts = pd.DataFrame()   # never break the page over one tab
+
     overlay_contacts = _load_overlay()
 
     # Dedupe: if overlay company exists in All-e, overlay wins (more up-to-date)
@@ -542,7 +580,15 @@ def load_crm_data():
             ~dropped_contacts['company'].str.lower().isin(overlay_companies)
         ]
 
-    return pd.concat([active_contacts, dropped_contacts, overlay_contacts], ignore_index=True)
+    merged = pd.concat([active_contacts, dropped_contacts, ankit_contacts,
+                        overlay_contacts], ignore_index=True)
+    # Hard email-level dedupe across ALL sources. The two tabs are disjoint
+    # today (verified 0 overlap), but a person added to both would otherwise
+    # receive the campaign twice.
+    if "email" in merged.columns:
+        _k = merged["email"].astype(str).str.strip().str.lower()
+        merged = merged[(_k == "") | ~_k.duplicated(keep="first")].reset_index(drop=True)
+    return merged
 
 
 contacts = load_crm_data()
