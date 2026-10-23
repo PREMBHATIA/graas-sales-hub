@@ -944,6 +944,36 @@ def _tab_guard(label):
 # page for minutes on a cache miss. The Context arc + per-segment suggestions
 # superseded its talking-points job. services/commerce_news.py still serves the
 # Prospect Brief 'While you wait' card.
+# ── Internal watchers ────────────────────────────────────────────────────────
+# Defined HERE, in the prologue, not next to the composer that used to own it:
+# the Contacts dashboard shows the count, and that renders long before the
+# composer's body. A helper defined after its first caller is a NameError on
+# deploy even though py_compile is green.
+#
+# Page-side with only pre-existing service imports — the Streamlit-Cloud
+# stale-module gotcha means the page must not import fetch_watchers from
+# email_sender directly.
+@st.cache_data(ttl=300, show_spinner=False)
+def _fetch_watchers_page() -> list:
+    """Internal watcher emails from the Outreach Log's 'Watchers' tab."""
+    from services.sheets_client import fetch_log_rows
+    sheet_id = os.getenv("EMAIL_LOG_SHEET_ID", "")
+    if not sheet_id:
+        return []
+    try:
+        df = fetch_log_rows(sheet_id, "Watchers")
+    except Exception:
+        return []
+    if df is None or df.empty or "email" not in df.columns:
+        return []
+    out = []
+    for e in df["email"].astype(str):
+        e = e.strip().lower()
+        if e and "@" in e and e not in out:
+            out.append(e)
+    return out
+
+
 tab_contacts, tab_segments, tab_compose, tab_calendar, tab_analytics = st.tabs([
     "👥 Contacts",
     "🎯 Segments",
@@ -1065,7 +1095,9 @@ with tab_contacts, _tab_guard("Contacts"):
     cool_n = with_email[with_email['recency_key'] == 'cool']['company'].nunique()
     cold_n = with_email[with_email['recency_key'] == 'cold']['company'].nunique()
 
-    c1, c2, c3, c4, c5, c6 = st.columns(6)
+    _watchers = _fetch_watchers_page()
+
+    c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
     with c1:
         st.metric("Total Contacts", len(with_email))
     with c2:
@@ -1078,6 +1110,34 @@ with tab_contacts, _tab_guard("Contacts"):
         st.metric("❄️ Cool", cool_n, help="Last contact 90-180 days ago")
     with c6:
         st.metric("🧊 Cold", cold_n, help="Last contact 180+ days ago")
+    with c7:
+        st.metric("📣 Internal", len(_watchers),
+                  help="Graas colleagues who can be copied on a campaign. "
+                       "NOT prospects — they are not part of Total Contacts, "
+                       "never counted in the weekly send cap, and only "
+                       "receive a copy when you tick the box in Email "
+                       "Composer → Step 4.")
+
+    # The watcher list had no home in the UI — it lived only in a sheet tab and
+    # a checkbox buried in the composer's send step, so "who are the internal
+    # addresses?" had no answer on the page.
+    with st.expander(f"📣 Internal watchers ({len(_watchers)}) — who can be copied on a campaign"):
+        if not _watchers:
+            st.info("No watchers configured. Add a row per address to the "
+                    "**Watchers** tab (single `email` column) of the Graas "
+                    "Outreach Log sheet.")
+        else:
+            st.caption(
+                "These are Graas colleagues, not prospects. They get **one** "
+                "copy of a campaign — subject prefixed `[Internal]`, no "
+                "tracking pixel — and only when the watcher box is ticked in "
+                "**Email Composer → Step 4 → Send**. It defaults OFF for "
+                "follow-up batches of a campaign they have already seen, so "
+                "they are not spammed. Edit the list in the **Watchers** tab "
+                "of the Outreach Log sheet, then hit 🔄 Refresh CRM Data."
+            )
+            st.dataframe(pd.DataFrame({"email": _watchers}),
+                         use_container_width=True, hide_index=True)
 
     # Filters
     st.markdown("---")
@@ -1720,29 +1780,6 @@ def _inline_critical_styles(html: str) -> tuple:
     return fixed, changed
 
 
-def _fetch_watchers_page() -> list:
-    """Internal watcher emails from the Outreach Log's 'Watchers' tab.
-
-    Defined page-side with only pre-existing service imports — the
-    Streamlit-Cloud stale-module gotcha means the page must not import the
-    fetch_watchers symbol from email_sender directly.
-    """
-    from services.sheets_client import fetch_log_rows
-    sheet_id = os.getenv("EMAIL_LOG_SHEET_ID", "")
-    if not sheet_id:
-        return []
-    try:
-        df = fetch_log_rows(sheet_id, "Watchers")
-    except Exception:
-        return []
-    if df is None or df.empty or "email" not in df.columns:
-        return []
-    out = []
-    for e in df["email"].astype(str):
-        e = e.strip().lower()
-        if e and "@" in e and e not in out:
-            out.append(e)
-    return out
 
 
 with tab_compose, _tab_guard("Email Composer"):

@@ -72,10 +72,8 @@ WATCHERS_TAB_NAME = "Watchers"
 # copying all four watchers on all 577 sends put ~370 irrelevant mails in each
 # inbox. A contact's "source" column (set in load_crm_data) picks the list.
 AUDIT_BCC_PIPELINE_DEFAULT = "prem@graas.ai,amruta@graas.ai,eunice.sarah@graas.ai"
-# Ankit's book: Ankit + Eunice. Ankit's address is NOT yet filled in — set
-# AUDIT_BCC_ANKIT in secrets to "ankit...@graas.ai,eunice.sarah@graas.ai".
-# Until then this list is Eunice only; it never guesses an address.
-AUDIT_BCC_ANKIT_DEFAULT = "eunice.sarah@graas.ai"
+# Ankit's book: Ankit + Eunice (address confirmed by Prem 2026-10-23).
+AUDIT_BCC_ANKIT_DEFAULT = "ankit.sachdev@graas.ai,eunice.sarah@graas.ai"
 
 # Back-compat: AUDIT_BCC still works as a global override / kill-switch. If it
 # is set (including to "") it wins for every source, so AUDIT_BCC="" remains
