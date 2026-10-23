@@ -3493,6 +3493,81 @@ with tab_analytics, _tab_guard("Analytics"):
                 for _i in _ins:
                     st.markdown(f"• {_i}")
 
+                # ── One deduped list for sales ───────────────────────────────
+                # The sections below each answer a different question and overlap:
+                # every repeat reader is also a reader, so screenshotting them
+                # sends sales the same person twice. Worse, some clickers never
+                # register as readers at all — their gateway strips the pixel
+                # while the click still lands — so the reader lists MISS them.
+                #
+                # Two tiers, Prem's cut: a second read or a click both mean the
+                # person went back to it deliberately. On the Oct-23 campaign
+                # those two groups don't intersect at all, so together they are
+                # simply everyone who did more than glance once.
+                _fu = {}
+                _clicks_fu = _human_click_rows(track_df, _zs)
+                _clicked_vid, _clicked_any = set(), set()
+                if _clicks_fu is not None and not _clicks_fu.empty:
+                    # NOT _cf — that name holds the campaign frame later in
+                    # this tab, and reusing it here silently broke it.
+                    _fucf = _clicks_fu[~_clicks_fu["_machine"].astype(bool)]
+                    _clicked_any = set(_fucf["to_email"])
+                    _clicked_vid = set(_fucf[_fucf["dest_url"].astype(str)
+                                       .str.contains("youtu", case=False, na=False)]["to_email"])
+                for _, _fr in _zs.iterrows():
+                    _fem = _fr["to_email"]
+                    _fn = int(_reads_s.get(_fr["_tid"], 0))
+                    if _fem in _clicked_vid:
+                        _fsig, _frank = "▶️ Clicked the video", 5
+                    elif _fem in _clicked_any:
+                        _fsig, _frank = "🖱️ Clicked a link", 4
+                    elif _fn >= 3:
+                        _fsig, _frank = f"🔁 Read {_fn}x", 3
+                    elif _fn == 2:
+                        _fsig, _frank = "🔁 Read twice", 2
+                    elif _fn >= 1:
+                        _fsig, _frank = "📖 Read once", 1
+                    else:
+                        continue
+                    _prev = _fu.get(_fem)
+                    if _prev is None or _frank > _prev["_rank"]:
+                        _fu[_fem] = {
+                            "Intent": "🔥 High" if _frank >= 2 else "Read once",
+                            "Who": _person(_fr), "Company": _fr.get("company", ""),
+                            "Segment": _seg_of(_fem).replace("AI ", ""),
+                            "Signal": _fsig, "_rank": _frank,
+                            "When (IST)": _last_ist([_fr["_tid"]]),
+                            "Write to them": f"mailto:{_fem}"}
+                if _fu:
+                    _fu_df = (pd.DataFrame(list(_fu.values()))
+                              .sort_values(["_rank", "Company"], ascending=[False, True])
+                              .drop(columns=["_rank"]).reset_index(drop=True))
+                    _n_hot = _isum(_fu_df["Intent"] == "🔥 High")
+                    _read_ids = set(_zs[_zs["_tid"].map(_reads_s).fillna(0) >= 1]["to_email"])
+                    _missed = len(_clicked_any - _read_ids)
+                    st.markdown("##### 📣 Follow-up list for sales — one row per person")
+                    st.caption(
+                        f"**{_n_hot} high intent** of {len(_fu_df)}. High = clicked a "
+                        "link **or** came back for a second read; both mean they "
+                        "returned to it deliberately. Each person appears once, so "
+                        "this replaces screenshotting the sections below — which "
+                        "repeat the same names."
+                        + (f"  \n**{_missed} of the clickers never register as readers** "
+                           "— their mail gateway strips the tracking pixel but the "
+                           "click still lands, so the reader lists below miss them "
+                           "entirely." if _missed else ""))
+                    st.dataframe(
+                        _fu_df, use_container_width=True, hide_index=True,
+                        height=min(460, 80 + 35 * len(_fu_df)),
+                        column_config={"Write to them": st.column_config.LinkColumn(
+                            "Write to them", display_text=r"mailto:(.*)")})
+                    st.download_button(
+                        "⬇️ Download follow-up list (CSV)",
+                        _fu_df.to_csv(index=False).encode("utf-8"),
+                        file_name="follow_up_list.csv", mime="text/csv",
+                        key=f"fu_dl_{abs(hash(str(_zs['_tid'].iloc[0])))}")
+                    st.markdown("---")
+
                 # ── Who to contact — scoped to this campaign ─────────────────
                 st.markdown("##### 🎯 Who to contact")
                 if _z_real.empty:
