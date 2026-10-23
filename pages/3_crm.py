@@ -1612,8 +1612,15 @@ def _human_click_rows(track_df, sends_df):
     himself passes that test, and then every scanned URL is attributed to him.
     On the Oct-23 campaign that turned ~45 real clicks into 868.
 
-    A row is a sweep if that person hit >=3 distinct URLs within 10 seconds of
-    it — the signature of mail-security software opening every link at once.
+    Three machine signatures, all seen on the Oct-23 campaign:
+      - >=3 distinct URLs within 60s  (scanner walking every link)
+      - the SAME url hit twice within 3s (prefetch / double-fetch: nobody
+        clicks the same link 400ms apart)
+      - repeats of one url by one person, which are collapsed to a single
+        row carrying a "times" count rather than listed over and over
+
+    What survives is one row per person per link, with the first time it was
+    hit and how many times.
     """
     import pandas as _pd
     if (track_df is None or track_df.empty or sends_df is None or sends_df.empty
@@ -1634,13 +1641,34 @@ def _human_click_rows(track_df, sends_df):
         return _pd.DataFrame()
     keep = []
     for _em, g in j.groupby("to_email"):
+        g = g.sort_values("_ev_ts")
         for _i, r in g.iterrows():
-            near = g[(g["_ev_ts"] - r["_ev_ts"]).abs() <= _pd.Timedelta(seconds=10)]
-            if near["dest_url"].nunique() < 3:
-                keep.append(_i)
-    out = j.loc[keep].copy()
+            win = g[(g["_ev_ts"] - r["_ev_ts"]).abs() <= _pd.Timedelta(seconds=60)]
+            if win["dest_url"].nunique() >= 3:
+                continue                      # scanner walking the whole mail
+            same = g[(g["dest_url"] == r["dest_url"])
+                     & ((g["_ev_ts"] - r["_ev_ts"]).abs() <= _pd.Timedelta(seconds=3))]
+            if len(same) > 1 and r["_ev_ts"] != same["_ev_ts"].min():
+                continue                      # the echo of a double-fetch
+            if len(same) > 1:
+                # keep the first of the pair, but mark it machine-made
+                keep.append((_i, True))
+                continue
+            keep.append((_i, False))
+    if not keep:
+        return _pd.DataFrame()
+    idx = [i for i, _m in keep]
+    out = j.loc[idx].copy()
+    out["_machine"] = [m for _i, m in keep]
     if "_ts" in out.columns:
         out["_mins"] = (out["_ev_ts"] - out["_ts"]).dt.total_seconds() / 60.0
+    # Collapse repeats of the same link by the same person into one row.
+    out = out.sort_values("_ev_ts")
+    grp = out.groupby(["to_email", "dest_url"], as_index=False)
+    out = grp.agg(**{c: (c, "first") for c in
+                     ("to_name", "company", "subject", "_ev_ts", "_mins", "_machine")
+                     if c in out.columns},
+                  _times=("dest_url", "size"))
     return out
 
 
@@ -3761,7 +3789,11 @@ with tab_analytics, _tab_guard("Analytics"):
                         "the link counts above are far higher than the number of "
                         "people below — a row here means one person, one link, "
                         "not part of a burst. **Minutes** is the time after their "
-                        "send: the longer the gap, the more certain it was a human."
+                        "send: the longer the gap, the more certain it was a human.  \n"
+                        "**Hits** = how many times that person hit that same link "
+                        "(repeats collapsed into one row). **⚠️** flags a link "
+                        "fetched twice within 3 seconds — a prefetch, not a second "
+                        "click."
                     )
                     _wc = _human_click_rows(track_df, _zs)
                     if _wc is None or _wc.empty:
@@ -3775,12 +3807,15 @@ with tab_analytics, _tab_guard("Analytics"):
                             "Link": str(r.get("dest_url", ""))[:70],
                             "Video?": "▶️" if "youtu" in str(r.get("dest_url", "")).lower() else "",
                             "Mins after send": round(float(r.get("_mins") or 0), 1),
+                            "Hits": int(r.get("_times") or 1),
+                            "Likely machine": "⚠️" if r.get("_machine") else "",
                         } for _, r in _wc.iterrows()]
                         st.dataframe(pd.DataFrame(_wc_rows), use_container_width=True,
                                      hide_index=True,
                                      height=min(420, 80 + 35 * len(_wc_rows)))
                         _vid = _wc[_wc["dest_url"].astype(str).str.contains(
-                            "youtu", case=False, na=False)]
+                            "youtu", case=False, na=False)
+                            & ~_wc["_machine"].astype(bool)]
                         if not _vid.empty:
                             st.caption(
                                 f"**{_vid['to_email'].nunique()} people clicked the video.** "
