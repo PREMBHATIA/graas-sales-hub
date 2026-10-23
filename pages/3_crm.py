@@ -3587,9 +3587,13 @@ with tab_analytics, _tab_guard("Analytics"):
                         + (f"  \n**{_missed} of the clickers show no open at all** — "
                            "their gateway strips the pixel but the click still lands, "
                            "so a reads-only list misses them." if _missed else ""))
+                    # Tall enough to screenshot the whole actionable block in one
+                    # go: every Highest-intent row plus a good slice of High,
+                    # rather than an 11-row window that needs three screenshots.
+                    _fu_h = min(1600, 80 + 35 * max(len(_fu_df), _n3 + _n2))
                     st.dataframe(
                         _fu_df, use_container_width=True, hide_index=True,
-                        height=min(460, 80 + 35 * len(_fu_df)),
+                        height=_fu_h,
                         column_config={"Write to them": st.column_config.LinkColumn(
                             "Write to them", display_text=r"mailto:(.*)")})
                     st.download_button(
@@ -3800,6 +3804,46 @@ with tab_analytics, _tab_guard("Analytics"):
                             _lv.columns = ["Link", "Clicks"]
                             st.dataframe(_lv, use_container_width=True, hide_index=True,
                                          height=min(300, 80 + 35 * len(_lv)))
+                # ── Internal copies ──────────────────────────────────────────
+                # Watchers get one [Internal] copy, tracked like any other send,
+                # so the same open/click evidence applies. Deliberately NOT in
+                # the sheet that goes to sales — this is the team, not pipeline.
+                _ic = log_df[(log_df["subject"].astype(str) == f"[Internal] {_zc}")
+                             & (log_df["status"].astype(str) == "sent")].copy()
+                if not _ic.empty:
+                    _ic["_tid"] = _ic["tracking_id"].astype(str).str.strip()
+                    _ic_clicks = _human_click_rows(track_df, _ic.assign(
+                        _ts=pd.to_datetime(_ic["timestamp_utc"], errors="coerce", utc=True)))
+                    _ic_clicked = (set(_ic_clicks[~_ic_clicks["_machine"].astype(bool)]["to_email"])
+                                   if _ic_clicks is not None and not _ic_clicks.empty else set())
+                    _ic_rows, _n_op, _n_ck = [], 0, 0
+                    for _, _r in _ic.sort_values("to_email").iterrows():
+                        _n = int(_reads_s.get(_r["_tid"], 0))
+                        _ck = _r["to_email"] in _ic_clicked
+                        if _ck:
+                            _st, _n_ck = "🖱️ Clicked", _n_ck + 1
+                        elif _n:
+                            _st = f"📖 Opened{f' {_n}x' if _n > 1 else ''}"
+                        elif _r["_tid"] in _beacon_ids:
+                            _st = "— Delivered, not opened"
+                        else:
+                            _st = "— No trace"
+                        if _n or _ck:
+                            _n_op += 1
+                        _ic_rows.append({"Who": str(_r["to_email"]).split("@")[0],
+                                         "Email": _r["to_email"], "Status": _st,
+                                         "When (IST)": _last_ist([_r["_tid"]]) if (_n or _ck) else "—"})
+                    _ic_df = pd.DataFrame(_ic_rows).sort_values("Status", ascending=False)
+                    with st.expander(f"📣 Internal copies — {_n_op} of {len(_ic_df)} "
+                                     f"opened it ({_n_ck} clicked)"):
+                        st.caption(
+                            "The watcher list, not prospects — kept off the sales "
+                            "sheet on purpose. Same tracking as any send, so the "
+                            "same caveat applies: a blocked pixel reads as "
+                            "unopened.")
+                        st.dataframe(_ic_df, use_container_width=True, hide_index=True,
+                                     height=min(620, 80 + 35 * len(_ic_df)))
+
                 with st.expander("🖱️ Who clicked what — by person"):
                     st.caption(
                         "Scanner sweeps removed. Mail-security software opens "
