@@ -1,6 +1,7 @@
 """CRM & Email Outreach — Unified contacts from All-e Active & Dropped leads."""
 
 import os
+import time as _time
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -546,14 +547,32 @@ def load_crm_data():
     # ImportError on Streamlit Cloud). force_refresh because fetch_sheet_tab
     # otherwise serves a disk cache that can be hours stale.
     ankit_contacts = pd.DataFrame()
+    _ankit_failed = False
     try:
         from services.sheets_client import fetch_sheet_tab as _ft
         _aid = os.getenv("ALLE_SHEET_ID", "")
         if _aid:
-            try:
-                _ank_raw = _ft(_aid, "Ankit's", force_refresh=True)
-            except TypeError:
-                _ank_raw = _ft(_aid, "Ankit's")
+            # Retry: a single transient Sheets failure here used to drop 371 of
+            # 577 contacts in silence, and @st.cache_data then served that
+            # 206-contact result for the whole TTL. A campaign sent from it
+            # would reach a third of the list and look complete.
+            _ank_raw, _ank_exc = None, None
+            for _att in range(3):
+                try:
+                    try:
+                        _ank_raw = _ft(_aid, "Ankit's", force_refresh=True)
+                    except TypeError:
+                        _ank_raw = _ft(_aid, "Ankit's")
+                    _ank_exc = None
+                    break
+                except Exception as _e:
+                    _ank_exc, _ank_raw = _e, None
+                    if _att < 2:
+                        _time.sleep(0.6 * (2 ** _att))
+            if _ank_exc is not None or _ank_raw is None or _ank_raw.empty:
+                # Loud, not silent. The page still renders, but it now KNOWS
+                # the contact set is partial and says so everywhere it matters.
+                _ankit_failed = True
             if _ank_raw is not None and not _ank_raw.empty:
                 _ank_df = _standardize_columns(_ank_raw)
                 _parts = []
@@ -574,7 +593,8 @@ def load_crm_data():
                     ankit_contacts["_overlay"] = False
                     ankit_contacts["_list"] = "ankit"
     except Exception:
-        ankit_contacts = pd.DataFrame()   # never break the page over one tab
+        ankit_contacts = pd.DataFrame()
+        _ankit_failed = True
 
     overlay_contacts = _load_overlay()
 
@@ -603,6 +623,9 @@ def load_crm_data():
     # than the local build, so coerce explicitly rather than trusting concat.
     # Any source that didn't set '_list' (the CSV overlay) follows up through
     # the pipeline owners, so default it there rather than leaving it blank.
+    # Carried as a column because @st.cache_data returns only the value — the
+    # page must be able to tell a partial load from a real one.
+    merged["_src_incomplete"] = bool(_ankit_failed)
     if "_list" not in merged.columns:
         merged["_list"] = "pipeline"
     _lv = merged["_list"].astype(str).str.strip().str.lower()
@@ -636,6 +659,21 @@ if _alle_id:
 if st.button("🔄 Refresh CRM Data"):
     st.cache_data.clear()
     st.rerun()
+
+# Partial-load alarm. A failed read of one source tab used to vanish silently
+# and get cached; a campaign built on it would have reached a third of the list
+# and looked complete. Everything downstream (segments, composer, counts) is
+# wrong while this is showing.
+_SRC_INCOMPLETE = bool(contacts["_src_incomplete"].any()) if "_src_incomplete" in contacts.columns else False
+if _SRC_INCOMPLETE:
+    st.error(
+        "🚨 **Contacts are INCOMPLETE — do not send.** Ankit's tab could not be "
+        "read, so only the Overall Pipeline contacts loaded. Every count, "
+        "segment and recipient list on this page is missing those contacts. "
+        "Press **🔄 Refresh CRM Data** above; if it keeps failing, Google Sheets "
+        "is rate-limiting us — wait a few minutes and try again.",
+        icon="🚨",
+    )
 
 # Clean up nan strings
 for col in contacts.columns:
@@ -2533,7 +2571,14 @@ with tab_compose, _tab_guard("Email Composer"):
                 # Blocked rather than auto-stripped: silently rewriting the
                 # subject of a 577-recipient send is the worse failure.
                 bulk_blocked_reason = None
-                if _supp_read_failed:
+                if _SRC_INCOMPLETE:
+                    bulk_blocked_reason = (
+                        "**Contacts are incomplete** — Ankit's tab failed to load, "
+                        "so this segment is missing those contacts. Sending now "
+                        "would reach only part of the list and look complete. "
+                        "Press **🔄 Refresh CRM Data** at the top and try again."
+                    )
+                if _supp_read_failed and not bulk_blocked_reason:
                     bulk_blocked_reason = (
                         "Could not read the **suppression list**, so there is no "
                         "way to tell who has unsubscribed. Sending now could mail "
