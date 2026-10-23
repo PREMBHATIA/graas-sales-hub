@@ -3533,8 +3533,15 @@ with tab_analytics, _tab_guard("Analytics"):
                         _fsig = " · ".join(_bits)
                     elif _fn == 1:
                         _tier, _frank, _fsig = "High intent", 2, "opened once"
+                    elif _fr["_tid"] in _beacon_ids:
+                        # A pixel fetch PROVES the mail arrived, even when it was
+                        # a security scanner that fetched it. So this is "it got
+                        # there and nobody read it" — a different problem from
+                        # "we have no sign it ever arrived", and a different
+                        # follow-up: reword and resend vs. find another route in.
+                        _tier, _frank, _fsig = "Not read", 1, "delivered, never opened"
                     else:
-                        _tier, _frank, _fsig = "Not reached", 1, "no open, no click"
+                        _tier, _frank, _fsig = "Not reached", 0, "no delivery evidence"
                     _prev = _fu.get(_fem)
                     if _prev is None or _frank > _prev["_rank"]:
                         _fu[_fem] = {
@@ -3550,11 +3557,12 @@ with tab_analytics, _tab_guard("Analytics"):
                               .drop(columns=["_rank"]).reset_index(drop=True))
                     _n3 = _isum(_fu_df["Intent"] == "🔥 Highest intent")
                     _n2 = _isum(_fu_df["Intent"] == "High intent")
-                    _n1 = _isum(_fu_df["Intent"] == "Not reached")
+                    _n1 = _isum(_fu_df["Intent"] == "Not read")
+                    _n0 = _isum(_fu_df["Intent"] == "Not reached")
                     _read_ids = set(_zs[_zs["_tid"].map(_reads_s).fillna(0) >= 1]["to_email"])
                     _missed = len(_clicked_any - _read_ids)
                     st.markdown("##### 🎯 Intent")
-                    _c1, _c2, _c3 = st.columns(3)
+                    _c1, _c2, _c3, _c4 = st.columns(4)
                     with _c1:
                         st.metric("🔥 Highest intent", _n3,
                                   help="Opened more than once, or clicked a link. "
@@ -3562,13 +3570,20 @@ with tab_analytics, _tab_guard("Analytics"):
                     with _c2:
                         st.metric("High intent", _n2, help="Opened once, no click.")
                     with _c3:
-                        st.metric("Not reached", _n1,
-                                  help="Sent, but no pixel fetch and no click. Usually a "
-                                       "gateway stripping the pixel rather than "
-                                       "non-delivery — absence of evidence, not proof.")
+                        st.metric("Not read", _n1,
+                                  help="It ARRIVED — a pixel was fetched, even if by a "
+                                       "scanner — and nobody opened it. The copy or the "
+                                       "subject line is the problem, not delivery.")
+                    with _c4:
+                        st.metric("Not reached", _n0,
+                                  help="No pixel fetch and no click: no evidence it "
+                                       "arrived at all. Could be a gateway stripping the "
+                                       "pixel OR genuine non-delivery — absence of "
+                                       "evidence, not proof of either.")
                     st.caption(
-                        "One row per person, strongest first. **Not reached** means no "
-                        "evidence it arrived, not proof it didn't."
+                        "One row per person, strongest first. **Not read** arrived and "
+                        "was ignored — a copy problem. **Not reached** left no trace at "
+                        "all, which is a delivery question, not proof it bounced."
                         + (f"  \n**{_missed} of the clickers show no open at all** — "
                            "their gateway strips the pixel but the click still lands, "
                            "so a reads-only list misses them." if _missed else ""))
