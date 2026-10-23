@@ -588,6 +588,19 @@ def load_crm_data():
     if "email" in merged.columns:
         _k = merged["email"].astype(str).str.strip().str.lower()
         merged = merged[(_k == "") | ~_k.duplicated(keep="first")].reset_index(drop=True)
+    # Concatenating sources whose date columns differ (tz-aware vs naive, or an
+    # all-empty column from one tab) yields an OBJECT dtype, and the later
+    # `pd.Timestamp.now() - last_contact` then raises TypeError and takes the
+    # whole page down. Newer pandas on Streamlit Cloud is stricter about this
+    # than the local build, so coerce explicitly rather than trusting concat.
+    for _dc in ("first_contact", "last_contact"):
+        if _dc in merged.columns:
+            _col = pd.to_datetime(merged[_dc], errors="coerce", utc=True)
+            try:
+                _col = _col.dt.tz_localize(None)
+            except (AttributeError, TypeError):
+                pass
+            merged[_dc] = _col
     return merged
 
 
@@ -619,7 +632,18 @@ for col in contacts.columns:
 
 contacts['has_email'] = contacts['email'].str.contains('@', na=False)
 if 'last_contact' in contacts.columns:
-    contacts['days_silent'] = (pd.Timestamp.now() - contacts['last_contact']).dt.days
+    # Belt and braces: the loader coerces these, but a page-down from a date
+    # dtype is never worth it - fall back to an empty column instead.
+    try:
+        _lc = pd.to_datetime(contacts['last_contact'], errors='coerce')
+        try:
+            _lc = _lc.dt.tz_localize(None)
+        except (AttributeError, TypeError):
+            pass
+        contacts['last_contact'] = _lc
+        contacts['days_silent'] = (pd.Timestamp.now() - _lc).dt.days
+    except Exception:
+        contacts['days_silent'] = pd.NA
 
 # ── Recency bucket ───────────────────────────────────────────────────────────
 def _recency_bucket(d):
