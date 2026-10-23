@@ -1603,6 +1603,47 @@ _CLICK_SWEEP_URLS = 2
 _CLICK_SWEEP_WIN_SEC = 180
 
 
+def _human_click_rows(track_df, sends_df):
+    """Click rows with scanner sweeps removed — ROW level, not per-person.
+
+    _human_click_counts answers "did a human click at all", which is the right
+    question for a rate. It is the wrong one for "who clicked WHAT": a person
+    whose security scanner followed all four links and who later clicked one
+    himself passes that test, and then every scanned URL is attributed to him.
+    On the Oct-23 campaign that turned ~45 real clicks into 868.
+
+    A row is a sweep if that person hit >=3 distinct URLs within 10 seconds of
+    it — the signature of mail-security software opening every link at once.
+    """
+    import pandas as _pd
+    if (track_df is None or track_df.empty or sends_df is None or sends_df.empty
+            or "tracking_id" not in track_df.columns):
+        return _pd.DataFrame()
+    ev = track_df[track_df["event"] == "click"].copy()
+    if ev.empty or "dest_url" not in ev.columns:
+        return _pd.DataFrame()
+    ev["_ev_ts"] = _pd.to_datetime(ev.get("ts_utc"), errors="coerce", utc=True)
+    sdf = sends_df.copy()
+    sdf["tracking_id"] = sdf["tracking_id"].astype(str).str.strip()
+    cols = [c for c in ("tracking_id", "to_email", "to_name", "company", "subject", "_ts")
+            if c in sdf.columns]
+    ev["tracking_id"] = ev["tracking_id"].astype(str).str.strip()
+    j = ev.merge(sdf[cols], on="tracking_id", how="left")
+    j = j[j["_ev_ts"].notna() & j.get("to_email").notna()]
+    if j.empty:
+        return _pd.DataFrame()
+    keep = []
+    for _em, g in j.groupby("to_email"):
+        for _i, r in g.iterrows():
+            near = g[(g["_ev_ts"] - r["_ev_ts"]).abs() <= _pd.Timedelta(seconds=10)]
+            if near["dest_url"].nunique() < 3:
+                keep.append(_i)
+    out = j.loc[keep].copy()
+    if "_ts" in out.columns:
+        out["_mins"] = (out["_ev_ts"] - out["_ts"]).dt.total_seconds() / 60.0
+    return out
+
+
 def _human_click_counts(track_df, sends_df):
     """{tracking_id: human_click_count} — scanner sweeps and prefetch removed."""
     import pandas as _pd
@@ -3713,6 +3754,41 @@ with tab_analytics, _tab_guard("Analytics"):
                             _lv.columns = ["Link", "Clicks"]
                             st.dataframe(_lv, use_container_width=True, hide_index=True,
                                          height=min(300, 80 + 35 * len(_lv)))
+                with st.expander("🖱️ Who clicked what — by person"):
+                    st.caption(
+                        "Scanner sweeps removed. Mail-security software opens "
+                        "**every** link the moment a mail arrives, which is why "
+                        "the link counts above are far higher than the number of "
+                        "people below — a row here means one person, one link, "
+                        "not part of a burst. **Minutes** is the time after their "
+                        "send: the longer the gap, the more certain it was a human."
+                    )
+                    _wc = _human_click_rows(track_df, _zs)
+                    if _wc is None or _wc.empty:
+                        st.caption("No human-paced clicks recorded for this campaign.")
+                    else:
+                        _wc = _wc.sort_values("_mins")
+                        _wc_rows = [{
+                            "Who": str(r.get("to_name") or r.get("to_email", "")),
+                            "Email": r.get("to_email", ""),
+                            "Company": r.get("company", ""),
+                            "Link": str(r.get("dest_url", ""))[:70],
+                            "Video?": "▶️" if "youtu" in str(r.get("dest_url", "")).lower() else "",
+                            "Mins after send": round(float(r.get("_mins") or 0), 1),
+                        } for _, r in _wc.iterrows()]
+                        st.dataframe(pd.DataFrame(_wc_rows), use_container_width=True,
+                                     hide_index=True,
+                                     height=min(420, 80 + 35 * len(_wc_rows)))
+                        _vid = _wc[_wc["dest_url"].astype(str).str.contains(
+                            "youtu", case=False, na=False)]
+                        if not _vid.empty:
+                            st.caption(
+                                f"**{_vid['to_email'].nunique()} people clicked the video.** "
+                                "A click is not a view — we can see they opened YouTube, "
+                                "not whether they watched. Watch time lives in YouTube "
+                                "Studio and is not per-recipient."
+                            )
+
                 with st.expander("🏢 Every account on this campaign (including silent) "
                                  "— with delivery evidence"):
                     st.caption("**Reached mailbox** counts sends with ANY pixel fetch — "
