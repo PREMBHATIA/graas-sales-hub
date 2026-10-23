@@ -1036,6 +1036,262 @@ def _fetch_watchers_page() -> list:
     return out
 
 
+# ── Engagement helpers ───────────────────────────────────────────────────
+# Moved above st.tabs: the Contacts dashboard now shows internal-copy
+# engagement at the top, and a helper defined below its first caller is a
+# NameError on deploy even though py_compile stays green. Analytics still
+# owns the heavy use of these; they just have to EXIST before the first
+# tab body runs, because Streamlit executes every tab body on every load.
+@st.cache_data(ttl=90, show_spinner=False)
+def _cached_log_df():
+    """The Sends log, one read per 90s — Analytics reuses this everywhere.
+
+    Returns None when the sheet could not be READ. Analytics used to render
+    "No sends logged yet" over a transient Sheets failure, which reads as
+    "nothing was sent" on the day of a 577-recipient campaign.
+    """
+    from services.email_sender import recent_sends
+    return recent_sends(limit=10000, strict=True)
+
+
+@st.cache_data(ttl=90, show_spinner=False)
+def _cached_tracking_df():
+    """The open/click beacon log, one read per 90s."""
+    from services.email_sender import fetch_tracking_events
+    return fetch_tracking_events()
+
+
+# Opens are noisy: mail servers and scanners fetch the pixel on arrival (a burst
+# within seconds of the send), and a single reader's client can re-fetch it many
+# times while the mail sits open. "Human" opens = events at least
+# _OPEN_PREFETCH_SEC after the send, collapsed into _OPEN_BUCKET_MIN windows.
+_OPEN_PREFETCH_SEC = 60
+_OPEN_BUCKET_MIN = 10
+
+
+def _human_open_counts(track_df, sends_df, within_hours=None):
+    """{tracking_id: human_open_count} — prefetch burst removed, repeats collapsed.
+
+    within_hours caps how long after the send an open still counts. Comparing a
+    campaign sent this morning against one sent a month ago on lifetime opens
+    flatters the old one purely for having been around longer; capping both at
+    the same age makes them like-for-like.
+    """
+    import pandas as _pd
+    if (track_df is None or track_df.empty or sends_df is None or sends_df.empty
+            or "tracking_id" not in track_df.columns or "tracking_id" not in sends_df.columns):
+        return {}
+    ev = track_df[track_df["event"] == "open"].copy()
+    if ev.empty:
+        return {}
+    ev["_ev_ts"] = _pd.to_datetime(ev.get("ts_utc"), errors="coerce", utc=True)
+    base = sends_df[["tracking_id", "_ts"]].copy()
+    base["tracking_id"] = base["tracking_id"].astype(str).str.strip()
+    ev = ev.merge(base, on="tracking_id", how="inner")
+    ev = ev[ev["_ev_ts"].notna() & ev["_ts"].notna()]
+    if ev.empty:
+        return {}
+    ev["_lag"] = (ev["_ev_ts"] - ev["_ts"]).dt.total_seconds()
+    ev = ev[ev["_lag"] > _OPEN_PREFETCH_SEC]
+    if within_hours is not None:
+        ev = ev[ev["_lag"] <= within_hours * 3600]
+    if ev.empty:
+        return {}
+    # Strip synchronised gateway bursts, per campaign, with the SAME rule as
+    # _real_read_ids — otherwise "read it 3+ times" counts sweep traffic while
+    # "Real reads" beside it doesn't. That mismatch made Aug's Circulated read
+    # 55 when only 15 survive the shared rule: the other 40 were a mail
+    # gateway re-fetching, not people coming back.
+    if "subject" in sends_df.columns:
+        # A window is a burst when many DISTINCT recipients of the same
+        # campaign fire in it — first opens or repeats. The earlier version
+        # flagged on first opens only, so a gateway's second sweep two hours
+        # later (dozens of recipients, same 10 minutes) sailed through and
+        # kept Aug's "came back 3+ times" inflated.
+        _subj = dict(zip(sends_df["tracking_id"].astype(str).str.strip(),
+                         sends_df["subject"].astype(str).str.strip()))
+        _n_by_subj = (sends_df.assign(
+            _sj=sends_df["subject"].astype(str).str.strip())
+            .groupby("_sj")["tracking_id"].size().to_dict())
+        ev["_sj"] = ev["tracking_id"].map(_subj)
+        ev["_w"] = ev["_ev_ts"].dt.floor(_BURST_WINDOW)
+        _win = ev.groupby(["_sj", "_w"])["tracking_id"].nunique()
+        _drop = {(_sj, _w) for (_sj, _w), _c in _win.items()
+                 if _c >= max(3, int(_n_by_subj.get(_sj, 0) * _BURST_SHARE))}
+        if _drop:
+            ev = ev[~ev.set_index(["_sj", "_w"]).index.isin(_drop)]
+        if ev.empty:
+            return {}
+    ev["_bucket"] = (ev["_lag"] // (_OPEN_BUCKET_MIN * 60)).astype(int)
+    return (ev.drop_duplicates(["tracking_id", "_bucket"])
+              .groupby("tracking_id").size().to_dict())
+
+
+# Clicks were counted raw while opens were de-noised — so every corporate mail
+# filter that follows links to check them safe registered as engagement. It is
+# unmistakable in the data: median lag from send to "click" was 69 seconds, and
+# 84 recipients hit the footer link and 82 the CTA — every link in the email,
+# once each. Two rules, mirroring the open logic:
+#   1. drop anything inside the prefetch window (nobody reads and clicks in 60s)
+#   2. drop a recipient whose clicks touch 2+ distinct links inside 3 minutes —
+#      that is a scanner walking the email, not a person choosing a link
+# On the Aug campaign this takes 202 raw events down to 13 genuine human clicks.
+_CLICK_SWEEP_URLS = 2
+_CLICK_SWEEP_WIN_SEC = 180
+
+
+def _human_click_rows(track_df, sends_df):
+    """Click rows with scanner sweeps removed — ROW level, not per-person.
+
+    _human_click_counts answers "did a human click at all", which is the right
+    question for a rate. It is the wrong one for "who clicked WHAT": a person
+    whose security scanner followed all four links and who later clicked one
+    himself passes that test, and then every scanned URL is attributed to him.
+    On the Oct-23 campaign that turned ~45 real clicks into 868.
+
+    Three machine signatures, all seen on the Oct-23 campaign:
+      - >=3 distinct URLs within 60s  (scanner walking every link)
+      - the SAME url hit twice within 3s (prefetch / double-fetch: nobody
+        clicks the same link 400ms apart)
+      - repeats of one url by one person, which are collapsed to a single
+        row carrying a "times" count rather than listed over and over
+
+    What survives is one row per person per link, with the first time it was
+    hit and how many times.
+    """
+    import pandas as _pd
+    if (track_df is None or track_df.empty or sends_df is None or sends_df.empty
+            or "tracking_id" not in track_df.columns):
+        return _pd.DataFrame()
+    ev = track_df[track_df["event"] == "click"].copy()
+    if ev.empty or "dest_url" not in ev.columns:
+        return _pd.DataFrame()
+    ev["_ev_ts"] = _pd.to_datetime(ev.get("ts_utc"), errors="coerce", utc=True)
+    sdf = sends_df.copy()
+    sdf["tracking_id"] = sdf["tracking_id"].astype(str).str.strip()
+    cols = [c for c in ("tracking_id", "to_email", "to_name", "company", "subject", "_ts")
+            if c in sdf.columns]
+    ev["tracking_id"] = ev["tracking_id"].astype(str).str.strip()
+    j = ev.merge(sdf[cols], on="tracking_id", how="left")
+    j = j[j["_ev_ts"].notna() & j.get("to_email").notna()]
+    if j.empty:
+        return _pd.DataFrame()
+    keep = []
+    for _em, g in j.groupby("to_email"):
+        g = g.sort_values("_ev_ts")
+        for _i, r in g.iterrows():
+            win = g[(g["_ev_ts"] - r["_ev_ts"]).abs() <= _pd.Timedelta(seconds=60)]
+            if win["dest_url"].nunique() >= 3:
+                continue                      # scanner walking the whole mail
+            same = g[(g["dest_url"] == r["dest_url"])
+                     & ((g["_ev_ts"] - r["_ev_ts"]).abs() <= _pd.Timedelta(seconds=3))]
+            if len(same) > 1 and r["_ev_ts"] != same["_ev_ts"].min():
+                continue                      # the echo of a double-fetch
+            if len(same) > 1:
+                # keep the first of the pair, but mark it machine-made
+                keep.append((_i, True))
+                continue
+            keep.append((_i, False))
+    if not keep:
+        return _pd.DataFrame()
+    idx = [i for i, _m in keep]
+    out = j.loc[idx].copy()
+    out["_machine"] = [m for _i, m in keep]
+    if "_ts" in out.columns:
+        out["_mins"] = (out["_ev_ts"] - out["_ts"]).dt.total_seconds() / 60.0
+    # Collapse repeats of the same link by the same person into one row.
+    out = out.sort_values("_ev_ts")
+    grp = out.groupby(["to_email", "dest_url"], as_index=False)
+    out = grp.agg(**{c: (c, "first") for c in
+                     ("to_name", "company", "subject", "_ev_ts", "_mins", "_machine")
+                     if c in out.columns},
+                  _times=("dest_url", "size"))
+    return out
+
+
+def _human_click_counts(track_df, sends_df):
+    """{tracking_id: human_click_count} — scanner sweeps and prefetch removed."""
+    import pandas as _pd
+    if (track_df is None or track_df.empty or sends_df is None or sends_df.empty
+            or "tracking_id" not in track_df.columns or "tracking_id" not in sends_df.columns):
+        return {}
+    ev = track_df[track_df["event"] == "click"].copy()
+    if ev.empty:
+        return {}
+    ev["_ev_ts"] = _pd.to_datetime(ev.get("ts_utc"), errors="coerce", utc=True)
+    base = sends_df[["tracking_id", "_ts"]].copy()
+    base["tracking_id"] = base["tracking_id"].astype(str).str.strip()
+    ev = ev.merge(base, on="tracking_id", how="inner")
+    ev = ev[ev["_ev_ts"].notna() & ev["_ts"].notna()]
+    if ev.empty:
+        return {}
+    ev["_lag"] = (ev["_ev_ts"] - ev["_ts"]).dt.total_seconds()
+    ev = ev[ev["_lag"] > _OPEN_PREFETCH_SEC]
+    if ev.empty:
+        return {}
+    if "dest_url" in ev.columns:
+        _g = ev.groupby("tracking_id")["dest_url"].nunique()
+        _span = ev.groupby("tracking_id")["_lag"].agg(lambda x: x.max() - x.min())
+        _sweeps = set(_g[(_g >= _CLICK_SWEEP_URLS)
+                         & (_span <= _CLICK_SWEEP_WIN_SEC)].index)
+        ev = ev[~ev["tracking_id"].isin(_sweeps)]
+    if ev.empty:
+        return {}
+    return ev.groupby("tracking_id").size().to_dict()
+
+
+# A "real read" is a first open that is more than 60s after the send AND not
+# part of a synchronised burst. The burst rule catches what the 60s cut cannot:
+# a mail gateway that sweeps a few minutes AFTER delivery. On 26 Aug, 92 of 132
+# recipients first opened inside the same 10-minute wall-clock window — 92
+# people at 92 companies do not do that, software does.
+# Threshold: a 10-minute window holding >=10% of the campaign's recipients. There
+# are 144 such windows in a day, so 10% in one is a ~14x concentration.
+_BURST_WINDOW = "10min"
+_BURST_SHARE = 0.10
+
+
+def _real_read_ids(track_df, sends_df, within_hours=None):
+    """Tracking_ids with at least one de-noised open.
+
+    Thin wrapper over _human_open_counts so "did they read it" and "how many
+    times did they read it" can never disagree — the audit found Circulated
+    at 55 while Real reads said 39% because the two had drifted onto
+    different burst rules. One counter, one rule, everywhere.
+    """
+    return {t for t, n in _human_open_counts(
+        track_df, sends_df, within_hours=within_hours).items() if n > 0}
+
+
+# ── Log integrity ────────────────────────────────────────────────────────────
+# Restored: the burst-rule unification replaced the whole region between
+# _real_read_ids and _inbox_scan_results and silently deleted this function —
+# while every gate stayed green, because none of them EXECUTED the tab body.
+# scripts/smoke_analytics_tab.py now does exactly that on every push.
+_INTEGRITY_TOLERANCE = 0.02
+
+
+def _log_integrity(track_df, sends_df):
+    """(bad, total, ok) — beacons timestamped before the send they belong to."""
+    import pandas as _pd
+    if (track_df is None or getattr(track_df, "empty", True)
+            or sends_df is None or sends_df.empty
+            or "tracking_id" not in track_df.columns
+            or "tracking_id" not in sends_df.columns):
+        return 0, 0, True
+    ev = track_df.copy()
+    ev["_ev_ts"] = _pd.to_datetime(ev.get("ts_utc"), errors="coerce", utc=True)
+    base = sends_df[["tracking_id", "_ts"]].copy()
+    base["tracking_id"] = base["tracking_id"].astype(str).str.strip()
+    ev["tracking_id"] = ev["tracking_id"].astype(str).str.strip()
+    ev = ev.merge(base, on="tracking_id", how="inner")
+    ev = ev[ev["_ev_ts"].notna() & ev["_ts"].notna()]
+    if ev.empty:
+        return 0, 0, True
+    bad = _isum((ev["_ev_ts"] - ev["_ts"]).dt.total_seconds() < 0)
+    return bad, len(ev), (bad / len(ev)) <= _INTEGRITY_TOLERANCE
+
+
 tab_contacts, tab_segments, tab_compose, tab_calendar, tab_analytics = st.tabs([
     "👥 Contacts",
     "🎯 Segments",
@@ -1183,20 +1439,82 @@ with tab_contacts, _tab_guard("Contacts"):
     # The watcher list had no home in the UI — it lived only in a sheet tab and
     # a checkbox buried in the composer's send step, so "who are the internal
     # addresses?" had no answer on the page.
-    with st.expander(f"📣 Internal watchers ({len(_watchers)}) — who can be copied on a campaign"):
+    # ── Internal copies: who on the team read the last campaign ──────────
+    # Shown HERE, open, at the top of the landing tab. It used to be an
+    # expander at the bottom of Analytics, which Prem said he would never
+    # scroll to — a status nobody reads is the same as no status.
+    _ic_sum = None
+    try:
+        _ic_log = _cached_log_df()
+        if _ic_log is not None and not _ic_log.empty:
+            _icl = _ic_log[_ic_log["template"].astype(str)
+                           .str.endswith("(internal copy)")
+                           & (_ic_log["status"].astype(str) == "sent")].copy()
+            if not _icl.empty:
+                _icl["_ts"] = pd.to_datetime(_icl["timestamp_utc"],
+                                             errors="coerce", utc=True)
+                _icl = _icl[_icl["_ts"].notna()]
+                _last_subj = _icl.sort_values("_ts").iloc[-1]["subject"]
+                _icl = _icl[_icl["subject"] == _last_subj].copy()
+                _icl["_tid"] = _icl["tracking_id"].astype(str).str.strip()
+                _ict = _cached_tracking_df()
+                _icb = (set(_ict["tracking_id"].astype(str).str.strip())
+                        if _ict is not None and not _ict.empty else set())
+                _icr = pd.Series(_human_open_counts(_ict, _icl), dtype="int64")
+                _icc = _human_click_rows(_ict, _icl)
+                _ick = (set(_icc[~_icc["_machine"].astype(bool)]["to_email"])
+                        if _icc is not None and not _icc.empty else set())
+                _rows, _op, _ck = [], 0, 0
+                for _, _r in _icl.sort_values("to_email").iterrows():
+                    _n = int(_icr.get(_r["_tid"], 0))
+                    _c = _r["to_email"] in _ick
+                    if _c:
+                        _stat, _ck = "🖱️ Clicked", _ck + 1
+                    elif _n:
+                        _stat = f"📖 Opened{f' {_n}x' if _n > 1 else ''}"
+                    elif _r["_tid"] in _icb:
+                        _stat = "— Delivered, not opened"
+                    else:
+                        _stat = "— No trace"
+                    if _n or _c:
+                        _op += 1
+                    _rows.append({"Who": str(_r["to_email"]).split("@")[0],
+                                  "Email": _r["to_email"], "Status": _stat})
+                _ic_sum = (pd.DataFrame(_rows), _op, _ck, _last_subj)
+    except Exception:
+        _ic_sum = None
+
+    if _ic_sum is not None:
+        _icdf, _op, _ck, _subj = _ic_sum
+        st.markdown("##### 📣 Internal copies — did the team read the last campaign?")
+        _i1, _i2, _i3, _i4 = st.columns(4)
+        with _i1:
+            st.metric("Sent to", len(_icdf))
+        with _i2:
+            st.metric("Opened", _op)
+        with _i3:
+            st.metric("Clicked", _ck)
+        with _i4:
+            st.metric("Didn't open", len(_icdf) - _op)
+        st.caption(f"Campaign: **{_subj}**. Watchers are colleagues, not "
+                   "prospects — they are not in Total Contacts and never count "
+                   "against the send cap. Same tracking as any send, so a "
+                   "blocked pixel reads as unopened.")
+        st.dataframe(_icdf, use_container_width=True, hide_index=True,
+                     height=min(560, 80 + 35 * len(_icdf)))
+
+    with st.expander(f"📣 Watcher list ({len(_watchers)}) — who can be copied on a campaign"):
         if not _watchers:
             st.info("No watchers configured. Add a row per address to the "
                     "**Watchers** tab (single `email` column) of the Graas "
                     "Outreach Log sheet.")
         else:
             st.caption(
-                "These are Graas colleagues, not prospects. They get **one** "
-                "copy of a campaign — subject prefixed `[Internal]`, no "
-                "tracking pixel — and only when the watcher box is ticked in "
-                "**Email Composer → Step 4 → Send**. It defaults OFF for "
-                "follow-up batches of a campaign they have already seen, so "
-                "they are not spammed. Edit the list in the **Watchers** tab "
-                "of the Outreach Log sheet, then hit 🔄 Refresh CRM Data."
+                "Edit the list in the **Watchers** tab of the Outreach Log "
+                "sheet, then hit 🔄 Refresh CRM Data. Copies go out only when "
+                "the watcher box is ticked in **Email Composer → Step 4**, and "
+                "default OFF for follow-up batches of a campaign they have "
+                "already seen."
             )
             st.dataframe(pd.DataFrame({"email": _watchers}),
                          use_container_width=True, hide_index=True)
@@ -1503,256 +1821,6 @@ def _missing_tokens(subs: dict, used: set) -> list:
         if not v or v.lower() == "nan":
             out.append(k)
     return sorted(out)
-
-
-@st.cache_data(ttl=90, show_spinner=False)
-def _cached_log_df():
-    """The Sends log, one read per 90s — Analytics reuses this everywhere.
-
-    Returns None when the sheet could not be READ. Analytics used to render
-    "No sends logged yet" over a transient Sheets failure, which reads as
-    "nothing was sent" on the day of a 577-recipient campaign.
-    """
-    from services.email_sender import recent_sends
-    return recent_sends(limit=10000, strict=True)
-
-
-@st.cache_data(ttl=90, show_spinner=False)
-def _cached_tracking_df():
-    """The open/click beacon log, one read per 90s."""
-    from services.email_sender import fetch_tracking_events
-    return fetch_tracking_events()
-
-
-# Opens are noisy: mail servers and scanners fetch the pixel on arrival (a burst
-# within seconds of the send), and a single reader's client can re-fetch it many
-# times while the mail sits open. "Human" opens = events at least
-# _OPEN_PREFETCH_SEC after the send, collapsed into _OPEN_BUCKET_MIN windows.
-_OPEN_PREFETCH_SEC = 60
-_OPEN_BUCKET_MIN = 10
-
-
-def _human_open_counts(track_df, sends_df, within_hours=None):
-    """{tracking_id: human_open_count} — prefetch burst removed, repeats collapsed.
-
-    within_hours caps how long after the send an open still counts. Comparing a
-    campaign sent this morning against one sent a month ago on lifetime opens
-    flatters the old one purely for having been around longer; capping both at
-    the same age makes them like-for-like.
-    """
-    import pandas as _pd
-    if (track_df is None or track_df.empty or sends_df is None or sends_df.empty
-            or "tracking_id" not in track_df.columns or "tracking_id" not in sends_df.columns):
-        return {}
-    ev = track_df[track_df["event"] == "open"].copy()
-    if ev.empty:
-        return {}
-    ev["_ev_ts"] = _pd.to_datetime(ev.get("ts_utc"), errors="coerce", utc=True)
-    base = sends_df[["tracking_id", "_ts"]].copy()
-    base["tracking_id"] = base["tracking_id"].astype(str).str.strip()
-    ev = ev.merge(base, on="tracking_id", how="inner")
-    ev = ev[ev["_ev_ts"].notna() & ev["_ts"].notna()]
-    if ev.empty:
-        return {}
-    ev["_lag"] = (ev["_ev_ts"] - ev["_ts"]).dt.total_seconds()
-    ev = ev[ev["_lag"] > _OPEN_PREFETCH_SEC]
-    if within_hours is not None:
-        ev = ev[ev["_lag"] <= within_hours * 3600]
-    if ev.empty:
-        return {}
-    # Strip synchronised gateway bursts, per campaign, with the SAME rule as
-    # _real_read_ids — otherwise "read it 3+ times" counts sweep traffic while
-    # "Real reads" beside it doesn't. That mismatch made Aug's Circulated read
-    # 55 when only 15 survive the shared rule: the other 40 were a mail
-    # gateway re-fetching, not people coming back.
-    if "subject" in sends_df.columns:
-        # A window is a burst when many DISTINCT recipients of the same
-        # campaign fire in it — first opens or repeats. The earlier version
-        # flagged on first opens only, so a gateway's second sweep two hours
-        # later (dozens of recipients, same 10 minutes) sailed through and
-        # kept Aug's "came back 3+ times" inflated.
-        _subj = dict(zip(sends_df["tracking_id"].astype(str).str.strip(),
-                         sends_df["subject"].astype(str).str.strip()))
-        _n_by_subj = (sends_df.assign(
-            _sj=sends_df["subject"].astype(str).str.strip())
-            .groupby("_sj")["tracking_id"].size().to_dict())
-        ev["_sj"] = ev["tracking_id"].map(_subj)
-        ev["_w"] = ev["_ev_ts"].dt.floor(_BURST_WINDOW)
-        _win = ev.groupby(["_sj", "_w"])["tracking_id"].nunique()
-        _drop = {(_sj, _w) for (_sj, _w), _c in _win.items()
-                 if _c >= max(3, int(_n_by_subj.get(_sj, 0) * _BURST_SHARE))}
-        if _drop:
-            ev = ev[~ev.set_index(["_sj", "_w"]).index.isin(_drop)]
-        if ev.empty:
-            return {}
-    ev["_bucket"] = (ev["_lag"] // (_OPEN_BUCKET_MIN * 60)).astype(int)
-    return (ev.drop_duplicates(["tracking_id", "_bucket"])
-              .groupby("tracking_id").size().to_dict())
-
-
-# Clicks were counted raw while opens were de-noised — so every corporate mail
-# filter that follows links to check them safe registered as engagement. It is
-# unmistakable in the data: median lag from send to "click" was 69 seconds, and
-# 84 recipients hit the footer link and 82 the CTA — every link in the email,
-# once each. Two rules, mirroring the open logic:
-#   1. drop anything inside the prefetch window (nobody reads and clicks in 60s)
-#   2. drop a recipient whose clicks touch 2+ distinct links inside 3 minutes —
-#      that is a scanner walking the email, not a person choosing a link
-# On the Aug campaign this takes 202 raw events down to 13 genuine human clicks.
-_CLICK_SWEEP_URLS = 2
-_CLICK_SWEEP_WIN_SEC = 180
-
-
-def _human_click_rows(track_df, sends_df):
-    """Click rows with scanner sweeps removed — ROW level, not per-person.
-
-    _human_click_counts answers "did a human click at all", which is the right
-    question for a rate. It is the wrong one for "who clicked WHAT": a person
-    whose security scanner followed all four links and who later clicked one
-    himself passes that test, and then every scanned URL is attributed to him.
-    On the Oct-23 campaign that turned ~45 real clicks into 868.
-
-    Three machine signatures, all seen on the Oct-23 campaign:
-      - >=3 distinct URLs within 60s  (scanner walking every link)
-      - the SAME url hit twice within 3s (prefetch / double-fetch: nobody
-        clicks the same link 400ms apart)
-      - repeats of one url by one person, which are collapsed to a single
-        row carrying a "times" count rather than listed over and over
-
-    What survives is one row per person per link, with the first time it was
-    hit and how many times.
-    """
-    import pandas as _pd
-    if (track_df is None or track_df.empty or sends_df is None or sends_df.empty
-            or "tracking_id" not in track_df.columns):
-        return _pd.DataFrame()
-    ev = track_df[track_df["event"] == "click"].copy()
-    if ev.empty or "dest_url" not in ev.columns:
-        return _pd.DataFrame()
-    ev["_ev_ts"] = _pd.to_datetime(ev.get("ts_utc"), errors="coerce", utc=True)
-    sdf = sends_df.copy()
-    sdf["tracking_id"] = sdf["tracking_id"].astype(str).str.strip()
-    cols = [c for c in ("tracking_id", "to_email", "to_name", "company", "subject", "_ts")
-            if c in sdf.columns]
-    ev["tracking_id"] = ev["tracking_id"].astype(str).str.strip()
-    j = ev.merge(sdf[cols], on="tracking_id", how="left")
-    j = j[j["_ev_ts"].notna() & j.get("to_email").notna()]
-    if j.empty:
-        return _pd.DataFrame()
-    keep = []
-    for _em, g in j.groupby("to_email"):
-        g = g.sort_values("_ev_ts")
-        for _i, r in g.iterrows():
-            win = g[(g["_ev_ts"] - r["_ev_ts"]).abs() <= _pd.Timedelta(seconds=60)]
-            if win["dest_url"].nunique() >= 3:
-                continue                      # scanner walking the whole mail
-            same = g[(g["dest_url"] == r["dest_url"])
-                     & ((g["_ev_ts"] - r["_ev_ts"]).abs() <= _pd.Timedelta(seconds=3))]
-            if len(same) > 1 and r["_ev_ts"] != same["_ev_ts"].min():
-                continue                      # the echo of a double-fetch
-            if len(same) > 1:
-                # keep the first of the pair, but mark it machine-made
-                keep.append((_i, True))
-                continue
-            keep.append((_i, False))
-    if not keep:
-        return _pd.DataFrame()
-    idx = [i for i, _m in keep]
-    out = j.loc[idx].copy()
-    out["_machine"] = [m for _i, m in keep]
-    if "_ts" in out.columns:
-        out["_mins"] = (out["_ev_ts"] - out["_ts"]).dt.total_seconds() / 60.0
-    # Collapse repeats of the same link by the same person into one row.
-    out = out.sort_values("_ev_ts")
-    grp = out.groupby(["to_email", "dest_url"], as_index=False)
-    out = grp.agg(**{c: (c, "first") for c in
-                     ("to_name", "company", "subject", "_ev_ts", "_mins", "_machine")
-                     if c in out.columns},
-                  _times=("dest_url", "size"))
-    return out
-
-
-def _human_click_counts(track_df, sends_df):
-    """{tracking_id: human_click_count} — scanner sweeps and prefetch removed."""
-    import pandas as _pd
-    if (track_df is None or track_df.empty or sends_df is None or sends_df.empty
-            or "tracking_id" not in track_df.columns or "tracking_id" not in sends_df.columns):
-        return {}
-    ev = track_df[track_df["event"] == "click"].copy()
-    if ev.empty:
-        return {}
-    ev["_ev_ts"] = _pd.to_datetime(ev.get("ts_utc"), errors="coerce", utc=True)
-    base = sends_df[["tracking_id", "_ts"]].copy()
-    base["tracking_id"] = base["tracking_id"].astype(str).str.strip()
-    ev = ev.merge(base, on="tracking_id", how="inner")
-    ev = ev[ev["_ev_ts"].notna() & ev["_ts"].notna()]
-    if ev.empty:
-        return {}
-    ev["_lag"] = (ev["_ev_ts"] - ev["_ts"]).dt.total_seconds()
-    ev = ev[ev["_lag"] > _OPEN_PREFETCH_SEC]
-    if ev.empty:
-        return {}
-    if "dest_url" in ev.columns:
-        _g = ev.groupby("tracking_id")["dest_url"].nunique()
-        _span = ev.groupby("tracking_id")["_lag"].agg(lambda x: x.max() - x.min())
-        _sweeps = set(_g[(_g >= _CLICK_SWEEP_URLS)
-                         & (_span <= _CLICK_SWEEP_WIN_SEC)].index)
-        ev = ev[~ev["tracking_id"].isin(_sweeps)]
-    if ev.empty:
-        return {}
-    return ev.groupby("tracking_id").size().to_dict()
-
-
-# A "real read" is a first open that is more than 60s after the send AND not
-# part of a synchronised burst. The burst rule catches what the 60s cut cannot:
-# a mail gateway that sweeps a few minutes AFTER delivery. On 26 Aug, 92 of 132
-# recipients first opened inside the same 10-minute wall-clock window — 92
-# people at 92 companies do not do that, software does.
-# Threshold: a 10-minute window holding >=10% of the campaign's recipients. There
-# are 144 such windows in a day, so 10% in one is a ~14x concentration.
-_BURST_WINDOW = "10min"
-_BURST_SHARE = 0.10
-
-
-def _real_read_ids(track_df, sends_df, within_hours=None):
-    """Tracking_ids with at least one de-noised open.
-
-    Thin wrapper over _human_open_counts so "did they read it" and "how many
-    times did they read it" can never disagree — the audit found Circulated
-    at 55 while Real reads said 39% because the two had drifted onto
-    different burst rules. One counter, one rule, everywhere.
-    """
-    return {t for t, n in _human_open_counts(
-        track_df, sends_df, within_hours=within_hours).items() if n > 0}
-
-
-# ── Log integrity ────────────────────────────────────────────────────────────
-# Restored: the burst-rule unification replaced the whole region between
-# _real_read_ids and _inbox_scan_results and silently deleted this function —
-# while every gate stayed green, because none of them EXECUTED the tab body.
-# scripts/smoke_analytics_tab.py now does exactly that on every push.
-_INTEGRITY_TOLERANCE = 0.02
-
-
-def _log_integrity(track_df, sends_df):
-    """(bad, total, ok) — beacons timestamped before the send they belong to."""
-    import pandas as _pd
-    if (track_df is None or getattr(track_df, "empty", True)
-            or sends_df is None or sends_df.empty
-            or "tracking_id" not in track_df.columns
-            or "tracking_id" not in sends_df.columns):
-        return 0, 0, True
-    ev = track_df.copy()
-    ev["_ev_ts"] = _pd.to_datetime(ev.get("ts_utc"), errors="coerce", utc=True)
-    base = sends_df[["tracking_id", "_ts"]].copy()
-    base["tracking_id"] = base["tracking_id"].astype(str).str.strip()
-    ev["tracking_id"] = ev["tracking_id"].astype(str).str.strip()
-    ev = ev.merge(base, on="tracking_id", how="inner")
-    ev = ev[ev["_ev_ts"].notna() & ev["_ts"].notna()]
-    if ev.empty:
-        return 0, 0, True
-    bad = _isum((ev["_ev_ts"] - ev["_ts"]).dt.total_seconds() < 0)
-    return bad, len(ev), (bad / len(ev)) <= _INTEGRITY_TOLERANCE
 
 
 def _inbox_scan_results() -> dict:

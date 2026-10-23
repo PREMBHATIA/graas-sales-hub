@@ -123,8 +123,12 @@ def main():
     # slice below (they're shared with earlier tabs, so they cannot move down).
     _h = src.index('def _isum(')
     exec(src[_h:src.index('\n\n', src.index('return 0', _h))], ns)
+    # End marker is the tabs declaration, not _inbox_scan_results: the
+    # engagement helpers moved ABOVE the tabs so the Contacts dashboard can use
+    # them, which left _inbox_scan_results below and made this slice swallow
+    # every tab body.
     exec(src[src.index('_OPEN_PREFETCH_SEC = 60'):
-             src.index('def _inbox_scan_results')], ns)
+             src.index('tab_contacts, tab_segments')], ns)
 
     try:
         from services.email_sender import recent_sends, fetch_tracking_events
