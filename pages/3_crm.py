@@ -448,9 +448,12 @@ def _parse_contacts(df: pd.DataFrame, segment: str) -> pd.DataFrame:
                 continue
             email = m.group(1).strip().rstrip(',')
             designation = (m.group(2) or '').strip()
-            # Derive person name from email prefix
+            # Derive person name from the email prefix — the pipeline sheet
+            # carries no real names, only "address (Designation)". Trailing
+            # disambiguation digits are stripped: sachin.kumar3@ is Sachin
+            # Kumar, and "Hi Sachin Kumar3" in a sales mail reads as careless.
             prefix = email.split('@')[0]
-            name_parts = re.split(r'[._]', prefix)
+            name_parts = [re.sub(r'\d+$', '', p) for p in re.split(r'[._-]', prefix)]
             person_name = ' '.join(p.capitalize() for p in name_parts if p)
 
             rows.append({
