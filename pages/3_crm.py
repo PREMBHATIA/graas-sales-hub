@@ -529,6 +529,13 @@ def load_crm_data():
     dropped_contacts = _parse_contacts(dropped_df, 'Dropped')
     active_contacts['_overlay'] = False
     dropped_contacts['_overlay'] = False
+    # '_list' decides which audit-BCC list a send to this contact copies in
+    # (see AUDIT_BCC_PIPELINE / AUDIT_BCC_ANKIT in services/email_sender.py).
+    # Underscored like _overlay on purpose: the sheet has its own 'Source of
+    # lead' column that _standardize_columns maps to 'source', so a tag called
+    # 'source' was silently overwritten with lead-source text.
+    active_contacts['_list'] = 'pipeline'
+    dropped_contacts['_list'] = 'pipeline'
 
     # Ankit's database (Oct 2026) — a SECOND tab in the same pipeline workbook,
     # same header shape (Lead name / Email of Key Personnel / AI Maturity).
@@ -565,6 +572,7 @@ def load_crm_data():
                 if _parts:
                     ankit_contacts = pd.concat(_parts, ignore_index=True)
                     ankit_contacts["_overlay"] = False
+                    ankit_contacts["_list"] = "ankit"
     except Exception:
         ankit_contacts = pd.DataFrame()   # never break the page over one tab
 
@@ -593,6 +601,12 @@ def load_crm_data():
     # `pd.Timestamp.now() - last_contact` then raises TypeError and takes the
     # whole page down. Newer pandas on Streamlit Cloud is stricter about this
     # than the local build, so coerce explicitly rather than trusting concat.
+    # Any source that didn't set '_list' (the CSV overlay) follows up through
+    # the pipeline owners, so default it there rather than leaving it blank.
+    if "_list" not in merged.columns:
+        merged["_list"] = "pipeline"
+    _lv = merged["_list"].astype(str).str.strip().str.lower()
+    merged["_list"] = _lv.where(_lv == "ankit", "pipeline")
     for _dc in ("first_contact", "last_contact"):
         if _dc in merged.columns:
             _col = pd.to_datetime(merged[_dc], errors="coerce", utc=True)
@@ -2027,6 +2041,20 @@ with tab_compose, _tab_guard("Email Composer"):
         suppressed_emails,
     )
 
+    def _send_email_params():
+        """Kwargs the DEPLOYED send_email accepts.
+
+        Streamlit Cloud can serve a cached older services/ module than the page,
+        so a new kwarg must be probed, not assumed — passing one it doesn't take
+        raises TypeError mid-send. The bulk loop catches that; this single send
+        checks up front instead.
+        """
+        try:
+            import inspect
+            return set(inspect.signature(send_email).parameters)
+        except Exception:
+            return set()
+
     pre_err = preflight_check()
     if pre_err:
         st.error(
@@ -2308,6 +2336,8 @@ with tab_compose, _tab_guard("Email Composer"):
                                         layout=email_layout,
                                         headline=rendered_headline_send,
                                         deck=rendered_deck_send,
+                                        **({"audit_source": str(send_target.get("_list", "pipeline") or "pipeline")}
+                                           if "audit_source" in _send_email_params() else {}),
                                     )
                                 st.session_state[confirm_key] = False
                                 # Stash result so we can show it after the rerun
@@ -2604,14 +2634,23 @@ with tab_compose, _tab_guard("Email Composer"):
                                     headline=r_headline,
                                     deck=r_deck,
                                 )
+                                # audit_source routes the audit copy to the people who
+                                # own THAT book (pipeline -> Prem/Amruta/Eunice,
+                                # Ankit's -> Ankit/Eunice). Dropped on a stale
+                                # module, which only reverts to the single list.
+                                _src = str(row.get("_list", "pipeline") or "pipeline")
                                 try:
                                     # precleared: the pre-flight pipeline above already ran
                                     # cap/suppression/dedup for the whole batch — skipping
                                     # the per-recipient re-reads keeps us under the Sheets
                                     # API quota (what dropped log rows on Aug 21).
-                                    ok_b, msg_b = send_email(precleared=True, **_b_kwargs)
+                                    ok_b, msg_b = send_email(precleared=True,
+                                                             audit_source=_src, **_b_kwargs)
                                 except TypeError:
-                                    ok_b, msg_b = send_email(**_b_kwargs)
+                                    try:
+                                        ok_b, msg_b = send_email(precleared=True, **_b_kwargs)
+                                    except TypeError:
+                                        ok_b, msg_b = send_email(**_b_kwargs)
                                 if ok_b:
                                     sent_n += 1
                                 else:

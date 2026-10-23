@@ -67,13 +67,36 @@ WATCHERS_TAB_NAME = "Watchers"
 # recipients only, no header, invisible to the prospect). Tests and internal
 # watcher copies are excluded so these folks aren't double-copied. Override
 # via env AUDIT_BCC (comma-separated); set AUDIT_BCC="" to disable.
-AUDIT_BCC_DEFAULT = ("prem@graas.ai,amruta@graas.ai,"
-                     "eunice.sarah@graas.ai,ajinkya.patil@graas.ai")
+# The audit list is per SOURCE LIST, not global (2026-10-23): the contacts come
+# from two different books and the people who follow them up are different, so
+# copying all four watchers on all 577 sends put ~370 irrelevant mails in each
+# inbox. A contact's "source" column (set in load_crm_data) picks the list.
+AUDIT_BCC_PIPELINE_DEFAULT = "prem@graas.ai,amruta@graas.ai,eunice.sarah@graas.ai"
+# Ankit's book: Ankit + Eunice. Ankit's address is NOT yet filled in — set
+# AUDIT_BCC_ANKIT in secrets to "ankit...@graas.ai,eunice.sarah@graas.ai".
+# Until then this list is Eunice only; it never guesses an address.
+AUDIT_BCC_ANKIT_DEFAULT = "eunice.sarah@graas.ai"
+
+# Back-compat: AUDIT_BCC still works as a global override / kill-switch. If it
+# is set (including to "") it wins for every source, so AUDIT_BCC="" remains
+# the one-setting way to turn audit copies off entirely.
+AUDIT_BCC_DEFAULT = AUDIT_BCC_PIPELINE_DEFAULT
 
 
-def _audit_bcc() -> list:
-    raw = os.getenv("AUDIT_BCC", AUDIT_BCC_DEFAULT)
-    return [e.strip().lower() for e in raw.split(",") if "@" in e.strip()]
+def _audit_bcc(source: str = "") -> list:
+    """Audit-copy recipients for a send, chosen by the contact's source list."""
+    raw = os.getenv("AUDIT_BCC")          # global override wins if present
+    if raw is None:
+        if str(source).strip().lower() == "ankit":
+            raw = os.getenv("AUDIT_BCC_ANKIT", AUDIT_BCC_ANKIT_DEFAULT)
+        else:
+            raw = os.getenv("AUDIT_BCC_PIPELINE", AUDIT_BCC_PIPELINE_DEFAULT)
+    seen, out = set(), []
+    for e in raw.split(","):
+        e = e.strip().lower()
+        if "@" in e and e not in seen:
+            seen.add(e); out.append(e)
+    return out
 
 # ── Open / click tracking ────────────────────────────────────────────────────
 # PIXEL_BASE_URL = the deployed Apps Script web-app URL that logs hits into the
@@ -439,6 +462,7 @@ def send_email(
     deck: str = "",
     bypass_cap: bool = False,
     precleared: bool = False,
+    audit_source: str = "",
 ) -> tuple[bool, str]:
     """Send a single email + log the result.
 
@@ -548,7 +572,7 @@ def send_email(
         "[TEST]" in (company or "") or "[INTERNAL WATCHER]" in (company or "")
         or str(template).endswith("(test)") or str(template).endswith("(internal copy)")
     )
-    _audit_to = [] if _internal_send else [b for b in _audit_bcc()
+    _audit_to = [] if _internal_send else [b for b in _audit_bcc(audit_source)
                                            if b != to_email.strip().lower()]
     _rcpts = [to_email]
 
