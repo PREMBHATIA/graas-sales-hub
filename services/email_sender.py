@@ -30,7 +30,7 @@ from email.mime.text import MIMEText
 from email.utils import formataddr, make_msgid
 from typing import Optional
 
-from .sheets_client import append_log_row, fetch_log_rows
+from .sheets_client import append_log_row, fetch_log_rows, SheetReadError
 from .email_layout import wrap_email, body_to_paragraphs, logo_mime_part
 
 
@@ -340,9 +340,19 @@ def recent_sent_emails(days: int = None) -> set:
     return set(sent["to_email"].str.lower().str.strip().tolist())
 
 
-def suppressed_emails() -> set:
-    """Return a set of lowercased suppressed emails — used for bulk filtering."""
-    df = fetch_suppressions()
+def suppressed_emails(strict: bool = True) -> set:
+    """Lowercased suppressed emails — used for bulk filtering.
+
+    strict=True (the default) raises SheetReadError when the list cannot be
+    read, rather than returning an empty set. An empty set means "nobody has
+    unsubscribed", so a transient Sheets failure used to silently clear the
+    do-not-contact list for the whole batch. Callers must let this raise and
+    block the send.
+    """
+    sheet_id = os.getenv("EMAIL_LOG_SHEET_ID", "")
+    if not sheet_id:
+        return set()
+    df = fetch_log_rows(sheet_id, SUPPRESSION_TAB_NAME, strict=strict)
     if df.empty or "email" not in df.columns:
         return set()
     return set(df["email"].str.lower().str.strip().tolist())
@@ -409,7 +419,7 @@ def get_sends_this_week() -> int:
     sheet_id = os.getenv("EMAIL_LOG_SHEET_ID", "")
     if not sheet_id:
         return 0
-    df = fetch_log_rows(sheet_id, LOG_TAB_NAME)
+    df = fetch_log_rows(sheet_id, LOG_TAB_NAME, strict=True)
     if df.empty or "timestamp_utc" not in df.columns or "status" not in df.columns:
         return 0
     cutoff = datetime.now(timezone.utc) - timedelta(days=7)
@@ -676,13 +686,20 @@ def send_email(
     return (status == "sent"), (error_msg or "ok")
 
 
-def recent_sends(limit: int = 20):
-    """Return the most recent N sends as a DataFrame."""
+def recent_sends(limit: int = 20, strict: bool = False):
+    """Return the most recent N sends as a DataFrame.
+
+    strict=True returns None when the log could not be READ, so the caller can
+    say so instead of rendering "no sends yet" over a full log.
+    """
     import pandas as pd
     sheet_id = os.getenv("EMAIL_LOG_SHEET_ID", "")
     if not sheet_id:
         return pd.DataFrame()
-    df = fetch_log_rows(sheet_id, LOG_TAB_NAME)
+    try:
+        df = fetch_log_rows(sheet_id, LOG_TAB_NAME, strict=strict)
+    except SheetReadError:
+        return None
     if df.empty:
         return df
     return df.tail(limit).iloc[::-1].reset_index(drop=True)

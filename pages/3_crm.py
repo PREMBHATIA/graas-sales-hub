@@ -1455,9 +1455,14 @@ def _missing_tokens(subs: dict, used: set) -> list:
 
 @st.cache_data(ttl=90, show_spinner=False)
 def _cached_log_df():
-    """The Sends log, one read per 90s — Analytics reuses this everywhere."""
+    """The Sends log, one read per 90s — Analytics reuses this everywhere.
+
+    Returns None when the sheet could not be READ. Analytics used to render
+    "No sends logged yet" over a transient Sheets failure, which reads as
+    "nothing was sent" on the day of a 577-recipient campaign.
+    """
     from services.email_sender import recent_sends
-    return recent_sends(limit=10000)
+    return recent_sends(limit=10000, strict=True)
 
 
 @st.cache_data(ttl=90, show_spinner=False)
@@ -2463,8 +2468,18 @@ with tab_compose, _tab_guard("Email Composer"):
                 stage_after_vh = len(after_no_touch)
 
                 # Stage 3: remove suppressed
+                # suppressed_emails() now RAISES when the list can't be read
+                # rather than returning an empty set. An empty set means
+                # "nobody unsubscribed", so a transient Sheets failure used to
+                # quietly clear the do-not-contact list for the whole batch.
+                # Fail closed: block the send and say why.
+                _supp_read_failed = ""
                 with st.spinner("Loading suppression + recent-send data…"):
-                    supp_set = suppressed_emails()
+                    try:
+                        supp_set = suppressed_emails()
+                    except Exception as _se:
+                        supp_set = set()
+                        _supp_read_failed = str(_se)
                     recent_set = recent_sent_emails(get_dedup_days())
                     watcher_list = _fetch_watchers_page()
                 sup_mask = after_no_touch["_email_norm"].isin(supp_set)
@@ -2518,9 +2533,19 @@ with tab_compose, _tab_guard("Email Composer"):
                 # Blocked rather than auto-stripped: silently rewriting the
                 # subject of a 577-recipient send is the worse failure.
                 bulk_blocked_reason = None
+                if _supp_read_failed:
+                    bulk_blocked_reason = (
+                        "Could not read the **suppression list**, so there is no "
+                        "way to tell who has unsubscribed. Sending now could mail "
+                        "people who opted out. Wait a moment and hit "
+                        "**🔄 Refresh CRM Data**.  \n"
+                        f"`{_supp_read_failed[:160]}`"
+                    )
                 _subj_check = str(subject or "")
                 _test_marker = _TEST_MARKER_RE.search(_subj_check)
-                if _test_marker:
+                if bulk_blocked_reason:
+                    pass          # suppression failure outranks everything
+                elif _test_marker:
                     bulk_blocked_reason = (
                         f"The subject still contains a test marker — "
                         f"**{_test_marker.group(0)}**. Delete it from the subject "
@@ -2614,7 +2639,9 @@ with tab_compose, _tab_guard("Email Composer"):
                     _w_dup = False
                     try:
                         _wlog = _cached_log_df()
-                        if not _wlog.empty and "subject" in _wlog.columns and "template" in _wlog.columns:
+                        if (_wlog is not None and not _wlog.empty
+                                and "subject" in _wlog.columns
+                                and "template" in _wlog.columns):
                             _int_sent = _wlog[
                                 (_wlog["status"] == "sent")
                                 & _wlog["template"].astype(str).str.endswith("(internal copy)")]
@@ -2928,7 +2955,14 @@ with tab_analytics, _tab_guard("Analytics"):
         track_df["tracking_id"] = track_df["tracking_id"].astype(str).str.strip()
         track_df["event"] = track_df.get("event", "").astype(str).str.strip().str.lower()
 
-    if log_df.empty:
+    if log_df is None:
+        st.error(
+            "📡 **Could not read the Sends log.** This is a Google Sheets read "
+            "failure, not an empty log — your campaigns are still there. "
+            "Nothing below is trustworthy until it loads. Wait a moment and "
+            "hit **🔄 Refresh CRM Data**."
+        )
+    elif log_df.empty:
         st.info("No sends logged yet. Once you send your first email from the composer, metrics will populate here.")
     else:
         # Parse timestamp once

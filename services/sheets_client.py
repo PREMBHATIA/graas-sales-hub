@@ -1,6 +1,7 @@
 """Google Sheets data client for Graas Command Center."""
 
 import os
+import time
 import json
 import hashlib
 from datetime import datetime, timedelta
@@ -150,21 +151,53 @@ def append_log_row(sheet_id: str, tab_name: str, row: list, headers: Optional[li
         return False
 
 
-def fetch_log_rows(sheet_id: str, tab_name: str) -> pd.DataFrame:
-    """Read all rows from a log sheet (no caching — always fresh for cap counting)."""
-    client = _get_writer_client()
-    if client is None:
-        return pd.DataFrame()
-    try:
-        spreadsheet = client.open_by_key(sheet_id)
-        worksheet = spreadsheet.worksheet(tab_name)
-        data = worksheet.get_all_values()
-        if not data or len(data) < 2:
-            return pd.DataFrame()
-        headers = data[0]
-        return pd.DataFrame(data[1:], columns=headers)
-    except Exception:
-        return pd.DataFrame()
+class SheetReadError(RuntimeError):
+    """A log-sheet read failed — as distinct from the tab being empty.
+
+    This distinction is the whole point: returning an empty frame on a failed
+    read made every caller believe the opposite of the truth. is_suppressed()
+    said "not suppressed" and would have mailed people who unsubscribed;
+    get_sends_this_week() said 0 and reset the cap; Analytics rendered
+    "No sends logged yet" over 485 real sends.
+    """
+
+
+def fetch_log_rows(sheet_id: str, tab_name: str, retries: int = 3,
+                   strict: bool = False) -> pd.DataFrame:
+    """Read all rows from a log sheet (no caching — always fresh for cap counting).
+
+    Transient Google Sheets API failures are common enough to see several times
+    in an afternoon, so a failed read is retried with backoff before it counts.
+    With strict=True an exhausted read raises SheetReadError instead of
+    returning an empty frame; callers making a SAFETY decision (suppression,
+    dedup, the cap) should pass it so they fail closed, not open.
+    """
+    last_exc = None
+    for attempt in range(max(1, retries)):
+        try:
+            # Inside the try: _get_writer_client can itself throw (unreadable
+            # credentials file, gspread.authorize failing), and an exception
+            # escaping here crashed the page instead of showing the banner.
+            client = _get_writer_client()
+            if client is None:
+                raise SheetReadError("No Sheets credentials available")
+            spreadsheet = client.open_by_key(sheet_id)
+            worksheet = spreadsheet.worksheet(tab_name)
+            data = worksheet.get_all_values()
+            # A tab with only headers (or nothing) is genuinely empty, not a
+            # failure — return straight away rather than burning retries.
+            if not data or len(data) < 2:
+                return pd.DataFrame()
+            return pd.DataFrame(data[1:], columns=data[0])
+        except Exception as e:
+            last_exc = e
+            if attempt < retries - 1:
+                time.sleep(0.6 * (2 ** attempt))
+
+    if strict:
+        raise SheetReadError(f"Could not read '{tab_name}' after {retries} "
+                             f"attempts: {type(last_exc).__name__}: {last_exc}")
+    return pd.DataFrame()
 
 
 def _get_drive_credentials() -> Optional[Credentials]:
