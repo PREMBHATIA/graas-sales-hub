@@ -3493,176 +3493,104 @@ with tab_analytics, _tab_guard("Analytics"):
                 for _i in _ins:
                     st.markdown(f"• {_i}")
 
-                # ── One deduped list for sales ───────────────────────────────
-                # The sections below each answer a different question and overlap:
-                # every repeat reader is also a reader, so screenshotting them
-                # sends sales the same person twice. Worse, some clickers never
-                # register as readers at all — their gateway strips the pixel
-                # while the click still lands — so the reader lists MISS them.
-                #
-                # Two tiers, Prem's cut: a second read or a click both mean the
-                # person went back to it deliberately. On the Oct-23 campaign
-                # those two groups don't intersect at all, so together they are
-                # simply everyone who did more than glance once.
+                # ── Intent ───────────────────────────────────────────────────
+                # One table, one row per person. This replaced "Who to contact"
+                # and "Read it multiple times", which asked the same question
+                # grouped differently and showed the same person up to three
+                # times. It also catches the clickers those two missed: a mail
+                # gateway that strips the tracking pixel still lets the click
+                # through the redirect, so some of the strongest signals on a
+                # campaign register as "never opened".
                 _fu = {}
                 _clicks_fu = _human_click_rows(track_df, _zs)
-                _clicked_vid, _clicked_any = set(), set()
+                _clicked_vid, _clicked_any, _click_n = set(), set(), {}
                 if _clicks_fu is not None and not _clicks_fu.empty:
                     # NOT _cf — that name holds the campaign frame later in
                     # this tab, and reusing it here silently broke it.
                     _fucf = _clicks_fu[~_clicks_fu["_machine"].astype(bool)]
                     _clicked_any = set(_fucf["to_email"])
+                    _click_n = _fucf.groupby("to_email")["_times"].sum().to_dict()
                     _clicked_vid = set(_fucf[_fucf["dest_url"].astype(str)
                                        .str.contains("youtu", case=False, na=False)]["to_email"])
                 for _, _fr in _zs.iterrows():
                     _fem = _fr["to_email"]
                     _fn = int(_reads_s.get(_fr["_tid"], 0))
-                    if _fem in _clicked_vid:
-                        _fsig, _frank = "▶️ Clicked the video", 5
-                    elif _fem in _clicked_any:
-                        _fsig, _frank = "🖱️ Clicked a link", 4
-                    elif _fn >= 3:
-                        _fsig, _frank = f"🔁 Read {_fn}x", 3
-                    elif _fn == 2:
-                        _fsig, _frank = "🔁 Read twice", 2
-                    elif _fn >= 1:
-                        _fsig, _frank = "📖 Read once", 1
+                    _fc = int(_click_n.get(_fem, 0))
+                    # A click is a deliberate act; an open can be a machine
+                    # fetching a pixel. So ANY click ranks with multiple opens,
+                    # not with a single open.
+                    if _fc or _fn >= 2:
+                        _tier, _frank = "🔥 Highest intent", 3
+                        _bits = []
+                        if _fn >= 2:
+                            _bits.append(f"opened {_fn}x")
+                        elif _fn == 1:
+                            _bits.append("opened")
+                        if _fc:
+                            _bits.append(f"clicked {_fc}x" if _fc > 1 else "clicked")
+                        if _fem in _clicked_vid:
+                            _bits.append("▶️ video")
+                        _fsig = " · ".join(_bits)
+                    elif _fn == 1:
+                        _tier, _frank, _fsig = "High intent", 2, "opened once"
                     else:
-                        continue
+                        _tier, _frank, _fsig = "Not reached", 1, "no open, no click"
                     _prev = _fu.get(_fem)
                     if _prev is None or _frank > _prev["_rank"]:
                         _fu[_fem] = {
-                            "Intent": "🔥 High" if _frank >= 2 else "Read once",
-                            "Who": _person(_fr), "Company": _fr.get("company", ""),
+                            "Intent": _tier, "Who": _person(_fr),
+                            "Company": _fr.get("company", ""),
                             "Segment": _seg_of(_fem).replace("AI ", ""),
                             "Signal": _fsig, "_rank": _frank,
-                            "When (IST)": _last_ist([_fr["_tid"]]),
+                            "When (IST)": _last_ist([_fr["_tid"]]) if _frank > 1 else "—",
                             "Write to them": f"mailto:{_fem}"}
                 if _fu:
                     _fu_df = (pd.DataFrame(list(_fu.values()))
                               .sort_values(["_rank", "Company"], ascending=[False, True])
                               .drop(columns=["_rank"]).reset_index(drop=True))
-                    _n_hot = _isum(_fu_df["Intent"] == "🔥 High")
+                    _n3 = _isum(_fu_df["Intent"] == "🔥 Highest intent")
+                    _n2 = _isum(_fu_df["Intent"] == "High intent")
+                    _n1 = _isum(_fu_df["Intent"] == "Not reached")
                     _read_ids = set(_zs[_zs["_tid"].map(_reads_s).fillna(0) >= 1]["to_email"])
                     _missed = len(_clicked_any - _read_ids)
-                    st.markdown("##### 📣 Follow-up list for sales — one row per person")
+                    st.markdown("##### 🎯 Intent")
+                    _c1, _c2, _c3 = st.columns(3)
+                    with _c1:
+                        st.metric("🔥 Highest intent", _n3,
+                                  help="Opened more than once, or clicked a link. "
+                                       "Either way they went back to it deliberately.")
+                    with _c2:
+                        st.metric("High intent", _n2, help="Opened once, no click.")
+                    with _c3:
+                        st.metric("Not reached", _n1,
+                                  help="Sent, but no pixel fetch and no click. Usually a "
+                                       "gateway stripping the pixel rather than "
+                                       "non-delivery — absence of evidence, not proof.")
                     st.caption(
-                        f"**{_n_hot} high intent** of {len(_fu_df)}. High = clicked a "
-                        "link **or** came back for a second read; both mean they "
-                        "returned to it deliberately. Each person appears once, so "
-                        "this replaces screenshotting the sections below — which "
-                        "repeat the same names."
-                        + (f"  \n**{_missed} of the clickers never register as readers** "
-                           "— their mail gateway strips the tracking pixel but the "
-                           "click still lands, so the reader lists below miss them "
-                           "entirely." if _missed else ""))
+                        "One row per person, strongest first. **Not reached** means no "
+                        "evidence it arrived, not proof it didn't."
+                        + (f"  \n**{_missed} of the clickers show no open at all** — "
+                           "their gateway strips the pixel but the click still lands, "
+                           "so a reads-only list misses them." if _missed else ""))
                     st.dataframe(
                         _fu_df, use_container_width=True, hide_index=True,
                         height=min(460, 80 + 35 * len(_fu_df)),
                         column_config={"Write to them": st.column_config.LinkColumn(
                             "Write to them", display_text=r"mailto:(.*)")})
                     st.download_button(
-                        "⬇️ Download follow-up list (CSV)",
+                        "⬇️ Download (CSV)",
                         _fu_df.to_csv(index=False).encode("utf-8"),
-                        file_name="follow_up_list.csv", mime="text/csv",
+                        file_name="campaign_intent.csv", mime="text/csv",
                         key=f"fu_dl_{abs(hash(str(_zs['_tid'].iloc[0])))}")
                     st.markdown("---")
 
-                # ── Who to contact — scoped to this campaign ─────────────────
-                st.markdown("##### 🎯 Who to contact")
-                if _z_real.empty:
-                    st.caption("Nobody has genuinely read this campaign yet.")
-                else:
-                    # One names column with markers instead of three columns
-                    # that repeated the same names: ↩ = also read another
-                    # campaign, 🔁 = came back 3+ times to this one. The email
-                    # link names its addressee — a button that doesn't say who
-                    # it writes to is a bug, and it targets the strongest
-                    # signal (returning reader first), not whoever happened to
-                    # sit first in the frame.
-                    _opens_s = pd.Series(_human_opens, dtype="int64")
-                    _wc_rows = []
-                    for _co, _g in _z_real.groupby("company"):
-                        _tags, _score, _best = [], 0, None
-                        for _, _r in _g.sort_values("to_email").iterrows():
-                            _t = _person(_r)
-                            _ret = _r["to_email"] in _multi
-                            _dp = int(_opens_s.get(_r["_tid"], 0)) >= 3
-                            if _ret:
-                                _t += " ↩"
-                            if _dp:
-                                _t += " 🔁"
-                            _tags.append(_t)
-                            _score += 1 + 2 * _ret + 2 * _dp
-                            _rank = 2 * _ret + _dp
-                            if _best is None or _rank > _best[0]:
-                                _best = (_rank, _r["to_email"], _person(_r))
-                        _co_seg = min((_seg_of(r["to_email"]) for _, r in _g.iterrows()),
-                                      key=lambda x: _SEG_PRIO[x])
-                        _wc_rows.append({
-                            "Company": _co,
-                            "Segment": _co_seg.replace("AI ", ""),
-                            "Who read it": ", ".join(sorted(_tags))[:80],
-                            "Last read (IST)": _last_ist(_g["_tid"]),
-                            "Write to them": f"mailto:{_best[1]}",
-                            "_s": _score + (3 - _SEG_PRIO[_co_seg]),
-                        })
-                    _wc = (pd.DataFrame(_wc_rows).sort_values("_s", ascending=False)
-                           .drop(columns="_s").reset_index(drop=True))
-                    st.dataframe(
-                        _wc.head(10), use_container_width=True, hide_index=True,
-                        height=min(400, 80 + 35 * min(10, len(_wc))),
-                        column_config={
-                            "Segment": st.column_config.Column(
-                                help="From the pipeline sheet's AI Maturity column — "
-                                     "a Mature reader outranks a Laggard one."),
-                            "Last read (IST)": st.column_config.Column(
-                                help="Most recent human read at this account. Recent "
-                                     "= warm — call while it is."),
-                            "Who read it": st.column_config.Column(
-                                help="↩ = also read another campaign (a returning "
-                                     "reader — the strongest signal here). "
-                                     "🔁 = came back to this email 3+ times."),
-                            "Write to them": st.column_config.LinkColumn(
-                                display_text=r"mailto:([^@]+)@.*",
-                                help="Opens a draft to the account's strongest "
-                                     "reader — returning readers first.")})
-                    if len(_wc) > 10:
-                        with st.expander(f"Show the other {len(_wc) - 10} account(s)"):
-                            st.dataframe(_wc.iloc[10:], use_container_width=True,
-                                         hide_index=True,
-                                         height=min(520, 80 + 35 * (len(_wc) - 10)))
-
-                # ── Read it multiple times — revisits and forwards ──────────
-                # A forwarded email fires the ORIGINAL recipient's pixel, so a
-                # forward shows up here as extra reads on their id. Without
-                # device data (Apps Script exposes none; the Cloudflare pixel
-                # would) a forward and a re-read are indistinguishable — the
-                # header says so instead of pretending otherwise.
-                _mr = _zs[_zs["_tid"].map(_reads_s).fillna(0) >= 2]
-                if not _mr.empty:
-                    st.markdown("##### 🔁 Read it multiple times")
-                    _mr_rows = [{
-                        "Who": _person(_r),
-                        "Company": _r["company"],
-                        "Segment": _seg_of(_r["to_email"]).replace("AI ", ""),
-                        "Reads": int(_reads_s.get(_r["_tid"], 0)),
-                        "Last read (IST)": _last_ist([_r["_tid"]]),
-                        "Write to them": f"mailto:{_r['to_email']}",
-                    } for _, _r in _mr.iterrows()]
-                    _mr_df = (pd.DataFrame(_mr_rows)
-                              .sort_values("Reads", ascending=False).reset_index(drop=True))
-                    st.dataframe(
-                        _mr_df, use_container_width=True, hide_index=True,
-                        height=min(300, 80 + 35 * len(_mr_df)),
-                        column_config={
-                            "Reads": st.column_config.Column(
-                                help="Separate de-noised reads. A forwarded email fires "
-                                     "the original recipient's pixel, so forwards appear "
-                                     "here as extra reads — we can't split the two "
-                                     "without device data."),
-                            "Write to them": st.column_config.LinkColumn(
-                                display_text=r"mailto:([^@]+)@.*")})
+                # "Who to contact" and "Read it multiple times" used to sit here
+                # as separate tables. Both answered the same question as the
+                # intent list above — the first grouped the same readers by
+                # company, the second listed the subset who read twice — so the
+                # same person was shown up to three times, and sales got them
+                # three times. The click-level detail that is genuinely
+                # different ("which link") stays, as an expander below.
 
                 # Companies headed for the Unread-or-Blocked table below —
                 # 2+ recipients, zero real reads. Notable unreads excludes
