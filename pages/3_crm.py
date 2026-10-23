@@ -944,6 +944,16 @@ def _tab_guard(label):
 # page for minutes on a cache miss. The Context arc + per-segment suggestions
 # superseded its talking-points job. services/commerce_news.py still serves the
 # Prospect Brief 'While you wait' card.
+# Markers a human types into the subject while testing. Matched at the START of
+# the subject (where they get typed) or anywhere as a bracketed tag, so a real
+# subject containing the word "test" — "Why most AI pilots never leave test" —
+# is not blocked.
+_TEST_MARKER_RE = re.compile(
+    r'^\s*(?:\[|\()\s*(?:TEST|TESTING|DRAFT|SAMPLE|IGNORE)\s*(?:\]|\))'
+    r'|(?:\[|\()\s*(?:TEST|TESTING|DRAFT|SAMPLE|IGNORE)\s*(?:\]|\))',
+    re.IGNORECASE)
+
+
 # ── Internal watchers ────────────────────────────────────────────────────────
 # Defined HERE, in the prologue, not next to the composer that used to own it:
 # the Contacts dashboard shows the count, and that renders long before the
@@ -2316,6 +2326,14 @@ with tab_compose, _tab_guard("Email Composer"):
                     # Test mode bypasses (test addresses are hit repeatedly during testing).
                     dedup_override = False
                     dedup_days = get_dedup_days()
+                    _single_test_marker = (None if test_mode
+                                           else _TEST_MARKER_RE.search(str(subject or "")))
+                    if _single_test_marker:
+                        st.error(
+                            f"⚠️ The subject still contains a test marker — "
+                            f"**{_single_test_marker.group(0)}**. Delete it from the "
+                            f"subject box before sending to a real recipient."
+                        )
                     if not test_mode:
                         _last_sent, _days_ago = last_sent_to(effective_to_email)
                         if _last_sent and _days_ago is not None and _days_ago < dedup_days:
@@ -2350,6 +2368,7 @@ with tab_compose, _tab_guard("Email Composer"):
                             or voice_hold_block
                             or (in_dedup_window and not dedup_override)
                             or preview_send_mismatch
+                            or bool(_single_test_marker)
                         )
                         if not st.session_state[confirm_key]:
                             if st.button("📧 Send email", type="primary", disabled=send_disabled,
@@ -2493,9 +2512,22 @@ with tab_compose, _tab_guard("Email Composer"):
                         f"{_miss_bit} · details below."
                     )
 
-                # Cap check
+                # Test-marker check. Testing is done by typing "[TEST] " into the
+                # subject box, and nothing removed it again — one forgotten
+                # delete ships a whole campaign with [TEST] in the subject line.
+                # Blocked rather than auto-stripped: silently rewriting the
+                # subject of a 577-recipient send is the worse failure.
                 bulk_blocked_reason = None
-                if stage_final == 0:
+                _subj_check = str(subject or "")
+                _test_marker = _TEST_MARKER_RE.search(_subj_check)
+                if _test_marker:
+                    bulk_blocked_reason = (
+                        f"The subject still contains a test marker — "
+                        f"**{_test_marker.group(0)}**. Delete it from the subject "
+                        f"box in Step 2 before sending to real recipients.  \n"
+                        f"Current subject: `{_subj_check[:120]}`"
+                    )
+                elif stage_final == 0:
                     bulk_blocked_reason = "No recipients left after filters."
                 elif stage_final > left:
                     bulk_blocked_reason = (
