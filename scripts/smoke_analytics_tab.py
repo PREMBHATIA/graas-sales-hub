@@ -119,6 +119,10 @@ def main():
     body = '\n'.join(l[4:] if l.startswith('    ') else l for l in body[:end])
 
     ns = {'st': st, 'pd': pd, 'datetime': datetime, 're': _re}
+    # Page-level helpers the analytics body calls but that live ABOVE the
+    # slice below (they're shared with earlier tabs, so they cannot move down).
+    _h = src.index('def _isum(')
+    exec(src[_h:src.index('\n\n', src.index('return 0', _h))], ns)
     exec(src[src.index('_OPEN_PREFETCH_SEC = 60'):
              src.index('def _inbox_scan_results')], ns)
 

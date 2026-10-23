@@ -992,6 +992,20 @@ _TEST_MARKER_RE = re.compile(
     re.IGNORECASE)
 
 
+# int(series.sum()) is not safe on this codebase's frames. An EMPTY
+# object-dtype Series — which `.map(lambda ...)` produces whenever the frame it
+# is mapping over is empty — sums to '' on the pandas Streamlit Cloud runs
+# (string identity, not 0), so int() raised ValueError and took Analytics down.
+# Local pandas returns 0, so the gates here cannot see it. Coerce, always.
+def _isum(series) -> int:
+    """Sum to a plain int, whatever the dtype, empty or not."""
+    try:
+        return int(pd.to_numeric(pd.Series(series),
+                                  errors="coerce").fillna(0).sum())
+    except Exception:
+        return 0
+
+
 # ── Internal watchers ────────────────────────────────────────────────────────
 # Defined HERE, in the prologue, not next to the composer that used to own it:
 # the Contacts dashboard shows the count, and that renders long before the
@@ -1359,8 +1373,8 @@ with tab_segments, _tab_guard("Segments"):
 
     _lcols = st.columns(4)
     for _lc, _sg in zip(_lcols, _seg_order_tab):
-        _n_co = int((_co_seg["Segment"] == _sg).sum())
-        _n_ct = int(_co_seg.loc[_co_seg["Segment"] == _sg, "Contacts"].sum())
+        _n_co = _isum(_co_seg["Segment"] == _sg)
+        _n_ct = _isum(_co_seg.loc[_co_seg["Segment"] == _sg, "Contacts"])
         with _lc:
             st.markdown(
                 f"<div style='text-align:center;padding:4px 0 10px;'>"
@@ -1668,7 +1682,7 @@ def _log_integrity(track_df, sends_df):
     ev = ev[ev["_ev_ts"].notna() & ev["_ts"].notna()]
     if ev.empty:
         return 0, 0, True
-    bad = int(((ev["_ev_ts"] - ev["_ts"]).dt.total_seconds() < 0).sum())
+    bad = _isum((ev["_ev_ts"] - ev["_ts"]).dt.total_seconds() < 0)
     return bad, len(ev), (bad / len(ev)) <= _INTEGRITY_TOLERANCE
 
 
@@ -1889,7 +1903,7 @@ with tab_compose, _tab_guard("Email Composer"):
         if comp_owner != "All":
             recipients = recipients[recipients['outreach_owner'] == comp_owner]
         if recipients.empty:
-            _uncl = int((_pool['ai_segment'] == 'Unclassified').sum())
+            _uncl = _isum(_pool['ai_segment'] == 'Unclassified')
             st.warning(
                 f"No contacts tagged **{comp_ai_seg}** yet. Add an **AI Segment** column to "
                 f"the pipeline sheet and tag companies (values: {', '.join(AI_SEGMENTS)}). "
@@ -3199,9 +3213,9 @@ with tab_analytics, _tab_guard("Analytics"):
                     _n = len(_g)
                     _first = _g["_ts"].min()
                     _age_d = (now_utc - _first).total_seconds() / 86400
-                    _real_n = int(_g["_real"].sum())
+                    _real_n = _isum(_g["_real"])
                     _mach_n = len(_mach_ids & set(_g["_tid"]))
-                    _ck = int(_g["click_count"].sum())
+                    _ck = _isum(_g["click_count"])
                     _ck_ok = _ck > 0 or _first < _CLICKS_OFF_FROM
                     _circ = int((_g["_tid"].map(pd.Series(_human_opens, dtype="int64"))
                                  .fillna(0) >= 3).sum())
@@ -3277,7 +3291,7 @@ with tab_analytics, _tab_guard("Analytics"):
                         _fl = (_mo[_mo["tracking_id"].isin(set(_gg["_tid"]))]
                                .groupby("tracking_id")["_lag"].min())
                         _col = _zr["_first"].strftime("%d %b")
-                        _vals = [round(int(_f(_fl).sum()) / _nn * 100)
+                        _vals = [round(_isum(_f(_fl)) / _nn * 100)
                                  for _lbl, _f in _BANDS]
                         _vals.append(round(max(0, _nn - len(_fl)) / _nn * 100))
                         _dist[_col] = _vals
@@ -3347,8 +3361,8 @@ with tab_analytics, _tab_guard("Analytics"):
                 # ── Insights: plain sentences before any table ────────────────
                 _z_real_segs = _z_real["to_email"].map(_seg_of)
                 _seg_bits = " · ".join(
-                    f"{int((_z_real_segs == _sg).sum())} {_sg.replace('AI ', '')}"
-                    for _sg in _SEG_PRIO if int((_z_real_segs == _sg).sum()))
+                    f"{_isum(_z_real_segs == _sg)} {_sg.replace('AI ', '')}"
+                    for _sg in _SEG_PRIO if _isum(_z_real_segs == _sg))
                 _ins = [f"**{_z_real_n} of {_zn}** recipients genuinely read this "
                         f"({int(round(_z_real_n / _zn * 100))}%)"
                         + (f" — {_seg_bits}" if _seg_bits else "")
@@ -3364,7 +3378,7 @@ with tab_analytics, _tab_guard("Analytics"):
                         _ins.append(f"**{_top_co}** is the warmest account — "
                                     f"{_co_rank.iloc[0]} people read it ({_top_people}), "
                                     f"last at {_last_ist(_z_real[_z_real['company'] == _top_co]['_tid'])} IST.")
-                    _n_multi_read = int((_z_real["_tid"].map(_reads_s).fillna(0) >= 2).sum())
+                    _n_multi_read = _isum(_z_real["_tid"].map(_reads_s).fillna(0) >= 2)
                     if _n_multi_read:
                         _ins.append(f"**{_n_multi_read}** read it more than once — "
                                     f"revisited or forwarded on (🔁 below).")
@@ -3513,7 +3527,7 @@ with tab_analytics, _tab_guard("Analytics"):
                 # done zero times or twice.
                 _quiet_cos = {str(_co) for _co, _g in _zs.groupby("company")
                               if _g["to_email"].nunique() >= 2
-                              and int(_g["_real"].sum()) == 0}
+                              and _isum(_g["_real"]) == 0}
 
                 # ── Notable unreads — read the last email, silent on this one ─
                 if _prev_subj is not None and len(_pv_silent):
@@ -3530,9 +3544,12 @@ with tab_analytics, _tab_guard("Analytics"):
                     _pv_silent = _pv_silent[~_pv_silent["to_email"].map(_seg_of)
                                             .eq("AI Laggard")]
                     _cur_tid = dict(zip(_zs["to_email"], _zs["_tid"]))
+                    # .astype(bool): the Laggard filter just above can empty
+                    # this frame, and .map() on an empty Series yields OBJECT
+                    # dtype — which breaks both the ~ below and the row mask.
                     _pv_evid = _pv_silent["to_email"].map(
-                        lambda em: _cur_tid.get(em) in _beacon_ids)
-                    _pv_unproven = int((~_pv_evid).sum())
+                        lambda em: _cur_tid.get(em) in _beacon_ids).astype(bool)
+                    _pv_unproven = _isum(~_pv_evid)
                     _pv_silent = _pv_silent[_pv_evid]
                 if _prev_subj is not None and len(_pv_silent):
                     st.markdown("##### 📪 Notable unread names — delivered, not opened")
@@ -3590,13 +3607,13 @@ with tab_analytics, _tab_guard("Analytics"):
                                            .to_dict())
                 _q_rows = []
                 for _co, _g in _zs.groupby("company"):
-                    if _g["to_email"].nunique() < 2 or int(_g["_real"].sum()) > 0:
+                    if _g["to_email"].nunique() < 2 or _isum(_g["_real"]) > 0:
                         continue
                     if min((_seg_of(r["to_email"]) for _, r in _g.iterrows()),
                            key=lambda x: _SEG_PRIO[x]) == "AI Laggard":
                         continue          # Laggard accounts: no 1:1 effort
                     _n_r = len(_g)
-                    _n_reach = int(_g["_tid"].isin(_beacon_ids).sum())
+                    _n_reach = _isum(_g["_tid"].isin(_beacon_ids))
                     _blocked = _n_reach == 0
                     _co_seg = min((_seg_of(r["to_email"]) for _, r in _g.iterrows()),
                                   key=lambda x: _SEG_PRIO[x])
@@ -3664,12 +3681,12 @@ with tab_analytics, _tab_guard("Analytics"):
                     if _sv.empty:
                         continue
                     _lo = (_sv["_ts"].min() + pd.Timedelta(hours=5, minutes=30))
-                    _sck = int(_sv["click_count"].sum())
+                    _sck = _isum(_sv["click_count"])
                     _sck_ok = _sck > 0 or _sv["_ts"].min() < _CLICKS_OFF_FROM
                     _sg_rows.append({
                         "Segment": _sg, "Sent": len(_sv),
                         "Sent at (IST)": _lo.strftime("%d %b · %H:%M"),
-                        "Real reads": int(_sv["_real"].sum()),
+                        "Real reads": _isum(_sv["_real"]),
                         "Clicks": _sck if _sck_ok else _CNT,
                     })
                 if _sg_rows:

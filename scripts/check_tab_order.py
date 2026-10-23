@@ -74,5 +74,37 @@ def main():
     return 0
 
 
+import os as _os
+import sys as _sys
+_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+
+
+def check_no_bare_int_sum():
+    """int(<expr>.sum()) is banned in 3_crm.py — use _isum().
+
+    An empty object-dtype Series sums to '' on the pandas Streamlit Cloud runs
+    (string identity, not 0), so int() raises ValueError and takes the tab down.
+    Local pandas returns 0, so no test on this machine can catch it — the only
+    defence is not writing the pattern.
+    """
+    import re as _re
+    raw = open(_os.path.join(_ROOT, 'pages', '3_crm.py'), encoding='utf-8').read()
+    # Blank out comments so the helper's own docs don't trip the check.
+    src = '\n'.join(_re.sub(r'#.*$', '', l) for l in raw.split('\n'))
+    bad = []
+    for m in _re.finditer(r'int\(\s*\(?[^\n]{0,90}?\.sum\(\)\s*\)', src):
+        line = src[:m.start()].count('\n') + 1
+        if 'pd.to_numeric' in m.group(0):      # the _isum helper itself
+            continue
+        bad.append((line, m.group(0).strip()))
+    if bad:
+        print("INT-SUM CHECK FAILED — use _isum(...) instead of int(....sum()):")
+        for line, txt in bad:
+            print(f"  3_crm.py:{line}: {txt[:90]}")
+        return 1
+    print("INT-SUM OK — no bare int(....sum())")
+    return 0
+
+
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main() or check_no_bare_int_sum())
