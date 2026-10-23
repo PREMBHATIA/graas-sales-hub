@@ -58,6 +58,16 @@ _REASON_PATTERNS = [
 _SOFT_REASONS = {"mailbox full"}
 
 
+class MailboxScanError(RuntimeError):
+    """The mailbox could not be scanned — as distinct from finding nothing.
+
+    Returning [] on an IMAP failure made "we couldn't log in" look identical to
+    "nobody bounced". Analytics printed a confident 0 bounces and 0 unsubs for
+    every campaign while the login was being rejected outright. For the one
+    number that proves non-delivery, silence is the worst possible answer.
+    """
+
+
 def _decode(v) -> str:
     try:
         return str(make_header(decode_header(v or "")))
@@ -123,11 +133,15 @@ def _failed_recipients(msg, text: str) -> list:
 def scan_bounces(since: str = "01-Aug-2026", limit: int = 200,
                  user: Optional[str] = None, password: Optional[str] = None) -> list:
     """Return [{email, reason, hard, subject, date, msg_id}] for bounces in the
-    insights@ inbox. Empty list on any failure — never raises at the caller."""
+    insights@ inbox.
+
+    Raises MailboxScanError when the mailbox cannot be read, so the caller can
+    say so instead of reporting zero bounces it never looked for.
+    """
     user = user or os.getenv("SMTP_USER", "")
     password = password or os.getenv("SMTP_PASS", "")
     if not user or not password:
-        return []
+        raise MailboxScanError("SMTP_USER / SMTP_PASS not set")
     rows, seen_pairs = [], set()
     try:
         M = imaplib.IMAP4_SSL(IMAP_HOST, timeout=IMAP_TIMEOUT)
@@ -165,7 +179,11 @@ def scan_bounces(since: str = "01-Aug-2026", limit: int = 200,
             except Exception:
                 continue
         M.logout()
-    except Exception:
+    except Exception as e:
+        # Nothing parsed at all => we never got in. Partial results mean the
+        # login worked and one message failed to parse, which is survivable.
+        if not rows:
+            raise MailboxScanError(f"{type(e).__name__}: {e}") from e
         return rows
     return rows
 
@@ -189,11 +207,14 @@ _UNSUB_SUBJECT_RE = re.compile(r"\bunsub(scribe|)\b", re.I)
 
 def scan_unsubscribes(since: str = "01-Aug-2026", limit: int = 200,
                       user: Optional[str] = None, password: Optional[str] = None) -> list:
-    """Return [{email, subject, date, msg_id}] — people who asked to opt out."""
+    """Return [{email, subject, date, msg_id}] — people who asked to opt out.
+
+    Raises MailboxScanError when the mailbox cannot be read (see scan_bounces).
+    """
     user = user or os.getenv("SMTP_USER", "")
     password = password or os.getenv("SMTP_PASS", "")
     if not user or not password:
-        return []
+        raise MailboxScanError("SMTP_USER / SMTP_PASS not set")
     rows, seen = [], set()
     try:
         M = imaplib.IMAP4_SSL(IMAP_HOST, timeout=IMAP_TIMEOUT)
@@ -248,6 +269,10 @@ def scan_unsubscribes(since: str = "01-Aug-2026", limit: int = 200,
             except Exception:
                 continue
         M.logout()
-    except Exception:
+    except Exception as e:
+        # Nothing parsed at all => we never got in. Partial results mean the
+        # login worked and one message failed to parse, which is survivable.
+        if not rows:
+            raise MailboxScanError(f"{type(e).__name__}: {e}") from e
         return rows
     return rows

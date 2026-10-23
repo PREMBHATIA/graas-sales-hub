@@ -1768,23 +1768,32 @@ def _inbox_scan_results() -> dict:
 
 @st.cache_data(ttl=900, show_spinner=False)
 def _cached_unsubs(_v: int = 1):
-    """Unsubscribe requests sitting in the insights@ inbox (15-min cache)."""
+    """Unsubscribe requests in the insights@ inbox (15-min cache).
+
+    Returns None when the mailbox could not be READ. It used to return [] on
+    any failure, so a rejected IMAP login displayed as "0 unsubscribes" — and
+    did, for every campaign, while the credentials were invalid.
+    """
     try:
         from services.bounce_scanner import scan_unsubscribes
         return scan_unsubscribes()
     except Exception:
-        return []
+        return None
 
 
 @st.cache_data(ttl=900, show_spinner=False)
 def _cached_bounces(_v: int = 1):
-    """Bounce reports from the insights@ inbox (15-min cache). Empty on any
-    failure — IMAP needs SMTP_USER/SMTP_PASS with IMAP enabled."""
+    """Bounce reports from the insights@ inbox (15-min cache).
+
+    Returns None when the mailbox could not be READ. A bounce is the only hard
+    proof a send never landed, so reporting zero of them because nobody could
+    log in is the most misleading number on the page.
+    """
     try:
         from services.bounce_scanner import scan_bounces
         return scan_bounces()
     except Exception:
-        return []
+        return None
 
 
 # ── Forward-safety for pasted HTML ───────────────────────────────────────────
@@ -3919,30 +3928,41 @@ with tab_analytics, _tab_guard("Analytics"):
                               "Runs only when you press this — never on page load, "
                               "so the dashboard stays fast."):
                 with st.spinner("Reading insights@ …"):
-                    try:
-                        st.session_state["_inbox_scan"] = {
-                            "bounces": _cached_bounces(),
-                            "unsubs": _cached_unsubs(),
-                            "at": datetime.now().strftime("%d %b %H:%M"),
-                        }
-                    except Exception as _se:
-                        st.session_state["_inbox_scan"] = {"bounces": [], "unsubs": [],
-                                                           "at": f"failed: {_se}"}
+                    # None from either reader = the mailbox could not be READ.
+                    # Kept as None rather than [] so the caption below can say
+                    # so: "0 bounces" we never looked for is worse than nothing.
+                    _b, _u = _cached_bounces(), _cached_unsubs()
+                    st.session_state["_inbox_scan"] = {
+                        "bounces": _b, "unsubs": _u,
+                        "failed": _b is None or _u is None,
+                        "at": datetime.now().strftime("%d %b %H:%M"),
+                    }
                 st.rerun()
         with _sc2:
-            st.caption(
-                f"Last scan: **{_scan['at']}** — {len(_scan['bounces'])} bounce(s), "
-                f"{len(_scan['unsubs'])} unsubscribe request(s)."
-                if _scan.get("at") else
-                "Bounces and unsubscribe requests are not checked automatically "
-                "(IMAP is slow) — press Scan to read the inbox."
-            )
+            if _scan.get("failed"):
+                st.error(
+                    "📭 **Couldn't read the insights@ mailbox** — so bounces and "
+                    "unsubscribes are **unknown, not zero**. The IMAP login was "
+                    "rejected. Check `SMTP_PASS` in Streamlit Cloud secrets is a "
+                    "current 16-character Gmail App Password, and that IMAP is "
+                    "enabled on insights@ (Gmail → Settings → Forwarding and "
+                    "POP/IMAP). A bounce is the only hard proof a send never "
+                    "landed — until this works, nothing here rules that out.",
+                    icon="📭")
+            elif _scan.get("at"):
+                st.caption(
+                    f"Last scan: **{_scan['at']}** — {len(_scan['bounces'] or [])} "
+                    f"bounce(s), {len(_scan['unsubs'] or [])} unsubscribe request(s).")
+            else:
+                st.caption(
+                    "Bounces and unsubscribe requests are not checked automatically "
+                    "(IMAP is slow) — press Scan to read the inbox.")
 
         # ── Unsubscribe requests ─────────────────────────────────────────────
         # Unsubscribe is a mailto (and Gmail's native button uses our
         # List-Unsubscribe header), so requests arrive as email to insights@ —
         # unread, they'd keep receiving campaigns. Surfaced here to be honoured.
-        _unsubs = _inbox_scan_results()["unsubs"]
+        _unsubs = _inbox_scan_results()["unsubs"] or []
         if _unsubs:
             _udf = pd.DataFrame(_unsubs)
             _sup_set = set()
@@ -3977,7 +3997,7 @@ with tab_analytics, _tab_guard("Analytics"):
         # ── Delivery issues (bounces) ────────────────────────────────────────
         # "sent" only means Gmail accepted it; rejections arrive later as bounce
         # mail to insights@. This surfaces them so the log means "delivered".
-        _bounces = _inbox_scan_results()["bounces"]
+        _bounces = _inbox_scan_results()["bounces"] or []
         if _bounces:
             _bdf = pd.DataFrame(_bounces)
             _sup_now = set()
