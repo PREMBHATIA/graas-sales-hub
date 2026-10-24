@@ -384,6 +384,7 @@ REFERENCE_PROPOSALS_FOLDER_ID = "1tBMrcpiIDVhg5e0-N1ytjuzbDexQyheX"
 DEMO_PATTERNS_DOC_IDS = [
     ("Use-case patterns by door", "1LXmt_XROAjNlJTFP6tKGA2cVPobEk4yXh16CFYzwl0c"),
     ("Voice — patterns & per-market compliance", "1eubWRVuSZCa-gnRFmmZCmykdZSFFjuirpJhPgHyrlg8"),
+    ("Modern trade / multi-brand retail — the play", "1GUXRbGfw9DgjPwy7c_OBAv7QIcXIQqVaMbynpS57yUU"),
 ]
 
 
@@ -746,6 +747,21 @@ def _build_new_brief_prompt(
             f"it a thing to verify. B2B voice is proven; **consumer "
             f"voice-to-voice has no case study and the public site lists voice "
             f"agents as coming soon**, so never present it as shipped.\n"
+            f"  — **MODERN TRADE / MULTI-BRAND RETAIL.** One Doc covers this. The "
+            f"play is a loop: people shop → the POS enriches the graph → a "
+            f"trigger (voice or text) goes out → it drives traffic back into "
+            f"stores OR resolves a support issue → that interaction writes "
+            f"another fact back. Lead with the compounding and the no-migration "
+            f"argument (they already sit on POS + CRM/loyalty). Two rules. "
+            f"(1) **Prime from the CHAIN's own side only** — a brand selling "
+            f"into modern trade holds none of the shopper data, which is a "
+            f"landmine, not a wedge. (2) **There are NO modern-trade customers "
+            f"or case studies** — only demos built for prospects, so never name "
+            f"one and never present the play as delivered; the footfall half is "
+            f"demoed while the CSAT/support half is reasoned only. The usual "
+            f"blocker to verify: can their loyalty/POS data actually reach a "
+            f"partner layer, or is it locked in the loyalty platform or "
+            f"warehouse?\n"
             f"  — The library's **ANTI-PATTERNS section is a direct source for "
             f"`do_not`** — especially: never pitch 'give us your data layer'; loyalty "
             f"is fuel, never the surface (replacing a large member programme loses the "
