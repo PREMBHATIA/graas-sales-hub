@@ -946,10 +946,27 @@ with right:
                     up the pattern.
                   </div>
                 </div>
-                """ + _news_card_html() + """
                 """,
                 unsafe_allow_html=True,
             )
+            # 📰 Commerce-tech story — OPT-IN, deliberately.
+            # This used to render here on every page load. The fetch is Claude +
+            # web_search and measured ~47s on a cold cache, so every cold load
+            # (first of the day, or after Streamlit Cloud spins the app back up)
+            # blocked for ~47s before an EMPTY FORM appeared, with no indicator
+            # beyond Streamlit's running-man. The 24h cache hid it locally and
+            # made it look fine. Now it costs nothing unless someone asks.
+            if st.session_state.get("pb_show_news"):
+                with st.spinner("Fetching today's commerce-tech story…"):
+                    st.markdown(_news_card_html(), unsafe_allow_html=True)
+            elif st.button(
+                "📰  Today's commerce-tech story",
+                key="pb_load_news",
+                help="Fetches a fresh story via web search. Takes 30-45 seconds "
+                     "the first time each day, then it's instant.",
+            ):
+                st.session_state["pb_show_news"] = True
+                st.rerun()
             return
         placeholder.markdown(
             f"**{company}** — {mode_label}",
@@ -1680,7 +1697,11 @@ def _list_recent_briefs(folder_id: str) -> dict:
     return {"ok": True, "error": None, "briefs": briefs}
 
 
-_res = _list_recent_briefs(DEFAULT_DRIVE_FOLDER)
+# Visible feedback: this is a Drive round-trip (~1s warm, slower cold). Without
+# a spinner the page just sits there and the only hint anything is happening is
+# Streamlit's running-man in the corner, which nobody looks at.
+with st.spinner("Loading saved briefs from Drive…"):
+    _res = _list_recent_briefs(DEFAULT_DRIVE_FOLDER)
 if not _res["ok"]:
     st.warning(
         "⚠️ Couldn't load your briefs from Drive just now — this is a transient "
