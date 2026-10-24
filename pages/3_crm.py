@@ -1039,6 +1039,44 @@ def _fetch_watchers_page() -> list:
     return out
 
 
+# Abridged title: seniority + primary function, so a list can be scanned for
+# "is this a CEO or an eCom head?" without reading 291 distinct job titles.
+# Function is whichever keyword appears EARLIEST in the title, so a title
+# listing several ("BD, Sales & Trade Marketing") takes its primary one.
+def _abridge_title(t):
+    s = str(t or "").strip()
+    if not s or s.lower() in ("nan", "none", "designation unknown"):
+        return ""
+    l = s.lower()
+    if re.search(r"\b(founder|co-?founder|owner|chairman|proprietor)\b", l):
+        lvl = "Founder"
+    elif re.search(r"\b(ceo|chief executive|managing director|group ceo|md|president|managing partner)\b", l):
+        lvl = "CEO/MD"
+    elif re.search(r"\bc[a-z]{1,2}o\b|chief\s+[\w&\s]+officer", l):
+        lvl = "C-suite"
+    elif re.search(r"\b(vp|vice president|svp|evp)\b", l):
+        lvl = "VP"
+    elif re.search(r"\b(head|director)\b", l):
+        lvl = "Head"
+    elif re.search(r"\b(lead|manager|mgr|specialist|executive)\b", l):
+        lvl = "Manager"
+    else:
+        lvl = "Other"
+    _FN = [("eCom", r"e-?comm?erce|ecom\b|omni-?channel|marketplace|d2c|digital commerce|\bdigital\b"),
+           ("Tech", r"\bit\b|\bcio\b|\bcto\b|technolog|technical|\berp\b|transformation|\bdata\b|\bai\b|analytics|information"),
+           ("Sales", r"sales|commercial|trade|business development|\bbd\b|revenue"),
+           ("Marketing", r"market|brand|growth|\bcmo\b|communication"),
+           ("Ops", r"operation|supply|logistic|warehouse|fulfil"),
+           ("Finance", r"financ|\bcfo\b|account"),
+           ("Customer", r"customer|\bcrm\b|loyalty|service|experience"),
+           ("HR", r"\bhr\b|people|talent|human resource")]
+    hits = [(m.start(), n) for n, pat in _FN for m in [re.search(pat, l)] if m]
+    fn = min(hits)[1] if hits else ""
+    if lvl in ("Founder", "CEO/MD") and fn in ("", "Sales", "Marketing"):
+        return lvl
+    return f"{lvl} \u00b7 {fn}" if fn else lvl
+
+
 # ── Engagement helpers ───────────────────────────────────────────────────
 # Moved above st.tabs: the Contacts dashboard now shows internal-copy
 # engagement at the top, and a helper defined below its first caller is a
@@ -3582,6 +3620,14 @@ with tab_analytics, _tab_guard("Analytics"):
                 # through the redirect, so some of the strongest signals on a
                 # campaign register as "never opened".
                 _fu = {}
+                # email -> job title, from the pipeline sheet's "(Designation)"
+                _title_of = {}
+                try:
+                    _tc = contacts[contacts["email"].astype(str).str.contains("@", na=False)]
+                    _title_of = dict(zip(_tc["email"].astype(str).str.lower(),
+                                         _tc["designation"].astype(str)))
+                except Exception:
+                    _title_of = {}
                 _clicks_fu = _human_click_rows(track_df, _zs)
                 _clicked_vid, _clicked_any, _click_n = set(), set(), {}
                 if _clicks_fu is not None and not _clicks_fu.empty:
@@ -3626,6 +3672,7 @@ with tab_analytics, _tab_guard("Analytics"):
                     if _prev is None or _frank > _prev["_rank"]:
                         _fu[_fem] = {
                             "Intent": _tier, "Who": _person(_fr),
+                            "Level": _abridge_title(_title_of.get(str(_fem).lower(), "")),
                             "Company": _fr.get("company", ""),
                             "Segment": _seg_of(_fem).replace("AI ", ""),
                             "Signal": _fsig, "_rank": _frank,

@@ -123,6 +123,8 @@ def main():
     # slice below (they're shared with earlier tabs, so they cannot move down).
     _h = src.index('def _isum(')
     exec(src[_h:src.index('\n\n', src.index('return 0', _h))], ns)
+    _a = src.index('def _abridge_title(')
+    exec(src[_a:src.index('\n\n\n', _a)], ns)
     # End marker is the tabs declaration, not _inbox_scan_results: the
     # engagement helpers moved ABOVE the tabs so the Contacts dashboard can use
     # them, which left _inbox_scan_results below and made this slice swallow
