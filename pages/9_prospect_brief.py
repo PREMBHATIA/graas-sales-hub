@@ -374,11 +374,17 @@ BRIEF_JSON_SCHEMA = """{
 
 REFERENCE_PROPOSALS_FOLDER_ID = "1tBMrcpiIDVhg5e0-N1ytjuzbDexQyheX"
 
-# Demo Pattern Library (KB bucket 3). Candidate use cases for FIT only — these are
-# demo patterns, NOT delivered deployments, so they must never reach
+# Pattern docs (KB bucket 3). Candidate use cases for FIT only — these are demo
+# patterns, NOT delivered deployments, so they must never reach
 # graas_proof_points. Kept deliberately separate from REFERENCE_PROPOSALS for that
 # reason: proposals are citable customers, patterns are hypotheses to test.
-DEMO_PATTERNS_DOC_ID = "1LXmt_XROAjNlJTFP6tKGA2cVPobEk4yXh16CFYzwl0c"
+# A LIST so a topic can get its own Doc rather than bloating one file — voice is
+# channel-shaped and cuts across every door, and modern trade is queued next.
+# Order matters: they are concatenated into the prompt in this order.
+DEMO_PATTERNS_DOC_IDS = [
+    ("Use-case patterns by door", "1LXmt_XROAjNlJTFP6tKGA2cVPobEk4yXh16CFYzwl0c"),
+    ("Voice — patterns & per-market compliance", "1eubWRVuSZCa-gnRFmmZCmykdZSFFjuirpJhPgHyrlg8"),
+]
 
 
 def _normalize_company_key(name: str) -> str:
@@ -495,20 +501,26 @@ def _fetch_proof_points_block() -> str:
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def _fetch_demo_patterns_block() -> str:
-    """Load the Demo Pattern Library — candidate use cases for FIT only.
+    """Load the pattern Docs — candidate use cases for FIT only.
 
     Separate tier from _fetch_proof_points_block(): these are demo patterns, not
     delivered deployments. They seed graas_fit / wedges hypotheses; they are never
-    citable as customers. Returns "" if unavailable so the brief degrades to its
-    previous behaviour rather than failing.
+    citable as customers. Each Doc is labelled so the model can tell the
+    use-case patterns from the channel ones. A Doc that can't be read is skipped
+    rather than failing the brief, and if none can be read the block is empty and
+    the brief degrades to its previous behaviour.
     """
     from services.sheets_client import fetch_drive_doc_text
 
-    try:
-        body = (fetch_drive_doc_text(DEMO_PATTERNS_DOC_ID) or "").strip()
-    except Exception:
-        return ""
-    return body
+    parts = []
+    for label, doc_id in DEMO_PATTERNS_DOC_IDS:
+        try:
+            body = (fetch_drive_doc_text(doc_id) or "").strip()
+        except Exception:
+            continue
+        if body:
+            parts.append(f"--- PATTERN DOC: {label} ---\n{body}")
+    return "\n\n".join(parts)
 
 
 def _build_new_brief_prompt(
@@ -717,6 +729,23 @@ def _build_new_brief_prompt(
             f"paper (→ vision) and conversations (→ voice) in their current workflow. "
             f"No conversation anywhere, or work that is rules rather than reasoning, "
             f"means our value is diminished — that belongs in `do_not`.\n"
+            f"  — **VOICE.** One of the Docs below is voice-specific. Voice is a "
+            f"first-class play, not a footnote: for any prospect with a field "
+            f"force, a tele-calling operation, a dealer/retailer network they "
+            f"can't fully cover, or low-typing/vernacular buyers, consider a "
+            f"voice fit. Two rules. (1) **Distinguish voice-to-voice (a live "
+            f"call, needs telephony + latency + per-market calling compliance) "
+            f"from a voice note (async audio, needs none of that)** — prospects "
+            f"say 'voice' for both, so make 'is someone talking to it, or "
+            f"sending it a recording?' a `verify` or a `discovery` question "
+            f"rather than assuming. (2) **Do NOT apply India's calling rules "
+            f"(TRAI / DLT / 140-160 series) to Indonesia, Australia or the "
+            f"Middle East** — the Doc carries per-market anchors with explicit "
+            f"confidence levels. Never state a calling hour, penalty or registry "
+            f"mechanic as fact for a market the Doc marks Medium or None; make "
+            f"it a thing to verify. B2B voice is proven; **consumer "
+            f"voice-to-voice has no case study and the public site lists voice "
+            f"agents as coming soon**, so never present it as shipped.\n"
             f"  — The library's **ANTI-PATTERNS section is a direct source for "
             f"`do_not`** — especially: never pitch 'give us your data layer'; loyalty "
             f"is fuel, never the surface (replacing a large member programme loses the "
