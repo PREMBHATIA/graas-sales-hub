@@ -385,6 +385,8 @@ DEMO_PATTERNS_DOC_IDS = [
     ("Use-case patterns by door", "1LXmt_XROAjNlJTFP6tKGA2cVPobEk4yXh16CFYzwl0c"),
     ("Voice — patterns & per-market compliance", "1eubWRVuSZCa-gnRFmmZCmykdZSFFjuirpJhPgHyrlg8"),
     ("Modern trade / multi-brand retail — the play", "1GUXRbGfw9DgjPwy7c_OBAv7QIcXIQqVaMbynpS57yUU"),
+    # AUDIENCE-GATED: only for briefs whose buying group holds a technical owner.
+    ("Knowledge Graph & Ontology — TECHNICAL BUYERS ONLY", "1gAIxUZWziyXFo78GXfwmA0lCUA2WnuUQx1MIyfLJPek"),
 ]
 
 
@@ -762,6 +764,23 @@ def _build_new_brief_prompt(
             f"blocker to verify: can their loyalty/POS data actually reach a "
             f"partner layer, or is it locked in the loyalty platform or "
             f"warehouse?\n"
+            f"  — **KNOWLEDGE GRAPH / ONTOLOGY — AUDIENCE-GATED, THIS ONE IS A "
+            f"RULE NOT A HINT.** One Doc covers the architecture conversation "
+            f"(context layer, the three CIO problems, ontology-vs-catalog, "
+            f"analyst validation, switching cost). **Use it ONLY when "
+            f"`key_people` actually contains a technical owner** — CIO, CTO, "
+            f"Head of Data / Analytics / AI, Head of Digital Transformation, "
+            f"enterprise architect. **If the buying group is entirely commercial "
+            f"(CMO, Head of Sales/GT, COO, founder, category or business heads), "
+            f"keep ontology and knowledge-graph architecture OUT of `graas_fit` "
+            f"and `wedges_worth_exploring` altogether** — at most ONE "
+            f"architecture question in `discovery`, and often none. Architecture "
+            f"talk with a business head reads as a data project, which triggers "
+            f"the 'one more new system?' objection and moves the conversation "
+            f"from revenue to IT budget. In a mixed room the brief should say to "
+            f"lead on the business outcome and hold the architecture in reserve. "
+            f"Note a CIO is frequently an **influencer, not the budget owner**, "
+            f"in GT deals — the stack row and `key_people` play should say which.\n"
             f"  — The library's **ANTI-PATTERNS section is a direct source for "
             f"`do_not`** — especially: never pitch 'give us your data layer'; loyalty "
             f"is fuel, never the surface (replacing a large member programme loses the "
