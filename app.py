@@ -20,7 +20,11 @@ st.set_page_config(
 pg = st.navigation(
     {
         "": [
-            st.Page("views/0_home.py", title="🏠 Home", url_path="home"),
+            # default=True, not merely first: Streamlit falls back to the
+            # first page in the first group, so a reorder would silently move
+            # where everyone lands. This states it.
+            st.Page("views/0_home.py", title="🏠 Home", url_path="home",
+                    default=True),
         ],
         # 🔒 Gated section — password-protected (see services/auth_gate.py).
         "Cross-Product 🔒": [
