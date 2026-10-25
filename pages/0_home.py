@@ -91,6 +91,41 @@ st.markdown("""
         font-weight: 700;
         font-size: 0.84rem;
     }
+
+    /* News */
+    .news-lead {
+        border: 1px solid #E5E7EB; border-left: 4px solid #4F46E5;
+        background: linear-gradient(90deg, #F5F3FF, #FFFFFF 60%);
+        border-radius: 12px; padding: 16px 18px; margin: 4px 0 14px;
+    }
+    .news-lead .n-tag { font-size: 0.66rem; font-weight: 800; color: #4F46E5;
+                        letter-spacing: .08em; text-transform: uppercase; }
+    .news-lead .n-ttl { font-size: 1.05rem; font-weight: 800; margin: 6px 0 7px;
+                        line-height: 1.3; letter-spacing: -0.01em; }
+    .news-lead .n-why { font-size: 0.86rem; color: #374151; line-height: 1.45; }
+    .news-item  { font-size: 0.84rem; line-height: 1.45; padding: 9px 0;
+                  border-bottom: 1px solid #F3F4F6; }
+    .news-item:last-child { border-bottom: none; }
+    .news-item .n-tag { font-size: 0.62rem; font-weight: 800; color: #9CA3AF;
+                        letter-spacing: .07em; text-transform: uppercase;
+                        display: block; margin-bottom: 3px; }
+
+    /* Security strip */
+    .sec-strip {
+        border: 1px solid #A7F3D0; border-left: 4px solid #059669;
+        border-radius: 12px;
+        background: linear-gradient(90deg, #F0FDF4, #FFFFFF 60%);
+        padding: 13px 16px; margin-bottom: 6px;
+        display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    }
+    .sec-strip .s-ttl { font-weight: 800; font-size: 0.92rem;
+                        margin-right: 4px; }
+    .sec-badge {
+        background: #FFFFFF; color: #065F46; border: 1px solid #A7F3D0;
+        font-size: 0.7rem; font-weight: 700; padding: 3px 10px;
+        border-radius: 999px; white-space: nowrap;
+    }
+    .sec-note { color: #6B7280; font-size: 0.8rem; margin-left: 4px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -158,8 +193,8 @@ st.markdown(
     '<span class="sec-badge">ISO 27001</span>'
     '<span class="sec-badge">GDPR</span>'
     '<span class="sec-badge">PDPA</span>'
-    '<span style="color:#6B7280;font-size:0.82rem">'
-    'Reports live in Key Collateral — send the link, not the file.</span>'
+    '<span class="sec-note">Reports live in Key Collateral — '
+    'send the link, not the file.</span>'
     '</div>', unsafe_allow_html=True)
 _s1, _ = st.columns([1, 3])
 with _s1:

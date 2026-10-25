@@ -106,5 +106,32 @@ def check_no_bare_int_sum():
     return 0
 
 
+
+
+def check_home_css():
+    """Every class the homepage uses must have a CSS rule.
+
+    Both the news and security styles were written anchored on a `.foot-tip`
+    selector that had already been deleted. str.replace with no match does
+    nothing and raises nothing, so the HTML shipped with no styling at all
+    and looked broken in the browser while every test passed.
+    """
+    import re as _re
+    src = open(_os.path.join(_ROOT, 'pages', '0_home.py'), encoding='utf-8').read()
+    m = _re.search(r'<style>(.*?)</style>', src, _re.S)
+    if not m:
+        print("HOME CSS OK — no <style> block")
+        return 0
+    defined = set(_re.findall(r'\.([\w-]+)\s*[\{,:]', m.group(1)))
+    used = set(_re.findall(r'class="([\w\s-]+)"', src))
+    used = {c for group in used for c in group.split()}
+    missing = sorted(used - defined)
+    if missing:
+        print("HOME CSS FAILED — class used with no rule: " + ", ".join(missing))
+        return 1
+    print(f"HOME CSS OK — {len(used)} classes, all defined")
+    return 0
+
+
 if __name__ == "__main__":
-    sys.exit(main() or check_no_bare_int_sum())
+    sys.exit(main() or check_no_bare_int_sum() or check_home_css())
