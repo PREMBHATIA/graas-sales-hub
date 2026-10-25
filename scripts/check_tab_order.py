@@ -13,7 +13,7 @@ are ignored, since AST reports their Load before their Store.
 import ast
 import sys
 
-PAGE = "pages/3_crm.py"
+PAGE = "views/3_crm.py"
 TABS = ["tab_analytics", "tab_compose", "tab_calendar"]
 
 
@@ -88,7 +88,7 @@ def check_no_bare_int_sum():
     defence is not writing the pattern.
     """
     import re as _re
-    raw = open(_os.path.join(_ROOT, 'pages', '3_crm.py'), encoding='utf-8').read()
+    raw = open(_os.path.join(_ROOT, 'views', '3_crm.py'), encoding='utf-8').read()
     # Blank out comments so the helper's own docs don't trip the check.
     src = '\n'.join(_re.sub(r'#.*$', '', l) for l in raw.split('\n'))
     bad = []
@@ -117,7 +117,7 @@ def check_home_css():
     and looked broken in the browser while every test passed.
     """
     import re as _re
-    src = open(_os.path.join(_ROOT, 'pages', '0_home.py'), encoding='utf-8').read()
+    src = open(_os.path.join(_ROOT, 'views', '0_home.py'), encoding='utf-8').read()
     m = _re.search(r'<style>(.*?)</style>', src, _re.S)
     if not m:
         print("HOME CSS OK — no <style> block")

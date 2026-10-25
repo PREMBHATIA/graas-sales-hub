@@ -44,15 +44,6 @@ st.markdown("""
         margin: 0 !important;
         display: inline-block;
     }
-    .main-header .mh-graas {
-        font-size: 0.52em;
-        font-weight: 600;
-        letter-spacing: 0.02em;
-        text-transform: uppercase;
-        display: block;
-        margin-bottom: -2px;
-        opacity: 0.7;
-    }
     .sub-header {
         font-size: 0.95rem !important;
         color: #9CA3AF;
@@ -149,6 +140,23 @@ st.markdown("""
         border-radius: 999px; white-space: nowrap;
     }
     .sec-note { color: #6B7280; font-size: 0.8rem; margin-left: 4px; }
+
+    /* Monthly Ruminations — headline + date only. The emails themselves are
+       in Key Collateral; this is a reminder that they exist and are
+       forwardable, not a reading list. */
+    .rumi-row {
+        display: flex; align-items: baseline; gap: 10px;
+        padding: 8px 0; border-bottom: 1px solid #F3F4F6;
+        font-size: 0.86rem;
+    }
+    .rumi-row:last-child { border-bottom: none; }
+    .rumi-date {
+        font-size: 0.68rem; font-weight: 800; color: #6B7280;
+        letter-spacing: .06em; text-transform: uppercase;
+        white-space: nowrap; min-width: 62px;
+    }
+    .rumi-row a { color: #1F2937; text-decoration: none; }
+    .rumi-row a:hover { text-decoration: underline; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -172,8 +180,7 @@ def _label(text, locked=False):
         + '</p>', unsafe_allow_html=True)
 
 
-st.markdown('<p class="main-header"><span class="mh-graas">Graas</span> '
-            'SalesHub</p>', unsafe_allow_html=True)
+st.markdown('<p class="main-header">SalesHub</p>', unsafe_allow_html=True)
 st.markdown('<p class="sub-header">Everything a salesperson needs — briefs, '
             'collateral, pipeline and outreach.</p>', unsafe_allow_html=True)
 
@@ -186,19 +193,19 @@ _label("All-e — where the work happens")
 c1, c2, c3, c4 = st.columns(4)
 with c1:
     _tile("📋", "Prospect Brief", "Pre-call two-pager research",
-          "pages/9_prospect_brief.py", "Create a brief →")
+          "views/9_prospect_brief.py", "Create a brief →")
 with c2:
     # Open, unlike the Knowledge Base below — onboarding material the sales
     # team needs cannot sit behind the team password (Prem, 25 Oct).
     _tile("🎒", "Key Collateral", "GTM Immersion · videos · creds",
-          "pages/6_collateral.py", "Open collateral →")
+          "views/6_collateral.py", "Open collateral →")
 with c3:
     _tile("🤖", "All-e", "Presales pipeline &amp; deals",
-          "pages/2_alle.py", "Open All-e →")
+          "views/2_alle.py", "Open All-e →")
 with c4:
     # Gated page inside an open section — the pill warns before the click.
     _tile("📧", "CRM", "Contacts, campaigns &amp; intent",
-          "pages/3_crm.py", "Open CRM →", locked=True)
+          "views/3_crm.py", "Open CRM →", locked=True)
     st.markdown(
         '<div style="font-size:0.78rem;margin-top:6px">'
         '<a href="https://docs.google.com/spreadsheets/d/'
@@ -223,7 +230,7 @@ st.markdown(
     '</div>', unsafe_allow_html=True)
 _s1, _ = st.columns([1, 3])
 with _s1:
-    st.page_link("pages/6_collateral.py", label="Get the certificates →")
+    st.page_link("views/6_collateral.py", label="Get the certificates →")
 
 st.markdown("")
 
@@ -299,6 +306,31 @@ if _stories:
                     f'</div>', unsafe_allow_html=True)
     st.markdown("")
 
+# ── Monthly Ruminations ──────────────────────────────────────────────────────
+# Headlines and dates only — one line each, read from the exported index.
+# The emails live in Key Collateral; this is a prompt that they exist and are
+# forwardable, not a reading list (Prem, 25 Oct).
+_RUMI_IDX = Path(__file__).parent.parent / "content" / "collateral" / "ruminations" / "index.json"
+_rumi = []
+try:
+    _rumi = json.loads(_RUMI_IDX.read_text(encoding="utf-8"))
+except Exception:
+    _rumi = []
+
+if _rumi:
+    _label("Monthly Ruminations &nbsp;·&nbsp; forward one to a customer")
+    _rows = "".join(
+        f'<div class="rumi-row">'
+        f'<span class="rumi-date">{str(r.get("sent",""))[3:].strip()}</span>'
+        f'<a href="collateral" target="_self">{r.get("subject","")}</a>'
+        f'</div>'
+        for r in sorted(_rumi, key=lambda x: x.get("n", 0), reverse=True))
+    st.markdown(_rows, unsafe_allow_html=True)
+    _r1, _ = st.columns([1, 3])
+    with _r1:
+        st.page_link("views/6_collateral.py", label="Preview or download →")
+    st.markdown("")
+
 # ── Restricted ────────────────────────────────────────────────────────────────
 
 # Resources sits here, not in the All-e row: it is cross-product reference
@@ -308,10 +340,10 @@ _label("Cross-product, Hoppr &amp; reference", locked=True)
 r1, r2, r3, _ = st.columns([1, 1, 1, 1])
 with r1:
     _tile("📋", "Pipeline", "Meetings &amp; proposals — All-e + Hoppr",
-          "pages/1_pipeline.py", "Open Pipeline →", locked=True)
+          "views/1_pipeline.py", "Open Pipeline →", locked=True)
 with r2:
     _tile("📊", "Hoppr", "Usage, accounts &amp; MCP Beta",
-          "pages/7_hoppr.py", "Open Hoppr →", locked=True)
+          "views/7_hoppr.py", "Open Hoppr →", locked=True)
 with r3:
     _tile("🧠", "Knowledge Base", "Source docs, decks &amp; KB health",
-          "pages/5_resources.py", "Open the KB →", locked=True)
+          "views/5_resources.py", "Open the KB →", locked=True)

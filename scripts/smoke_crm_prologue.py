@@ -14,7 +14,7 @@ from unittest.mock import MagicMock
 # Resolve the page relative to the repo root so this runs anywhere (hook, CI,
 # by hand); allow an explicit path override as argv[1] for testing old versions.
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-PAGE = sys.argv[1] if len(sys.argv) > 1 else os.path.join(_REPO, "pages", "3_crm.py")
+PAGE = sys.argv[1] if len(sys.argv) > 1 else os.path.join(_REPO, "views", "3_crm.py")
 
 # ── mock streamlit ──────────────────────────────────────────────────────────
 st = MagicMock(name="streamlit")

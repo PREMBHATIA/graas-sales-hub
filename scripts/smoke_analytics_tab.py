@@ -110,7 +110,7 @@ def synthetic():
 
 def main():
     st = St()
-    src = open('pages/3_crm.py').read()
+    src = open('views/3_crm.py').read()
     lines = src.split('\n')
     start = next(i for i, l in enumerate(lines) if 'with tab_analytics' in l)
     body = lines[start + 1:]

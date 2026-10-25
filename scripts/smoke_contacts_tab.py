@@ -150,9 +150,9 @@ def main():
     import services.auth_gate as _ag
     st.session_state[_ag._SESSION_KEY] = True
 
-    src = open('pages/3_crm.py').read()
+    src = open('views/3_crm.py').read()
     ns = {'__name__': 'crm_smoke',
-          '__file__': os.path.abspath('pages/3_crm.py')}
+          '__file__': os.path.abspath('views/3_crm.py')}
 
     try:
         exec(compile(src, '3_crm.py', 'exec'), ns)

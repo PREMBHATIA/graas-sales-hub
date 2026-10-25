@@ -493,7 +493,7 @@ def find_briefs_for_company(company_name: str, folder_id: str) -> list:
     """Return matching Prospect Brief Docs for `company_name` in `folder_id`.
 
     Matches the same naming convention as
-    `_resolve_existing_brief_for_company` in pages/9_prospect_brief.py
+    `_resolve_existing_brief_for_company` in views/9_prospect_brief.py
     ('Prospect Brief — <company> — YYYY-MM-DD'), normalised so PT/Tbk/
     country suffixes don't break the match.
 
@@ -902,7 +902,7 @@ def _url_quote(s: str) -> str:
 
 
 def _normalize_company_key_for_pipeline(name: str) -> str:
-    """Inline copy of pages/9_prospect_brief.py::_normalize_company_key.
+    """Inline copy of views/9_prospect_brief.py::_normalize_company_key.
 
     Kept here so the pipeline-sheet write helper can match Lead names
     using the same normalization the auto-save uses for Drive dedup —

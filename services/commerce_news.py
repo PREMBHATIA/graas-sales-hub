@@ -1,9 +1,9 @@
 """Shared commerce-tech news fetcher.
 
 Used by:
-  - pages/9_prospect_brief.py — surfaces 1 story per session in the
+  - views/9_prospect_brief.py — surfaces 1 story per session in the
     "While you wait" card during brief generation
-  - pages/3_crm.py            — surfaces all 3 stories on the
+  - views/3_crm.py            — surfaces all 3 stories on the
     "📰 Newsworthy" tab as email talking points for Dhanashree
 
 Uses Claude + web_search to fetch up to 3 distinct, high-impact stories

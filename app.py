@@ -1,4 +1,12 @@
-"""Graas Sales Hub — navigation controller."""
+"""SalesHub — navigation controller.
+
+The page files live in views/, NOT pages/. Streamlit auto-discovers any
+folder called pages/ and builds its own sidebar from the filenames, which
+showed up beside this one as a flat lowercase list ("ask graas", "B
+proposal bank") with no groups, no icons and no lock markers. Renaming the
+folder is what stops that: st.navigation below is then the only nav, and
+its first entry — Home — is where everyone lands.
+"""
 
 import streamlit as st
 
@@ -12,33 +20,35 @@ st.set_page_config(
 pg = st.navigation(
     {
         "": [
-            st.Page("pages/0_home.py", title="🏠 Home", url_path="home"),
+            st.Page("views/0_home.py", title="🏠 Home", url_path="home"),
         ],
         # 🔒 Gated section — password-protected (see services/auth_gate.py).
         "Cross-Product 🔒": [
-            st.Page("pages/1_pipeline.py",  title="📋 Pipeline",   url_path="pipeline"),
+            st.Page("views/1_pipeline.py",  title="📋 Pipeline",   url_path="pipeline"),
         ],
         "All-e": [
-            st.Page("pages/2_alle.py",            title="📊 Pipeline",                url_path="alle"),
+            st.Page("views/2_alle.py",            title="📊 Pipeline",                url_path="alle"),
             # 🔒 Gated page inside an otherwise-open section — the lock sits on the
             # page title, not the "All-e" group, because its siblings stay open.
-            st.Page("pages/3_crm.py",             title="📧 Emails & Segments 🔒",     url_path="crm"),
-            st.Page("pages/9_prospect_brief.py",  title="📋 Create Prospect Brief  ✨ NEW",   url_path="prospect-brief"),
-            st.Page("pages/B_proposal_bank.py",   title="📑 Proposal Bank",            url_path="proposal-bank"),
+            st.Page("views/3_crm.py",             title="📧 Emails & Segments 🔒",     url_path="crm"),
+            st.Page("views/9_prospect_brief.py",  title="📋 Create Prospect Brief  ✨ NEW",   url_path="prospect-brief"),
+            st.Page("views/B_proposal_bank.py",   title="📑 Proposal Bank",            url_path="proposal-bank"),
             # Open, unlike Resources at the bottom: onboarding and customer-
             # facing collateral cannot sit behind the team password, which the
             # sales team does not have (Prem, 25 Oct).
-            st.Page("pages/6_collateral.py",      title="🎒 Key Collateral",           url_path="collateral"),
+            st.Page("views/6_collateral.py",      title="🎒 Key Collateral",           url_path="collateral"),
+            st.Page("views/4_ask_graas.py",       title="💬 Ask Graas",                url_path="ask-graas"),
         ],
         # 🔒 Gated section — password-protected (Hoppr + MCP Beta).
         "Hoppr 🔒": [
-            st.Page("pages/7_hoppr.py",      title="📊 Hoppr",      url_path="hoppr"),
+            st.Page("views/7_hoppr.py",      title="📊 Hoppr",      url_path="hoppr"),
+            st.Page("views/8_ask_hoppr.py",  title="💬 Ask Hoppr",  url_path="ask-hoppr"),
         ],
         # Shared / cross-product reference material — kept at the bottom so it
         # reads as "the team's library", not as an All-e-specific page.
         # 🔒 Gated section — the KB holds internal-only material.
         "Reference 🔒": [
-            st.Page("pages/5_resources.py",  title="🧠 Knowledge Base",  url_path="resources"),
+            st.Page("views/5_resources.py",  title="🧠 Knowledge Base",  url_path="resources"),
         ],
     },
     position="sidebar",
