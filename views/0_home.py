@@ -331,10 +331,9 @@ except Exception:
 
 if _rumi:
     _label("Monthly Ruminations &nbsp;·&nbsp; forward one to a customer")
-    st.caption("To send one: open it in **Key Collateral**, press Preview, then "
-               "copy the whole page into a Gmail compose window — the "
-               "formatting comes with it. Forwarding the original from "
-               "insights@ in your own inbox works too, and keeps your name on "
+    st.caption("To send one: open it in **Key Collateral** and download the "
+               "PDF, then attach it to your own email. Forwarding the original "
+               "from insights@ in your inbox works too, and keeps your name on "
                "the thread.")
     # "Send to" on the right: the headline alone does not tell anyone which
     # customer this one suits, which is what stops it being forwarded.

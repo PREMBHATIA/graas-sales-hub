@@ -168,10 +168,9 @@ if _rumi:
     except Exception:
         _want = ""
     st.markdown("### 📬 Monthly Ruminations")
-    st.caption("The Index emails, newest first. **To send one:** press "
-               "Preview, select the whole page, copy, and paste into a Gmail "
-               "compose window — the formatting travels with it. Downloading "
-               "the HTML is for editing, not sending. "
+    st.caption("The Index emails, newest first. **To send one: download the "
+               "PDF and attach it.** The HTML is for reading here or for "
+               "editing — it is not something you can attach to a mail. "
                "or open the original in your inbox from **insights@** and "
                "forward that, which keeps your name on it. No tracking pixel "
                "in these copies. ✅ Safe to share.")
@@ -200,12 +199,25 @@ if _rumi:
             except Exception as _e:
                 st.warning(f"Couldn't read it: {_e}")
                 continue
-            _q1, _q2, _ = st.columns([1, 1, 3])
+            # PDF first: it is the only form a salesperson can actually send.
+            # The HTML is for reading here or for editing — you cannot usefully
+            # attach it to a mail, and "copy the preview" does not work because
+            # the preview is inside an iframe (Prem, 25 Oct).
+            _pdf_path = _root_dir / str(_r.get("pdf", ""))
+            _q1, _q2, _q3, _ = st.columns([1, 1, 1, 2])
             with _q1:
+                if _r.get("pdf") and _pdf_path.exists():
+                    st.download_button(
+                        f"📄 PDF ({_r.get('pdf_kb','?')}KB)",
+                        _pdf_path.read_bytes(),
+                        file_name=f"{_r.get('subject','rumination')[:60]}.pdf",
+                        mime="application/pdf", type="primary",
+                        key=f"rumi_pdf_{_r.get('n')}")
+            with _q2:
                 st.download_button("⬇️ HTML", _rhtml.encode("utf-8"),
                                    file_name=_rp.name, mime="text/html",
                                    key=f"rumi_dl_{_r.get('n')}")
-            with _q2:
+            with _q3:
                 # Deep link: the homepage sends ?r=<n>, so clicking a headline
                 # there opens THAT email rather than dropping you at the top
                 # of this page to find it again.
