@@ -1,46 +1,46 @@
 {
-  "generated_utc": "2026-10-25T03:41:42Z",
+  "generated_utc": "2026-10-25T03:45:32Z",
   "window_days": 30,
   "stories": [
     {
-      "tag": "US - AI pilot failure / data readiness",
-      "title": "Gartner: Only 13% of CIOs Report Significant AI Value; Use Case Success Rate Remains One-in-Five",
-      "body": "At Gartner IT Symposium/Xpo in Orlando on October 19, 2026, Gartner released survey data showing only 13% of CIOs say their enterprise has realized significant or transformational value from AI. Despite AI use cases accelerating over two years, the likelihood of any single use case succeeding remains one-in-five. A separate Gartner finding reinforces the root cause: 85% of AI projects fail due to poor underlying data quality, and projects lacking AI-ready data are at serious risk of abandonment.",
-      "why": "This is the single most powerful objection-handling stat a Graas seller can use: AI investment is near-universal yet value realization is at 13% — and the cause is data quality and context, not model capability. It directly validates why a governed semantic/context layer must precede any agent deployment, which is exactly what Graas enables.",
-      "source_label": "Gartner Newsroom",
-      "source_url": "https://www.gartner.com/en/newsroom/press-releases/2026-10-19-gartner-survey-finds-only-13-percent-of-cios-say-their-enterprise-has-realized-significant-or-transformational-value-from-ai"
+      "tag": "Global - enterprise AI architecture",
+      "title": "Atlan Frames the 'Context Layer' as the Missing Enterprise Infrastructure Before Agents Can Work",
+      "body": "Atlan's 2026 enterprise guide defines a context layer for retail AI as the shared infrastructure — spanning SKU definitions, live inventory truth, resolved customer identity, and policy rules — that merchandising, inventory, and customer-facing agents all draw from instead of each rebuilding their own version. The architecture distinguishes between a knowledge layer (what exists and what it means), a context graph (situational facts tied to a specific decision), and a context layer (the full governed delivery stack). Gartner cited in the piece projects that 40% of enterprise applications will include task-specific AI agents by end of 2026, up from less than 5% in 2025.",
+      "why": "This is the clearest vendor-side articulation of why retail AI pilots stall: agents querying fragmented POS, ERP, and catalog systems each inherit a different 'version of truth,' and no model can fix that without a governed context layer underneath. A Graas salesperson can use this framing to reframe the conversation from 'which AI tool' to 'what data foundation do your agents actually run on.'",
+      "source_label": "Atlan",
+      "source_url": "https://atlan.com/know/context-layer-for-retail-ai/"
     },
     {
-      "tag": "US - McKinsey analyst report / CPG agentic AI",
-      "title": "McKinsey (Oct 9, 2026): For CPG Companies, Agentic AI's Real Payoff Is Growth — Not Cost-Cutting",
-      "body": "McKinsey's October 9, 2026 article, based on a survey of 41 senior commercial leaders across large CPG companies in the US and Europe, argues that CPG businesses are leaving growth on the table by deploying agentic AI primarily to cut costs and speed up existing work rather than as a growth accelerator. The firm contends the real opportunity lies in the increasingly complex CPG-retailer relationship, and that agentic AI must be deployed across the full commercial system — innovation, marketing, revenue growth management, and execution — to recapture lost sales. McKinsey separately found that in its 2026 State of AI survey, 80% of respondents report AI improved individual productivity, yet only 37% report positive EBIT impact.",
-      "why": "This McKinsey article arms a Graas seller with a named consultancy's argument that productivity pilots are not enough — agents must be wired into commercial workflows end-to-end to generate revenue lift, the exact framing Graas uses. The 37% EBIT figure confirms the pilot-to-production gap is still wide and traceable to workflow and data-foundation gaps.",
+      "tag": "US - analyst research",
+      "title": "McKinsey (Oct 9, 2026): CPG Companies Are Using Agentic AI to Cut Costs When They Should Be Using It to Recapture Growth",
+      "body": "McKinsey's October 9, 2026 article argues that CPG businesses are leaving growth on the table because most deployments of agentic AI are focused on cost reduction and accelerating existing work rather than top-line recovery. The article notes that investors in CPG companies reward top-line growth more than margin expansion, and that the real opportunity lies in the increasingly complex CPG–retailer relationship. In performance management specifically, McKinsey finds AI can track KPIs, detect variances, and recommend actions while cutting the human effort required by roughly half — freeing commercial teams to act on growth opportunities rather than reporting.",
+      "why": "McKinsey naming the 'cost-only' AI deployment as the wrong strategy is a gift for an enterprise retail-AI sales team: it validates that the market is stuck in efficiency pilots and has not yet wired agents into commercial growth workflows. Graas can position its context and data layer as the prerequisite that lets CPG commercial teams move from variance-reporting agents to revenue-recovery agents.",
       "source_label": "McKinsey & Company",
       "source_url": "https://www.mckinsey.com/industries/consumer-packaged-goods/our-insights/for-cpg-companies-agentic-ais-real-payoff-is-growth"
     },
     {
-      "tag": "Global - BCG named deployment / CPG supply chain agents",
-      "title": "BCG: Global CPG Leader Deploys Agentic Replenishment System, Cuts Admin Costs 40–60% and Lifts Fill Rates",
-      "body": "BCG's June 2026 report 'The AI-First Supply Chain' documents a global consumer goods company that replaced reactive, backward-looking analytics with a multi-agent replenishment system. Supply chain managers empowered by AI agents saw fill rates and in-stock levels rise by 2–4 percentage points, while administration costs fell 40%–60%. The modular architecture routes recommendations through subagents for data mapping, rationale tracking, and validation, with human analysts retained in the loop for critical decisions.",
-      "why": "This is a named, outcome-quantified BCG case study a Graas seller can put in front of a CPG or distributor prospect to show agents working in an actual replenishment workflow — not a pilot. The modular agent architecture described maps directly to Graas's own layered approach, and the in-stock and fill-rate outcomes are KPIs every supply chain buyer tracks.",
-      "source_label": "BCG",
-      "source_url": "https://www.bcg.com/publications/2026/how-ai-agents-are-transforming-supply-chains"
+      "tag": "US/Global - named enterprise deployment",
+      "title": "SAP Launches Joule Agents Across Supply Chain at SAP Connect 2026, Grounded in SAP Knowledge Graph",
+      "body": "At SAP Connect on October 6–8, 2026, SAP made its Autonomous Enterprise architecture generally available, deploying Joule Work and 50 domain-specific Joule Assistants across finance, procurement, HR, and supply chain — with new agents specifically targeting supply chain planning, warehousing, outbound optimization, fulfillment, and transportation dispatching. The agents are architecturally grounded in the SAP Knowledge Graph, which maps more than 7 million data fields to provide reliable business context, plus customer-specific process logic and approval workflows stored in HANA Cloud. SAP's Q3 2026 earnings simultaneously crossed €10 billion in quarterly revenue for the first time, with cloud backlog growing 28% to €24.1 billion, which SAP CEO Christian Klein attributed to agentic AI deployment as a distinct demand driver — not merely an ERP migration feature.",
+      "why": "SAP's explicit architecture decision — agents must be grounded in a governed knowledge graph before they can touch live ERP data — is the strongest enterprise proof point available that context infrastructure is table stakes, not a nice-to-have. For Graas, this is the anchor case that shows retail and CPG buyers what 'agent-ready' ERP looks like, and surfaces the gap for customers not yet on that foundation.",
+      "source_label": "SAP News / TechTimes",
+      "source_url": "https://news.sap.com/2026/10/joule-assistants-agents-advance-autonomous-scm/"
     },
     {
-      "tag": "US - BCG analyst report / retailer agentic commerce strategy",
-      "title": "BCG (Oct 21, 2026): 68% of Retailers Expect Agentic Commerce to Be Transformational Within Two Years",
-      "body": "BCG's October 21, 2026 article, based on a survey of 150 retailers and brands, finds 68% expect AI shopping agents to have a significant or transformational effect on commerce within two years. Eight in ten retailers have already taken a formal position on external agents: 42% make their product data discoverable by any agent, 32% allow access only to chosen agents, and 6% are blocking agents entirely. BCG argues retailers must now win both the direct shopper visit and the agent's recommendation — placing different demands on data quality, pricing consistency, and fulfillment reliability.",
-      "why": "This BCG report reframes 'agent readiness' as a commercial survival question for any retailer or brand: if an agent cannot read your product, pricing, and inventory data cleanly, it routes demand to a competitor. Graas sellers can use this to open a conversation about whether a prospect's data layer is machine-readable — today, not in two years.",
+      "tag": "Global - analyst research",
+      "title": "BCG Survey (Oct 21, 2026): 68% of Retailers Expect Agentic Commerce to Be Significant or Transformational Within Two Years — But Most Haven't Rewired Their Data",
+      "body": "BCG's October 21, 2026 survey of 150 retailers and brands finds that 68% expect agentic commerce to have a significant or transformational effect within two years, and that eight in ten retailers have already taken a position on external AI agents — with 42% making their data discoverable by any agent, 32% giving access only to chosen agents, and 6% blocking agents entirely. BCG argues retailers must now win two games simultaneously: the direct shopper visit and the external agent's recommendation, which place fundamentally different demands on loyalty programs, retail media, and personalization infrastructure. Traditional growth levers like banner ads and sponsored search are expected to slow as discovery moves off retailers' own websites and into agent-mediated flows.",
+      "why": "The BCG finding that only 42% of retailers have made their data machine-readable to any agent — while 68% expect agentic commerce to be transformational — defines the exact gap Graas addresses. A salesperson can use this to show retail and CPG prospects that the strategy decision is already being made by their competitors, while the data readiness work has barely started.",
       "source_label": "BCG",
       "source_url": "https://www.bcg.com/publications/2026/retailers-win-ai-shopping-agents"
     },
     {
-      "tag": "US - enterprise AI architecture / context layer critique",
-      "title": "Snowflake, Atlan, Databricks: Q1–Q3 2026 Vendor Wave Frames the 'Context Layer' as the Core Enterprise AI Infrastructure Product",
-      "body": "A growing body of 2026 vendor and analyst output — led by Snowflake's published architecture, Atlan's Enterprise Data Graph, and Databricks/Snowplow's real-time framing — defines the context layer as the architectural tier between raw enterprise data and AI agents that translates data into governed business meaning agents can act on reliably. Snowflake's architecture predicted 'agent context, not the model, will be the core product as the model gets commoditized.' Gartner has published multiple 2026 analyses describing context layers as an architectural interaction plane for agents and as infrastructure for creating reusable context across agents, while a dbt Labs April 2026 benchmark found a semantic layer scored 98–100% accuracy versus 84–90% for text-to-SQL on enterprise questions.",
-      "why": "This story gives a Graas seller a vendor-neutral, analyst-backed vocabulary to explain why agents fail without a context layer — and why the context layer, not the LLM, is the enterprise buying decision. The dbt accuracy benchmark is a crisp proof point that structured semantic layers outperform raw model inference on real enterprise data.",
-      "source_label": "Tellius / Medium (industry synthesis citing Snowflake, Atlan, Gartner, dbt Labs)",
-      "source_url": "https://www.tellius.com/resources/blog/what-is-a-context-layer-for-ai-agents-the-definitive-guide-for-2026"
+      "tag": "US - AI economics / build-vs-buy",
+      "title": "BCG and Futurum Data: AI Now Consumes 17% of IT Budgets, Non-AI SaaS Licenses Being Cut to Fund It — and Gartner Warns 40%+ of Agentic Projects Will Be Canceled by 2027",
+      "body": "BCG's 2026 CIO survey finds AI's share of IT budgets has more than tripled, from 5% to 17%, with server prices running 80% above 2025 rates and CIOs now required to tie every AI dollar to measurable business value. Futurum's concurrent 2H 2026 CIO survey finds that 36.4% of organizations that reallocated funds to cover AI overruns did so by cutting non-AI software licenses, while 27.5% of buyers expect to purchase fewer core SaaS seats as their use of vendors' AI features grows. Gartner's positioning, cited in multiple analyst notes, calls 2026 a 'trough of disillusionment' year and expects more than 40% of agentic AI projects to be canceled by end of 2027 absent proven ROI.",
+      "why": "The budget squeeze is the forcing function for every enterprise AI conversation in late 2026: CIOs are cutting point-solution SaaS to fund agents, but Gartner warns that 40%+ of agentic projects will be canceled if they can't prove ROI. Graas can use this to reframe its pitch — a governed context and data layer is not an added cost, it is what separates the 60% of projects that survive from the 40% that get cut.",
+      "source_label": "BCG / Futurum Group",
+      "source_url": "https://www.bcg.com/publications/2026/ai-share-it-budgets-rising-fast"
     }
   ]
 }
