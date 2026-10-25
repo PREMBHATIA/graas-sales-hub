@@ -17,10 +17,12 @@
   },
   {
     "n": 3,
-    "subject": "Agentic mistakes retail keep making",
+    "subject": "Agentic mistakes retail keeps making",
     "file": "content/collateral/ruminations/03_agentic-mistakes-retail-keep-making.html",
     "sent": "23 Oct 2026",
     "recipients": 474,
-    "chars": 16903
+    "chars": 16903,
+    "sent_subject": "Agentic mistakes retail keep making",
+    "subject_corrected": "Sent as 'keep'; 'retail' takes a singular verb. Label corrected 25 Oct — the 474 delivered emails are unchanged."
   }
 ]

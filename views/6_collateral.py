@@ -176,6 +176,11 @@ if _rumi:
             st.markdown(f"**{_r.get('subject', 'Untitled')}**")
             st.caption(f"Sent {_r.get('sent', '')} · "
                        f"{_r.get('recipients', 0)} recipients")
+            if _r.get("sent_subject"):
+                # Say it plainly rather than quietly showing a subject that
+                # differs from the one in anyone's inbox.
+                st.caption(f"⚠️ Went out as *“{_r['sent_subject']}”* — "
+                           "grammar corrected here only.")
             try:
                 _rhtml = _rp.read_text(encoding="utf-8")
             except Exception as _e:
