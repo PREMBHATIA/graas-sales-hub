@@ -81,7 +81,7 @@ for name in ("plotly.express", "dotenv"):
 sys.modules["dotenv"].load_dotenv = lambda *a, **k: None
 
 src = open(PAGE).read()
-prologue = src[: src.index("tab_contacts, tab_segments")]
+prologue = src[: src.index("tab_contacts,")]
 ns = {"__name__": "__smoke__", "__file__": PAGE}
 try:
     exec(compile(prologue, PAGE, "exec"), ns)

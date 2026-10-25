@@ -130,7 +130,7 @@ def main():
     # them, which left _inbox_scan_results below and made this slice swallow
     # every tab body.
     exec(src[src.index('_OPEN_PREFETCH_SEC = 60'):
-             src.index('tab_contacts, tab_segments')], ns)
+             src.index('tab_contacts,')], ns)
 
     try:
         from services.email_sender import recent_sends, fetch_tracking_events

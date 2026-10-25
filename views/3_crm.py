@@ -1337,9 +1337,11 @@ def _log_integrity(track_df, sends_df):
     return bad, len(ev), (bad / len(ev)) <= _INTEGRITY_TOLERANCE
 
 
-tab_contacts, tab_segments, tab_compose, tab_calendar, tab_analytics = st.tabs([
-    "👥 Contacts",
-    "🎯 Segments",
+# Segments folded into Contacts (Prem, 25 Oct): both answered "who is on the
+# list", one by person and one by company, and splitting them meant checking
+# two tabs to size a campaign.
+tab_contacts, tab_compose, tab_calendar, tab_analytics = st.tabs([
+    "👥 Contacts & Segments",
     "✉️ Email Composer",
     "🎨 Creatives",
     "📊 Analytics",
@@ -1453,27 +1455,21 @@ with tab_contacts, _tab_guard("Contacts"):
     total_companies = contacts['company'].nunique()
 
     # Recency KPIs (cross-segment)
-    hot_n = with_email[with_email['recency_key'] == 'hot']['company'].nunique()
-    warm_n = with_email[with_email['recency_key'] == 'warm']['company'].nunique()
-    cool_n = with_email[with_email['recency_key'] == 'cool']['company'].nunique()
-    cold_n = with_email[with_email['recency_key'] == 'cold']['company'].nunique()
-
+    # Hot/Warm/Cool/Cold tiles removed (Prem, 25 Oct). They were computed from
+    # the pre-sales sheet's conversation dates, not from email engagement, and
+    # read as the latter sitting above a contact table. They also described
+    # 199 of 577 contacts: Ankit's 371 carry no conversation date at all, so
+    # two-thirds of the book could never land in any bucket. Recency survives
+    # as a filter below, where its meaning is explicit.
     _watchers = _fetch_watchers_page()
+    _dated = _isum(with_email["last_contact"].notna())
 
-    c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
+    c1, c2, c3 = st.columns(3)
     with c1:
         st.metric("Total Contacts", len(with_email))
     with c2:
         st.metric("Companies", total_companies)
     with c3:
-        st.metric("🔥 Hot", hot_n, help="Met within last 30 days")
-    with c4:
-        st.metric("☀️ Warm", warm_n, help="Last contact 30-90 days ago")
-    with c5:
-        st.metric("❄️ Cool", cool_n, help="Last contact 90-180 days ago")
-    with c6:
-        st.metric("🧊 Cold", cold_n, help="Last contact 180+ days ago")
-    with c7:
         st.metric("📣 Internal", len(_watchers),
                   help="Graas colleagues who can be copied on a campaign. "
                        "NOT prospects — they are not part of Total Contacts, "
@@ -1531,38 +1527,16 @@ with tab_contacts, _tab_guard("Contacts"):
 
     if _ic_sum is not None:
         _icdf, _op, _ck, _subj = _ic_sum
-        st.markdown("##### 📣 Internal copies — did the team read the last campaign?")
-        _i1, _i2, _i3, _i4 = st.columns(4)
-        with _i1:
-            st.metric("Sent to", len(_icdf))
-        with _i2:
-            st.metric("Opened", _op)
-        with _i3:
-            st.metric("Clicked", _ck)
-        with _i4:
-            st.metric("Didn't open", len(_icdf) - _op)
-        st.caption(f"Campaign: **{_subj}**. Watchers are colleagues, not "
-                   "prospects — they are not in Total Contacts and never count "
-                   "against the send cap. Same tracking as any send, so a "
-                   "blocked pixel reads as unopened.")
-        st.dataframe(_icdf, use_container_width=True, hide_index=True,
-                     height=min(560, 80 + 35 * len(_icdf)))
-
-    with st.expander(f"📣 Watcher list ({len(_watchers)}) — who can be copied on a campaign"):
-        if not _watchers:
-            st.info("No watchers configured. Add a row per address to the "
-                    "**Watchers** tab (single `email` column) of the Graas "
-                    "Outreach Log sheet.")
-        else:
-            st.caption(
-                "Edit the list in the **Watchers** tab of the Outreach Log "
-                "sheet, then hit 🔄 Refresh CRM Data. Copies go out only when "
-                "the watcher box is ticked in **Email Composer → Step 4**, and "
-                "default OFF for follow-up batches of a campaign they have "
-                "already seen."
-            )
-            st.dataframe(pd.DataFrame({"email": _watchers}),
-                         use_container_width=True, hide_index=True)
+        # Collapsed, with the numbers in the label — it is a weekly glance,
+        # not something to scroll past every visit (Prem, 25 Oct).
+        with st.expander(f"📣 Internal copies — {_op} of {len(_icdf)} opened"
+                         f"{f', {_ck} clicked' if _ck else ''}"):
+            st.caption(f"Campaign: **{_subj}**. Watchers are colleagues, not "
+                       "prospects — they are not in Total Contacts and never "
+                       "count against the send cap. Same tracking as any "
+                       "send, so a blocked pixel reads as unopened.")
+            st.dataframe(_icdf, use_container_width=True, hide_index=True,
+                         height=min(560, 80 + 35 * len(_icdf)))
 
     # Filters
     st.markdown("---")
@@ -1697,7 +1671,10 @@ with tab_contacts, _tab_guard("Contacts"):
 # TAB 2: SEGMENTS
 # ══════════════════════════════════════════════════════════════════════════════
 
-with tab_segments, _tab_guard("Segments"):
+    # ── Segments ─────────────────────────────────────────────────────────
+    # Was its own tab until 25 Oct. Same question as the table above, asked
+    # by company rather than by person.
+    st.markdown("---")
     st.markdown("### 🎯 AI Segments")
     st.caption(
         "Every company by AI maturity — the axis campaigns target. Move a company "
@@ -2036,8 +2013,6 @@ def _inline_critical_styles(html: str) -> tuple:
                       lambda d: f": {d.group(1).strip()} !important{d.group(2)}", block)
     fixed = re.sub(r"@media[^{]*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}", _important, fixed)
     return fixed, changed
-
-
 
 
 with tab_compose, _tab_guard("Email Composer"):
