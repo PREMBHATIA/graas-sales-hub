@@ -341,8 +341,8 @@ if _rumi:
     _rows = "".join(
         f'<div class="rumi-row">'
         f'<span class="rumi-date">{str(r.get("sent",""))[3:].strip()}</span>'
-        f'<span class="rumi-subj"><a href="collateral" target="_self">'
-        f'{r.get("subject","")}</a></span>'
+        f'<span class="rumi-subj"><a href="collateral?r={r.get("n","")}" '
+        f'target="_self">{r.get("subject","")}</a></span>'
         f'<span class="rumi-about">{r.get("send_to","")}</span>'
         f'</div>'
         for r in sorted(_rumi, key=lambda x: x.get("n", 0), reverse=True))

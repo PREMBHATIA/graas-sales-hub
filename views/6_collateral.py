@@ -163,6 +163,10 @@ except Exception:
     _rumi = []
 
 if _rumi:
+    try:
+        _want = str(st.query_params.get("r", ""))
+    except Exception:
+        _want = ""
     st.markdown("### 📬 Monthly Ruminations")
     st.caption("The Index emails, newest first. **To send one:** press "
                "Preview, select the whole page, copy, and paste into a Gmail "
@@ -171,7 +175,10 @@ if _rumi:
                "or open the original in your inbox from **insights@** and "
                "forward that, which keeps your name on it. No tracking pixel "
                "in these copies. ✅ Safe to share.")
-    for _r in sorted(_rumi, key=lambda x: x.get("n", 0), reverse=True):
+    _order = sorted(_rumi, key=lambda x: x.get("n", 0), reverse=True)
+    if _want:
+        _order.sort(key=lambda x: str(x.get("n", "")) != _want)
+    for _r in _order:
         _rp = _root_dir / _r.get("file", "")
         if not _rp.exists():
             continue
@@ -199,7 +206,11 @@ if _rumi:
                                    file_name=_rp.name, mime="text/html",
                                    key=f"rumi_dl_{_r.get('n')}")
             with _q2:
-                _rshow = st.toggle("Preview", key=f"rumi_pv_{_r.get('n')}")
+                # Deep link: the homepage sends ?r=<n>, so clicking a headline
+                # there opens THAT email rather than dropping you at the top
+                # of this page to find it again.
+                _rshow = st.toggle("Preview", key=f"rumi_pv_{_r.get('n')}",
+                                   value=(_want == str(_r.get("n", ""))))
             if _rshow:
                 import streamlit.components.v1 as _cmp_r
                 _cmp_r.html(_rhtml, height=700, scrolling=True)
