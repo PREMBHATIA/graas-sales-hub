@@ -20,22 +20,36 @@ import streamlit as st
 
 st.markdown("""
 <style>
-    .block-container { padding-top: 2rem; }
+    /* 3rem, not 2: at 2rem the gradient header's ascenders were clipped by
+       the top of the scroll container. */
+    .block-container { padding-top: 3rem; }
 
     .main-header {
-        font-size: 2.4rem;
+        font-size: 2.6rem;
         font-weight: 800;
         letter-spacing: -0.03em;
+        /* line-height and the padding below matter: -webkit-background-clip
+           crops the glyphs to the painted box, so a tight box cuts the tops
+           and tails off the letters. */
+        line-height: 1.22;
+        padding: 2px 0 4px;
         background: linear-gradient(90deg, #4F46E5, #7C3AED 55%, #DB2777);
         -webkit-background-clip: text;
+        background-clip: text;
         -webkit-text-fill-color: transparent;
-        margin-bottom: 0;
+        margin: 0;
+        display: inline-block;
+    }
+    .main-header .mh-graas {
+        font-weight: 500;
+        letter-spacing: -0.01em;
+        opacity: 0.55;
     }
     .sub-header {
-        font-size: 1rem;
+        font-size: 0.95rem;
         color: #9CA3AF;
-        margin-top: -6px;
-        margin-bottom: 30px;
+        margin-top: 2px;
+        margin-bottom: 28px;
     }
 
     /* Section label with a fading rule, so the eye can find the groups */
@@ -149,9 +163,10 @@ def _label(text, locked=False):
         + '</p>', unsafe_allow_html=True)
 
 
-st.markdown('<p class="main-header">Graas Sales Hub</p>', unsafe_allow_html=True)
-st.markdown('<p class="sub-header">Pipeline, All-e &amp; Hoppr — shared team view</p>',
-            unsafe_allow_html=True)
+st.markdown('<p class="main-header"><span class="mh-graas">Graas</span> '
+            'SalesHub</p>', unsafe_allow_html=True)
+st.markdown('<p class="sub-header">Everything a salesperson needs — briefs, '
+            'collateral, pipeline and outreach.</p>', unsafe_allow_html=True)
 
 # ── All-e ─────────────────────────────────────────────────────────────────────
 # Promoted above Cross-Product: it is where the team actually works and holds
