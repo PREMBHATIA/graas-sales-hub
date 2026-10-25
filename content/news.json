@@ -1,46 +1,46 @@
 {
-  "generated_utc": "2026-10-25T03:24:25Z",
+  "generated_utc": "2026-10-25T03:32:52Z",
   "window_days": 30,
   "stories": [
     {
-      "tag": "🇺🇸 US · agentic commerce",
-      "title": "TikTok Launches AI Shopping Assistant and 'Buy Direct' One-Click Checkout at Advertising Week New York",
-      "body": "On October 5, 2026, TikTok unveiled two agentic commerce tools at Advertising Week New York: Shopping Assistant, a conversational AI agent that retains user preferences and provides real-time guidance on sizing, shipping, and availability; and Buy Direct, a one-click in-app checkout that lets users purchase from a brand's For You feed without leaving the app. The tools are being co-built with Salesforce, Shopify, Shoplazza, and Stripe and are enabled by Universal Commerce Protocol (UCP) integration. TikTok framed this as the first of several agentic commerce experiences, while simultaneously launching marketer-side tools including Agentic Leads — signaling a full-stack AI commerce infrastructure play.",
-      "why": "This is a direct threat and opportunity for any $100M+ brand: TikTok is collapsing the discovery-to-checkout funnel into a single in-app AI interaction, bypassing traditional DTC storefronts. For a Graas salesperson, it's the clearest current proof point that brands need AI-native commerce infrastructure — catalog readiness, agentic channel optimization, and performance measurement across feed-based checkout — or risk being invisible in the next generation of shopping.",
-      "source_label": "TechCrunch",
-      "source_url": "https://techcrunch.com/2026/10/05/tiktok-rolls-out-an-ai-shopping-assistant-and-one-click-checkout/"
+      "tag": "US - analyst / agentic AI ROI gap",
+      "title": "McKinsey State of AI 2026: AI Adoption Is Rising Faster Than ROI",
+      "body": "McKinsey's 2026 State of AI global survey finds 80% of respondents say AI has improved their individual productivity, yet only 37% report a positive EBIT impact — unchanged from 2025 — and just 6% qualify as AI high performers. Large enterprises ($1B+ revenue) are pulling ahead on agents, with 40% now scaling AI agents in at least one function, up from 27% last year, while smaller organizations stayed flat at 22%. The survey also finds that roughly 32% of organizations have decided against buying at least one software product because coding agents now let them build it in-house, directly reshaping the build-vs-buy calculus.",
+      "why": "The 80%-productivity / 37%-EBIT disconnect is the exact 'pilot stall' story a Graas salesperson can use: individual tool adoption does not equal enterprise value, and the gap closes only when agents are grounded in governed context across workflows. The large-enterprise agent scaling surge (27→40%) signals that Graas's target accounts are already committing budget — the conversation is now about which data foundation makes those agents reliable enough to clear the EBIT bar.",
+      "source_label": "McKinsey QuantumBlack",
+      "source_url": "https://www.mckinsey.com/capabilities/quantumblack/our-insights/the-state-of-ai"
     },
     {
-      "tag": "🇺🇸 US · agentic commerce",
-      "title": "Retailers Draw Battle Lines on AI Agents: QVC Says Yes, Amazon Says No, Walmart Bets on Sparky",
-      "body": "About 61 million U.S. consumers now start shopping research with AI, yet 59.7% of the most recent AI-assisted purchases still closed on Amazon's own website — a tension that is forcing every major retailer to choose a stance. QVC lets agents complete purchases end-to-end; Tapestry sells through Google's AI tools but bars agents from its own checkout; and Amazon blocks outside agents entirely while building its own. Walmart is threading the needle: when a shopper selects a Walmart item inside Google Gemini, Walmart's Sparky agent takes over the basket, keeping the customer relationship in-house.",
-      "why": "This story crystallizes the strategic fork every retail brand faces right now: build your own agent layer, join a platform's agent ecosystem, or get bypassed entirely. Graas salespeople can use this as a direct 'have you chosen your agentic posture?' opener with CMOs and Heads of Digital who are still in wait-and-see mode.",
-      "source_label": "PYMNTS",
-      "source_url": "https://www.pymnts.com/news/retail/2026/ai-agents-knock-retailers-decide-how-wide-to-open-the-door/"
-    },
-    {
-      "tag": "🇸🇪 EU · agentic AI / retail transformation",
-      "title": "McKinsey: IKEA's Chief Digital Officer on Navigating 'The Risk of Doing Everything But Maybe Nothing' in Agentic AI",
-      "body": "In a June 2026 interview published by McKinsey, Ingka Group Chief Digital Officer Parag Parekh — overseeing IKEA operations across 32 countries and approximately 87% of global IKEA retail sales — described how agentic AI and generative AI are shifting customer relationships from transactional to immersive. Parekh revealed that AI has already compressed interior design sessions from six hours of co-worker time to a fraction of that, a service that previously cost customers around €70 per session. The CDO's key warning: prioritizing which AI initiatives to pursue 'is as important as the ideas themselves,' flagging the organizational trap of spreading investment too thin.",
-      "why": "A C-suite-level case study from one of the world's largest retailers, published by McKinsey, is the gold standard 'have you seen this?' opener for enterprise commerce conversations. For Graas, it directly validates the argument that agentic AI must be sequenced and measured — exactly the kind of structured, data-driven commerce execution Graas enables.",
+      "tag": "US - analyst / CPG agentic AI",
+      "title": "For CPG Companies, Agentic AI's Real Payoff Is Growth — Not Cost Cuts (McKinsey, October 2026)",
+      "body": "A McKinsey article published October 9, 2026, drawing on a survey of 41 senior commercial leaders at predominantly $10B+ revenue CPG companies in the US and Europe, finds that most CPG firms are deploying agentic AI primarily to cut costs and speed up existing work — and are leaving top-line growth on the table as a result. McKinsey argues that agentic AI must be deployed across the full commercial system — innovation, marketing, revenue growth management, and execution — to recapture the lost sales that stem from the increasingly complex CPG-retailer relationship. Time savings are one measure of returns, but the real payoff will be measured in better product availability, pricing, and shelf presence for shoppers.",
+      "why": "This is a direct opening for Graas: CPG companies are stalling at cost-efficiency pilots because their agents lack the cross-system commercial context (RGM, execution, retailer data) to drive growth. Graas can position its context and data layer as the prerequisite that turns a CPG's cost-reduction pilot into a revenue-recapture engine across the retailer relationship.",
       "source_label": "McKinsey & Company",
-      "source_url": "https://www.mckinsey.com/industries/retail/our-insights/elevating-the-customer-experience-ikeas-agentic-ai-journey"
+      "source_url": "https://www.mckinsey.com/industries/consumer-packaged-goods/our-insights/for-cpg-companies-agentic-ais-real-payoff-is-growth"
     },
     {
-      "tag": "🇺🇸 US · platform consolidation",
-      "title": "Amazon Opens Seller Central to Walmart, eBay, Shopify, and TikTok Shop — Free Multichannel Management for All Sellers",
-      "body": "At its annual Accelerate seller conference on September 24–25, 2026, Amazon announced free Multichannel Selling Tools built directly into Seller Central, allowing independent sellers to connect, manage listings, view orders, and fulfill across eBay, Shopify, TikTok Shop, and Walmart from a single dashboard at no additional cost. The tools are rolling out gradually to U.S. sellers over the coming months. The move gives Amazon unprecedented visibility into off-platform seller data and inventory flows across its four largest rivals simultaneously.",
-      "why": "Amazon is making a structural play to become the operating system of multichannel commerce — centralizing data from every major rival under its own roof. For Graas, this reframes the conversation with brands: as Amazon consolidates the seller layer, brands need an independent intelligence and performance layer that isn't captive to any single platform's data incentives.",
-      "source_label": "GeekWire",
-      "source_url": "https://www.geekwire.com/2026/amazon-will-let-sellers-manage-walmart-ebay-shopify-and-tiktok-sales-from-their-amazon-dashboards/"
+      "tag": "US - analyst / agentic commerce strategy",
+      "title": "BCG: 68% of Retailers Expect Agentic Commerce to Have a Significant or Transformational Effect Within Two Years (October 21, 2026)",
+      "body": "In a survey of 150 retailers and brands published October 21, 2026, BCG finds that 68% of retailers expect agentic commerce to significantly or transformationally reshape how products are discovered and purchased within two years. Eight in ten retailers have already taken a formal position on external AI agents: 42% are making their data discoverable by any agent, 32% are granting access only to chosen agents, and 6% are blocking agents entirely. BCG argues retailers must now win two distinct games simultaneously — the shopper's direct visit and the agent's recommendation — placing new demands on data infrastructure, loyalty programs, and retail media.",
+      "why": "The 42% of retailers opening their data to any agent represent an immediate infrastructure urgency: if product, pricing, and inventory data is not governed and semantically consistent, agents will surface wrong information and erode trust. Graas can frame its context and semantic layer as the mechanism that makes a retailer's data 'agent-ready' before that 42% window closes competitively.",
+      "source_label": "BCG",
+      "source_url": "https://www.bcg.com/publications/2026/retailers-win-ai-shopping-agents"
     },
     {
-      "tag": "🇺🇸 US · platform-level launch / social commerce",
-      "title": "TikTok Shop Launches 20-Day Black Friday–Cyber Monday Campaign With 1,200%+ Product Catalog Expansion Since 2024",
-      "body": "On October 19, 2026, TikTok Shop officially announced its Black Friday and Cyber Monday campaign running November 11–30, its longest and most expansive holiday push to date. Since 2024, TikTok Shop has expanded its product selection across categories by more than 1,200%, with major retailers including Sephora, Michael Kors, Best Buy, Ulta Beauty, and Victoria's Secret joining the platform this year alone. The campaign runs alongside TikTok Shop's US gross merchandise value crossing $30 billion in the first half of 2026 — up sharply from a roughly $9 billion annualized run rate in mid-2025.",
-      "why": "TikTok Shop is no longer a test channel — it is a structural Q4 battleground with $30B+ in H1 GMV and every major retail brand now participating. For Graas, this is a concrete urgency trigger for any brand not yet optimized for TikTok Shop performance: the holiday window is weeks away and the algorithm favors brands already live, making this an immediate actionable conversation starter.",
-      "source_label": "GlobeNewswire / TikTok Shop",
-      "source_url": "https://globenewswire.com/news-release/2026/10/19/3383528/0/en/tiktok-shop-announces-black-friday-and-cyber-monday-campaign-running-november-11-30.html"
+      "tag": "US - enterprise AI architecture / context layer",
+      "title": "Atlan Publishes Retail-Specific Context Layer Architecture: SKU Identity and Inventory Truth as the Agent Substrate (2026)",
+      "body": "Atlan's 2026 retail AI architecture guide argues that a context layer for retail AI must unify SKU definitions, live inventory truth, resolved customer identity, and policy rules into a single governed infrastructure that merchandising, inventory, and customer-facing agents all draw from — instead of each agent rebuilding its own version. The guide highlights a structural failure mode: a product discontinued in an ERP can still appear as orderable in an online store for days because no system propagates the change in real time, and any agent querying a single system inherits whichever version of truth that system holds. Gartner's 2026 data cited in the piece projects that 40% of enterprise applications will include task-specific AI agents by year-end, up from less than 5% in 2025.",
+      "why": "This is the clearest articulation of why retail AI pilots stall: fragmented SKU, inventory, and identity data means agents hallucinate or contradict each other across channels. Graas salespeople can use this architecture blueprint to show prospects exactly which context gaps — catalog, ERP, POS, CDP misalignment — must be closed before agent ROI materializes.",
+      "source_label": "Atlan",
+      "source_url": "https://atlan.com/know/ai-agent/context-layer-for-retail-ai/"
+    },
+    {
+      "tag": "US - economics / build vs buy AI",
+      "title": "Gartner: $2.59 Trillion in Global AI Spend in 2026, But Build-From-Scratch Fails 67% of the Time",
+      "body": "Gartner forecasts worldwide AI spending will reach $2.59 trillion in 2026, a 47% year-over-year increase, with AI infrastructure alone projected at $1.43 trillion. A synthesis of Gartner's RAG total-cost-of-ownership benchmark puts a 'simple' enterprise document-search deployment at $750,000–$1,000,000 in lifetime cost, with the initial build accounting for only 10–20% of that figure, and Gartner projects 70% of in-house RAG builders will see three-year TCO exceed budget by more than 2x by 2027. Vendor-led or partnered AI projects succeed roughly 67% of the time versus approximately 33% for pure in-house builds, which is why most 2026 enterprise budgets now favor buy-and-customize over build-from-scratch for anything outside a core differentiator.",
+      "why": "The 33% success rate for pure builds — and the hidden TCO blowout — gives Graas a sharp economic proof point for CIOs weighing whether to assemble a context layer internally. Framing Graas as the governed, retail-specific data foundation that eliminates the 2x TCO overrun converts a capability conversation into a CFO-ready business case.",
+      "source_label": "InfotechLead / Gartner",
+      "source_url": "https://infotechlead.com/artificial-intelligence/build-vs-buy-ai-in-2026-why-cios-are-choosing-a-hybrid-strategy-as-spending-hits-2-59-trillion-98267"
     }
   ]
 }

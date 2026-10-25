@@ -24,49 +24,62 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 
 
 _PROMPT_TMPL = (
-    "Use web_search to find UP TO {count} distinct, HIGH-IMPACT commerce-tech "
-    "news stories from the LAST {days} DAYS. These will be used as email "
-    "talking points to commerce executives — they MUST be substantive "
-    "enough to anchor a sales outreach (not blog posts, not minor "
-    "feature launches).\n\n"
-    "PRIORITY TOPIC = AGENTIC AI in retail/commerce (autonomous shopping "
-    "agents, agentic checkout, AI sales reps, agentic search/discovery, "
-    "retailer rollouts of agent platforms — e.g. IKEA's agentic AI "
-    "journey, Walmart Sparky, Amazon Rufus, Shopify Sidekick). "
-    "Secondary topics: major M&A or funding ($50M+), platform-level "
-    "announcements from Shopify/Amazon/TikTok Shop, Anthropic/OpenAI "
-    "retail moves, quick commerce shifts in India/SEA at scale.\n\n"
-    "WHAT 'HIGH IMPACT' MEANS — pick stories that:\n"
-    "  • A CMO or Head of Digital at a $100M+ brand would care about\n"
-    "  • Make a credible 'have you seen this?' email opener\n"
-    "  • Aren't already old news (skip anything that broke before 21 days ago)\n\n"
-    "PREFERRED SOURCES (search these first; aim for ≥1 from this list — "
-    "but never fabricate to fit, fall back to other credible outlets "
-    "if these don't have a fit):\n"
-    "  • McKinsey, Bain, BCG newsletters / insights — esp. retail + "
-    "agentic AI pieces\n"
-    "  • Watson Weekly (watsonweekly.com)\n"
-    "  • GeekWire (geekwire.com)\n"
-    "  • TechCrunch (techcrunch.com)\n"
-    "  • Daman Soni's Substack (damansoni.substack.com) — India D2C\n"
-    "  • e27 (e27.co), Tech in Asia, DealStreetAsia — SEA\n"
-    "  • The Ken, Entrackr, Inc42 — India ecom\n"
-    "  • Modern Retail, Retail Dive, Bloomberg/Reuters retail desk\n\n"
-    "Each story MUST cover a DIFFERENT angle/topic from the others.\n\n"
-    "Return ONLY a JSON object with key 'stories' whose value is an "
-    "array of 1-{count} story objects. Each story object has these EXACT keys:\n"
-    "  • tag: country flag + short topic, e.g. '🇺🇸 US · agentic "
-    "commerce', '🇮🇳 India · quick commerce'\n"
-    "  • title: the actual headline (verbatim or close paraphrase)\n"
-    "  • body: 2-3 sentences using ONLY facts in the source\n"
-    "  • why: 2 sentences on why this matters for a Graas salesperson — "
-    "tie it to commerce-AI, retail agents, or vertical AI dynamics\n"
-    "  • source_label: publication name\n"
-    "  • source_url: the ACTUAL article URL — MUST start with http\n\n"
+    "Use web_search to find UP TO {count} distinct, HIGH-IMPACT news items "
+    "from the LAST {days} DAYS for an enterprise retail-AI sales team.\n\n"
+
+    "WHAT WE WANT — in priority order:\n"
+    "  1. ENTERPRISE AI ARCHITECTURE: context layers, knowledge graphs, "
+    "ontologies, semantic layers, agent infrastructure, the data foundation "
+    "enterprises need before agents work. Vendor launches AND critiques.\n"
+    "  2. ANALYST / CONSULTING RESEARCH: McKinsey, BCG, Bain, Gartner, "
+    "Forrester, Deloitte, Accenture — on agentic AI, retail transformation, "
+    "AI adoption rates, why pilots stall. A named report beats a news item.\n"
+    "  3. NAMED ENTERPRISE DEPLOYMENTS: a large retailer, CPG or distributor "
+    "putting agents into a real workflow — ordering, service, supply chain — "
+    "with outcomes attached.\n"
+    "  4. The economics: AI spend, build-vs-buy, what CIOs are cutting.\n\n"
+
+    "WHAT WE DO NOT WANT — these crowd out the above and are not useful "
+    "to us:\n"
+    "  • Marketplace and platform feature launches (Amazon, TikTok Shop, "
+    "Shopify, Walmart adding a shopping assistant, checkout or seller tool). "
+    "At most ONE such item, and only if it genuinely changes enterprise "
+    "strategy.\n"
+    "  • Consumer shopping-app news, Black Friday campaigns, promotions.\n"
+    "  • Funding rounds, unless the company sells enterprise AI "
+    "infrastructure.\n"
+    "  • Model releases with no enterprise retail angle.\n\n"
+
+    "SOURCES to search first (never fabricate to fit; fall back to other "
+    "credible outlets):\n"
+    "  • McKinsey, BCG, Bain, Gartner, Forrester insights and newsletters\n"
+    "  • MIT Sloan Review, HBR — on AI operating models\n"
+    "  • The Information, Bloomberg/Reuters enterprise-tech desks\n"
+    "  • VentureBeat, TechCrunch Enterprise, The New Stack — data/AI "
+    "infrastructure\n"
+    "  • Modern Retail, Retail Dive, Grocery Dive — enterprise retail ops\n"
+    "  • The Ken, Entrackr, Inc42 (India) · e27, Tech in Asia, "
+    "DealStreetAsia (SEA)\n\n"
+
+    "Each item MUST cover a DIFFERENT angle from the others. Aim for at "
+    "least 2 from category 1 or 2.\n\n"
+
+    "Return ONLY a JSON object with key 'stories' whose value is an array "
+    "of 1-{count} story objects. Each story object has these EXACT keys:\n"
+    "  - tag: country/region flag + short topic, e.g. "
+    "'US - context layer', 'India - enterprise AI'\n"
+    "  - title: the actual headline (verbatim or close paraphrase)\n"
+    "  - body: 2-3 sentences using ONLY facts in the source\n"
+    "  - why: 2 sentences on why a Graas salesperson should care - tie it "
+    "to context layers, retail agents, or why AI pilots stall\n"
+    "  - source_label: publication name\n"
+    "  - source_url: the ACTUAL article URL - MUST start with http\n\n"
+
     "HARD RULES:\n"
     "  1. Every claim in body MUST be in the source you cite.\n"
     "  2. If a story has no verifiable URL, OMIT it.\n"
-    "  3. If nothing solid surfaces, return {\"stories\": []}.\n\n"
+    "  3. If nothing solid surfaces, return an empty stories array.\n\n"
+
     "Return ONLY the JSON. No prose, no code fences."
 )
 
@@ -132,7 +145,15 @@ def fetch_stories(count: int = 3, days: int = 21) -> list:
                 "source_url": url,
             })
         return out
-    except Exception:
+    except Exception as e:
+        # Say why. A bare `return []` here is indistinguishable from "the
+        # search found nothing", and that cost two CI runs chasing a
+        # KeyError the log never showed.
+        import sys as _sys
+        import traceback as _tb
+        print(f"commerce_news: fetch failed — {type(e).__name__}: {e}",
+              file=_sys.stderr)
+        _tb.print_exc(file=_sys.stderr)
         return []
 
 
