@@ -117,6 +117,7 @@ st.markdown("## 🎒 Key Collateral")
 st.caption("Open to the whole team — no password. The decks, courses and "
            "videos a salesperson needs.")
 
+_root_dir = Path(__file__).parent.parent
 _items = _sales_items()
 
 for _name, _icon, _blurb in SECTIONS:
@@ -143,8 +144,54 @@ for _name, _icon, _blurb in SECTIONS:
                 _card(_r)
     st.markdown("")
 
+# ── Monthly Ruminations ──────────────────────────────────────────────────────
+# The Index emails, exported from the Sends log into the repo. Served as files
+# rather than read from Sheets: this page is open and must stay fast, and the
+# Creatives shelf that holds them otherwise is behind the CRM password.
+#
+# These are the composed bodies, before send-time link rewriting, so they carry
+# no tracking pixel and no recipient id — checked, and it matters, because the
+# whole point is forwarding them to a customer.
+_RUMI = _root_dir / "content" / "collateral" / "ruminations" / "index.json"
+_rumi = []
+try:
+    _rumi = json.loads(_RUMI.read_text(encoding="utf-8"))
+except Exception:
+    _rumi = []
+
+if _rumi:
+    st.markdown("### 📬 Monthly Ruminations")
+    st.caption("The Index emails, newest first. Forward one to a customer — "
+               "or open the original in your inbox from **insights@** and "
+               "forward that, which keeps your name on it. No tracking pixel "
+               "in these copies. ✅ Safe to share.")
+    for _r in sorted(_rumi, key=lambda x: x.get("n", 0), reverse=True):
+        _rp = _root_dir / _r.get("file", "")
+        if not _rp.exists():
+            continue
+        with st.container(border=True):
+            st.markdown(f"**{_r.get('subject', 'Untitled')}**")
+            st.caption(f"Sent {_r.get('sent', '')} · "
+                       f"{_r.get('recipients', 0)} recipients")
+            try:
+                _rhtml = _rp.read_text(encoding="utf-8")
+            except Exception as _e:
+                st.warning(f"Couldn't read it: {_e}")
+                continue
+            _q1, _q2, _ = st.columns([1, 1, 3])
+            with _q1:
+                st.download_button("⬇️ HTML", _rhtml.encode("utf-8"),
+                                   file_name=_rp.name, mime="text/html",
+                                   key=f"rumi_dl_{_r.get('n')}")
+            with _q2:
+                _rshow = st.toggle("Preview", key=f"rumi_pv_{_r.get('n')}")
+            if _rshow:
+                import streamlit.components.v1 as _cmp_r
+                _cmp_r.html(_rhtml, height=700, scrolling=True)
+    st.markdown("")
+
 # ── Reports served from the repo ─────────────────────────────────────────────
-_root = Path(__file__).parent.parent
+_root = _root_dir
 for _rep in LOCAL_REPORTS:
     _path = _root / _rep["file"]
     if not _path.exists():

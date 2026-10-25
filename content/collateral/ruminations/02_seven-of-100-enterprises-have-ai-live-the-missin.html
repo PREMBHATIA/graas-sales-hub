@@ -1,0 +1,311 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<base target="_blank">
+<title>Why AI is failing in Retail Commerce</title>
+<!-- SUBJECT:     Seven of 100 enterprises have AI live. The missing piece is context.
+     ALT SUBJECT: The conversation is easy. Context is hard.
+     PREHEADER:   Understanding what someone says is solved. Knowing what's true for this buyer, today, is not.
+     NOTE: every colour/size is inline - survives forwarding, where Gmail strips
+     <style>. Only image is the header logo (hosted PNG, alt text set). Keep everything else text.
+     STRUCTURE (each section): annotated message -> what the agent must understand -> TOP 3 USE CASES -> proof example.
+     Modern Trade has no proof example yet - add one after its use-case box when there is.
+     LINKS: hrefs are the real destinations. The earlier script.google.com problem was NOT fixed by
+     target="_blank" - that only opens the broken page in a new tab, and <base> is stripped with <head>
+     by Gmail. It was fixed in SalesHub by no longer routing hrefs through the Apps Script redirect
+     (which cannot redirect: its iframe is sandboxed allow-top-navigation-by-user-activation).
+     SEND: through SalesHub, Email Composer -> "Paste my own HTML". Do NOT send via GmailApp /
+     Apps Script - that bypasses the suppression list, so unsubscribes go unhonoured, and there is
+     no send log, no open tracking and no campaign record. Never copy from the preview. -->
+</head>
+<body style="margin:0;padding:0;background-color:#eceef3;">
+
+<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">Understanding what someone says is solved. Knowing what&#8217;s true for this buyer, today, is not.</div>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#eceef3" style="background-color:#eceef3;">
+<tr><td align="center" style="padding:24px 12px;">
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background-color:#ffffff;border-radius:12px;overflow:hidden;">
+
+  <!-- masthead -->
+  <!-- LOGO: website logo (Webflow CDN, 918x267 PNG, transparent, white text), shown at 84x24. Left = logo, right = text tagline. -->
+  <tr><td bgcolor="#0D0D11" style="background-color:#0D0D11;padding:16px 24px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+      <td valign="middle" style="width:84px;"><a target="_blank" rel="noopener" href="https://www.graas.ai/?utm_source=graas_index&utm_content=header_logo" style="text-decoration:none;"><img src="https://cdn.prod.website-files.com/686deb6985e5956707d1d644/687494049c704d26a946e7e2_b7d82822c55b92188933c528ffc6d868_Graas%20logo.png" width="84" height="24" alt="graas" style="display:block;border:0;outline:none;width:84px;height:24px;font-family:'Outfit',Arial,sans-serif;font-size:20px;font-weight:800;color:#ffffff;"></a></td>
+      <td valign="middle" align="right" style="font-family:'Outfit',Arial,sans-serif;font-size:12px;font-weight:600;color:#c7ccd6;padding-left:12px;">Growth-as-a-Service</td>
+    </tr></table>
+  </td></tr>
+  <tr><td height="3" bgcolor="#2742FF" style="background-color:#2742FF;height:3px;line-height:3px;font-size:0;">&nbsp;</td></tr>
+
+  <!-- hero: the hook -->
+  <tr><td bgcolor="#0D0D11" style="background-color:#0D0D11;padding:28px 24px;">
+    <div style="font-family:'Outfit',Arial,sans-serif;font-size:12px;font-weight:700;color:#08C1FF;letter-spacing:1.4px;">THE GRAAS RETAIL COMMERCE INDEX &#183; 02</div>
+    <div style="font-family:'Outfit',Arial,sans-serif;font-size:26px;line-height:1.2;font-weight:800;color:#ffffff;letter-spacing:-0.4px;padding-top:10px;">The conversation is easy.<br>Context is hard.</div>
+    <div style="font-family:'Outfit',Arial,sans-serif;font-size:15px;line-height:1.4;font-weight:600;color:#c7ccd6;padding-top:12px;">Why AI is failing in Retail Commerce</div>
+  </td></tr>
+
+  <!-- opening -->
+  <tr><td style="padding:26px 24px 4px;">
+    <div style="font-family:'Outfit',Arial,sans-serif;font-size:16px;line-height:1.65;color:#2b2b38;">
+      In the <a target="_blank" rel="noopener" href="https://www.graas.ai/blog/retail-ai-index?utm_source=graas_index&utm_content=aug_edition" style="color:#2742FF;font-weight:700;text-decoration:underline;">Graas Retail Commerce Index</a> (published Aug 2026), 36 of 100 enterprises were evaluating AI. Seven had something live.
+    </div>
+    <div style="font-family:'Outfit',Arial,sans-serif;font-size:16px;line-height:1.65;color:#2b2b38;padding-top:14px;">
+      Commerce has moved from <strong style="color:#2742FF;">clicks to conversation</strong> - on WhatsApp, on a call, in chat on your own storefront. Understanding what someone said is solved. Knowing whether it is true for this buyer, this week, at this depot, is not.
+    </div>
+    <!-- stakes -->
+    <div style="font-family:'Outfit',Arial,sans-serif;font-size:20px;line-height:1.3;font-weight:800;color:#0D0D11;letter-spacing:-0.2px;padding-top:20px;">A chatbot answers. An agent commits.</div>
+    <div style="font-family:'Outfit',Arial,sans-serif;font-size:16px;line-height:1.65;color:#2b2b38;padding-top:8px;">
+      A wrong chatbot answer is a poor experience. A wrong agent answer is an unprofitable discount, the wrong SKU on a truck, or a promise the depot cannot keep - because an agent commits to a price, a quantity, a delivery date, an order in your ERP. Sounding right isn&#8217;t enough. It has to be right.
+    </div>
+    <!-- context -->
+    <div style="font-family:'Outfit',Arial,sans-serif;font-size:16px;line-height:1.65;color:#2b2b38;padding-top:14px;">
+      <strong style="color:#0D0D11;">The problem isn&#8217;t language. It&#8217;s context.</strong> The models (OpenAI, Gemini, Claude, DeepSeek or whatever else) are fine. But nobody buying or selling says what the models are trained on. They use slang, market lingo and nicknames, abbreviate pack sizes, refer to &#8220;my last purchase&#8221;, and want delivery &#8220;fast&#8221; (when the depot may not have the goods till next week). The machine has to reconstruct every word from multiple systems that have historically explained nothing.
+    </div>
+    <div style="font-family:'Outfit',Arial,sans-serif;font-size:16px;line-height:1.65;color:#2b2b38;padding-top:14px;">
+      Below are examples from across the retail chain: how customers actually ask, and what a machine needs to understand before it can answer.
+    </div>
+  </td></tr>
+
+  <!-- ══════════ GENERAL TRADE ══════════ -->
+  <tr><td style="padding:26px 24px 0;">
+    <div style="border-top:2px solid #0D0D11;padding-top:18px;">
+      <div style="font-family:'Outfit',Arial,sans-serif;font-size:22px;font-weight:800;color:#2742FF;letter-spacing:-0.2px;">General Trade</div>
+      <div style="font-family:'Outfit',Arial,sans-serif;font-size:12.5px;line-height:1.5;color:#9aa1ad;font-style:italic;padding-top:4px;">Distributors, wholesalers, retailers - and the sales agents and field force who serve them.</div>
+    </div>
+  </td></tr>
+
+  <!-- annotated message: GT -->
+  <tr><td style="padding:16px 18px 0;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#0D0D11" style="background-color:#0D0D11;border-radius:12px;">
+      <tr><td style="padding:20px 14px 6px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+          <tr valign="bottom">
+            <td width="50%" align="center" style="font-family:'Outfit',Arial,sans-serif;font-size:12px;line-height:1.45;color:#7FD4F5;padding:0 8px;">How many in a carton - 12&#215;1L or 24&#215;250ml?</td>
+            <td width="50%" align="center" style="font-family:'Outfit',Arial,sans-serif;font-size:12px;line-height:1.45;color:#F7A8D0;padding:0 8px;">Which price - and does it still stand?</td>
+          </tr>
+          <tr>
+            <td align="center" style="padding-top:6px;"><div style="width:1px;height:22px;background-color:#2F5E70;font-size:0;line-height:0;">&nbsp;</div></td>
+            <td align="center" style="padding-top:6px;"><div style="width:1px;height:22px;background-color:#6E4257;font-size:0;line-height:0;">&nbsp;</div></td>
+          </tr>
+        </table>
+        <div style="font-family:Georgia,'Times New Roman',serif;font-size:19px;line-height:1.55;color:#ffffff;text-align:center;padding:10px 4px 12px;">
+          &#8220;<span style="color:#6FDBFF;">20 cartons</span> of Dettol, at <span style="color:#FFA3D4;">the old price</span>.<br><span style="color:#86F0B9;">Volume offer</span> still on? Need it <span style="color:#FFCE7A;">today</span>.&#8221;
+        </div>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+          <tr>
+            <td width="50%" align="center"><div style="width:1px;height:22px;background-color:#35604B;font-size:0;line-height:0;">&nbsp;</div></td>
+            <td width="50%" align="center"><div style="width:1px;height:22px;background-color:#6B5530;font-size:0;line-height:0;">&nbsp;</div></td>
+          </tr>
+          <tr valign="top">
+            <td align="center" style="font-family:'Outfit',Arial,sans-serif;font-size:12px;line-height:1.45;color:#8FE3B8;padding:6px 6px 16px;">Which scheme - and is he even eligible?</td>
+            <td align="center" style="font-family:'Outfit',Arial,sans-serif;font-size:12px;line-height:1.45;color:#F5C173;padding:6px 6px 16px;">Which depot serves him - and is it stocked?</td>
+          </tr>
+        </table>
+      </td></tr>
+    </table>
+  </td></tr>
+
+  <tr><td style="padding:14px 24px 0;">
+    <div style="font-family:'Outfit',Arial,sans-serif;font-size:15.5px;line-height:1.65;color:#2b2b38;">
+      Four questions inside one sentence. The answers sit in four places: the ERP, the promotion calendar, this month&#8217;s scheme in an Excel file, and the WMS. The agent reaches one of them - so it escalates to a human, or it guesses.
+    </div>
+    <!-- meant vs did -->
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:14px;">
+      <tr><td bgcolor="#FAF7F2" style="background-color:#FAF7F2;border-radius:10px;padding:16px 16px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+          <tr>
+            <td width="22%" style="font-size:0;line-height:0;">&nbsp;</td>
+            <td width="39%" style="font-family:'Outfit',Arial,sans-serif;font-size:12px;font-weight:700;color:#8A6A1F;letter-spacing:1.2px;padding:0 0 6px 8px;">THE BUYER MEANT</td>
+            <td width="39%" style="font-family:'Outfit',Arial,sans-serif;font-size:12px;font-weight:700;color:#B3341F;letter-spacing:1.2px;padding:0 0 6px 8px;">THE AGENT GUESSED</td>
+          </tr>
+          <tr valign="top">
+            <td style="border-top:1px solid #E3DCD0;font-family:Georgia,'Times New Roman',serif;font-size:15px;color:#1a1a1a;padding:10px 6px 10px 0;">&#8220;carton&#8221;</td>
+            <td style="border-top:1px solid #E3DCD0;font-family:'Outfit',Arial,sans-serif;font-size:13.5px;line-height:1.45;color:#2b2b38;padding:10px 4px 10px 8px;">12&#215;1L, his usual</td>
+            <td style="border-top:1px solid #E3DCD0;font-family:'Outfit',Arial,sans-serif;font-size:13.5px;line-height:1.45;color:#C0392B;padding:10px 4px 10px 8px;">24&#215;250ml, never</td>
+          </tr>
+          <tr valign="top">
+            <td style="border-top:1px solid #E3DCD0;font-family:Georgia,'Times New Roman',serif;font-size:15px;color:#1a1a1a;padding:10px 6px 10px 0;">&#8220;old price&#8221;</td>
+            <td style="border-top:1px solid #E3DCD0;font-family:'Outfit',Arial,sans-serif;font-size:13.5px;line-height:1.45;color:#2b2b38;padding:10px 4px 10px 8px;">Aug promo, now ended</td>
+            <td style="border-top:1px solid #E3DCD0;font-family:'Outfit',Arial,sans-serif;font-size:13.5px;line-height:1.45;color:#C0392B;padding:10px 4px 10px 8px;">Quoted wrong Aug price</td>
+          </tr>
+          <tr valign="top">
+            <td style="border-top:1px solid #E3DCD0;font-family:Georgia,'Times New Roman',serif;font-size:15px;color:#1a1a1a;padding:10px 6px 10px 0;">&#8220;volume offer&#8221;</td>
+            <td style="border-top:1px solid #E3DCD0;font-family:'Outfit',Arial,sans-serif;font-size:13.5px;line-height:1.45;color:#2b2b38;padding:10px 4px 10px 8px;">8%, from 25 cartons</td>
+            <td style="border-top:1px solid #E3DCD0;font-family:'Outfit',Arial,sans-serif;font-size:13.5px;line-height:1.45;color:#C0392B;padding:10px 4px 10px 8px;">Applied at 20</td>
+          </tr>
+          <tr valign="top">
+            <td style="border-top:1px solid #E3DCD0;font-family:Georgia,'Times New Roman',serif;font-size:15px;color:#1a1a1a;padding:10px 6px 0 0;">&#8220;today&#8221;</td>
+            <td style="border-top:1px solid #E3DCD0;font-family:'Outfit',Arial,sans-serif;font-size:13.5px;line-height:1.45;color:#2b2b38;padding:10px 4px 0 8px;">Same-day delivery</td>
+            <td style="border-top:1px solid #E3DCD0;font-family:'Outfit',Arial,sans-serif;font-size:13.5px;line-height:1.45;color:#C0392B;padding:10px 4px 0 8px;">Promised it anyway</td>
+          </tr>
+        </table>
+      </td></tr>
+    </table>
+
+    <!-- top 3 -->
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:16px;">
+      <tr><td bgcolor="#F5F7FD" style="background-color:#F5F7FD;border-left:3px solid #2742FF;border-radius:0 8px 8px 0;padding:14px 16px;">
+        <div style="font-family:'Outfit',Arial,sans-serif;font-size:12px;font-weight:700;color:#2742FF;letter-spacing:1.2px;">TOP 3 USE CASES</div>
+        <div style="font-family:'Outfit',Arial,sans-serif;font-size:15px;line-height:1.75;color:#0D0D11;font-weight:600;padding-top:8px;">
+          1&nbsp;&nbsp;Order capture and confirmation<br>
+          2&nbsp;&nbsp;Price, scheme and credit checked as the order is placed<br>
+          3&nbsp;&nbsp;Reorder reminders based on past orders
+        </div>
+      </td></tr>
+    </table>
+    <!-- proof -->
+    <div style="font-family:'Outfit',Arial,sans-serif;font-size:14.5px;line-height:1.6;color:#6b7280;padding-top:12px;">
+      <a target="_blank" rel="noopener" href="https://www.youtube.com/watch?v=8e48UEAjvGA" style="color:#2742FF;font-weight:700;text-decoration:underline;">PI Industries</a> takes orders from a conversation. <a target="_blank" rel="noopener" href="https://www.youtube.com/watch?v=jDJfMnR3OYE" style="color:#2742FF;font-weight:700;text-decoration:underline;">Schneider</a> takes them by voice. Both work because the systems behind the conversation are connected.
+    </div>
+  </td></tr>
+
+  <!-- ══════════ ECOMMERCE ══════════ -->
+  <tr><td style="padding:26px 24px 0;">
+    <div style="border-top:2px solid #0D0D11;padding-top:18px;">
+      <div style="font-family:'Outfit',Arial,sans-serif;font-size:22px;font-weight:800;color:#7C3AED;letter-spacing:-0.2px;">eCommerce</div>
+      <div style="font-family:'Outfit',Arial,sans-serif;font-size:12.5px;line-height:1.5;color:#9aa1ad;font-style:italic;padding-top:4px;">Brand storefront and marketplace storefronts.</div>
+    </div>
+  </td></tr>
+
+  <tr><td style="padding:16px 18px 0;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#0D0D11" style="background-color:#0D0D11;border-radius:12px;">
+      <tr><td style="padding:20px 14px 6px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+          <tr valign="bottom">
+            <td width="50%" align="center" style="font-family:'Outfit',Arial,sans-serif;font-size:12px;line-height:1.45;color:#7FD4F5;padding:0 6px;">Which volumes - and which product family?</td>
+            <td width="50%" align="center" style="font-family:'Outfit',Arial,sans-serif;font-size:12px;line-height:1.45;color:#8FE3B8;padding:0 6px;">Cheap to buy, or cheap to run?</td>
+          </tr>
+          <tr>
+            <td align="center" style="padding-top:6px;"><div style="width:1px;height:22px;background-color:#2F5E70;font-size:0;line-height:0;">&nbsp;</div></td>
+            <td align="center" style="padding-top:6px;"><div style="width:1px;height:22px;background-color:#35604B;font-size:0;line-height:0;">&nbsp;</div></td>
+          </tr>
+        </table>
+        <div style="font-family:Georgia,'Times New Roman',serif;font-size:19px;line-height:1.55;color:#ffffff;text-align:center;padding:10px 4px 12px;">
+          &#8220;I&#8217;m <span style="color:#6FDBFF;">setting up a small business</span>.<br>Need a <span style="color:#86F0B9;">cheap</span> <span style="color:#FFCE7A;">printer</span>.&#8221;
+        </div>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+          <tr><td align="center"><div style="width:1px;height:22px;background-color:#6B5530;font-size:0;line-height:0;">&nbsp;</div></td></tr>
+          <tr><td align="center" style="font-family:'Outfit',Arial,sans-serif;font-size:12px;line-height:1.45;color:#F5C173;padding:6px 6px 16px;">Which of forty models - and is it in stock near them?</td></tr>
+        </table>
+      </td></tr>
+    </table>
+  </td></tr>
+
+  <tr><td style="padding:14px 24px 0;">
+    <div style="font-family:'Outfit',Arial,sans-serif;font-size:15.5px;line-height:1.65;color:#2b2b38;">
+      Chat is quietly replacing the search box (on websites and apps) and the landing page (for ads). A shopper who used to filter by category now describes the job instead - and a catalogue search hands back a longer list rather than a decision.
+    </div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:16px;">
+      <tr><td bgcolor="#F8F5FE" style="background-color:#F8F5FE;border-left:3px solid #7C3AED;border-radius:0 8px 8px 0;padding:14px 16px;">
+        <div style="font-family:'Outfit',Arial,sans-serif;font-size:12px;font-weight:700;color:#7C3AED;letter-spacing:1.2px;">TOP 3 USE CASES</div>
+        <div style="font-family:'Outfit',Arial,sans-serif;font-size:15px;line-height:1.75;color:#0D0D11;font-weight:600;padding-top:8px;">
+          1&nbsp;&nbsp;Guided discovery in place of filters<br>
+          2&nbsp;&nbsp;AEO (answer engine optimisation) - being the answer when shoppers ask an AI, not a search box<br>
+          3&nbsp;&nbsp;Routing to the store or dealer that actually has it
+        </div>
+      </td></tr>
+    </table>
+    <div style="font-family:'Outfit',Arial,sans-serif;font-size:14.5px;line-height:1.6;color:#6b7280;padding-top:12px;">
+      <strong style="color:#0D0D11;">Canon India</strong>&#8217;s ad campaigns now land on a chatbot that guides users through products and configurations - something a landing page could not do. <a target="_blank" rel="noopener" href="https://cloud.connect.canon.co.in/Agentic_AI_Connect?utm_source=graas_index&utm_content=ecom" style="color:#2742FF;font-weight:700;text-decoration:underline;">Ask it something your own catalogue would struggle with.</a>
+    </div>
+  </td></tr>
+
+  <!-- ══════════ MODERN TRADE ══════════ -->
+  <tr><td style="padding:26px 24px 0;">
+    <div style="border-top:2px solid #0D0D11;padding-top:18px;">
+      <div style="font-family:'Outfit',Arial,sans-serif;font-size:22px;font-weight:800;color:#5B3FE0;letter-spacing:-0.2px;">Modern Trade</div>
+      <div style="font-family:'Outfit',Arial,sans-serif;font-size:12.5px;line-height:1.5;color:#9aa1ad;font-style:italic;padding-top:4px;">Large format organised retail, with single or multi-brand catalogues.</div>
+    </div>
+  </td></tr>
+
+  <tr><td style="padding:16px 18px 0;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#0D0D11" style="background-color:#0D0D11;border-radius:12px;">
+      <tr><td style="padding:20px 14px 6px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+          <tr valign="bottom">
+            <td width="50%" align="center" style="font-family:'Outfit',Arial,sans-serif;font-size:12px;line-height:1.45;color:#7FD4F5;padding:0 6px;">Which of her sizes - and did she already rebuy?</td>
+            <td width="50%" align="center" style="font-family:'Outfit',Arial,sans-serif;font-size:12px;line-height:1.45;color:#F7A8D0;padding:0 6px;">Is it in stock at the store she actually visits?</td>
+          </tr>
+          <tr>
+            <td align="center" style="padding-top:6px;"><div style="width:1px;height:22px;background-color:#2F5E70;font-size:0;line-height:0;">&nbsp;</div></td>
+            <td align="center" style="padding-top:6px;"><div style="width:1px;height:22px;background-color:#6E4257;font-size:0;line-height:0;">&nbsp;</div></td>
+          </tr>
+        </table>
+        <div style="font-family:Georgia,'Times New Roman',serif;font-size:19px;line-height:1.55;color:#ffffff;text-align:center;padding:10px 4px 12px;">
+          &#8220;Nudge Priya - <span style="color:#6FDBFF;">her usual refill</span> is due,<br>it&#8217;s <span style="color:#FFA3D4;">in stock at her store</span>, and her <span style="color:#FFCE7A;">points expire Friday</span>.&#8221;
+        </div>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+          <tr><td align="center"><div style="width:1px;height:22px;background-color:#6B5530;font-size:0;line-height:0;">&nbsp;</div></td></tr>
+          <tr><td align="center" style="font-family:'Outfit',Arial,sans-serif;font-size:12px;line-height:1.45;color:#F5C173;padding:6px 6px 16px;">Which offer is she eligible for - and is this nudge too soon?</td></tr>
+        </table>
+      </td></tr>
+    </table>
+  </td></tr>
+
+  <tr><td style="padding:14px 24px 0;">
+    <div style="font-family:'Outfit',Arial,sans-serif;font-size:15.5px;line-height:1.65;color:#2b2b38;">
+      A nudge (email, WhatsApp, in-app) has to be right about all four things at once. Get one wrong and you have messaged a loyal customer about a product she bought last week, at a store that doesn&#8217;t stock it.
+    </div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:16px;">
+      <tr><td bgcolor="#F6F4FD" style="background-color:#F6F4FD;border-left:3px solid #5B3FE0;border-radius:0 8px 8px 0;padding:14px 16px;">
+        <div style="font-family:'Outfit',Arial,sans-serif;font-size:12px;font-weight:700;color:#5B3FE0;letter-spacing:1.2px;">TOP 3 USE CASES</div>
+        <div style="font-family:'Outfit',Arial,sans-serif;font-size:15px;line-height:1.75;color:#0D0D11;font-weight:600;padding-top:8px;">
+          1&nbsp;&nbsp;Intelligent nudges - the right customer, product and moment<br>
+          2&nbsp;&nbsp;Inward-facing analytics so goods arrive just in time<br>
+          3&nbsp;&nbsp;Fill rate and substitutions answered on the spot
+        </div>
+      </td></tr>
+    </table>
+  </td></tr>
+
+  <!-- ══════════ TAKEAWAYS ══════════ -->
+  <tr><td style="padding:28px 24px 0;">
+    <div style="border-top:2px solid #0D0D11;padding-top:22px;">
+      <div style="font-family:'Outfit',Arial,sans-serif;font-size:24px;line-height:1.25;font-weight:800;color:#0D0D11;letter-spacing:-0.3px;padding-bottom:16px;">Takeaways</div>
+
+      <div style="font-family:'Outfit',Arial,sans-serif;font-size:16px;line-height:1.7;color:#2b2b38;">
+        <strong style="color:#2742FF;">Retrieval finds what looks similar. Commerce needs what&#8217;s actually true.</strong> It can&#8217;t know that <em>Dettol</em> in a WhatsApp message, <em>DETTOL LIQ 1L</em> in the ERP and item code 4471 in the WMS are one product. It can&#8217;t know what holds right now, when stock moves hourly and schemes expire on the 31st. And it can&#8217;t know whether a rule applies to this buyer. So it returns the most plausible-looking answer, with complete confidence.
+      </div>
+
+      <div style="font-family:'Outfit',Arial,sans-serif;font-size:16px;line-height:1.7;color:#2b2b38;padding-top:16px;">
+        <strong style="color:#2742FF;">Wrong answers cost more than no answer.</strong> A confidently wrong reply to a distributor or a category buyer doesn&#8217;t just lose that order. It erodes trust and wastes their time. They will not return for a sub-par experience.
+      </div>
+
+      <div style="font-family:'Outfit',Arial,sans-serif;font-size:16px;line-height:1.7;color:#2b2b38;padding-top:16px;">
+        <strong style="color:#2742FF;">Context is the missing layer.</strong> It reconciles the ERP, WMS, DMS, loyalty system and spreadsheets: it resolves the nickname to the SKU, holds the live state, and carries the rules that decide what applies to whom. It is the difference between an agent that escalates and one that answers - yes, at this price, from this depot, today.
+      </div>
+
+      <div style="font-family:'Outfit',Arial,sans-serif;font-size:21px;line-height:1.35;font-weight:800;color:#0D0D11;padding-top:24px;">
+        The stack exists.<br>Context does not.
+      </div>
+    </div>
+  </td></tr>
+
+  <!-- CTA -->
+  <tr><td style="padding:24px 24px 32px;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+      <td bgcolor="#2742FF" style="background-color:#2742FF;border-radius:4px;">
+        <a target="_blank" rel="noopener" href="https://www.graas.ai/commerce-knowledge-graph?utm_source=graas_index&utm_content=context" style="display:inline-block;padding:13px 24px;font-family:'Outfit',Arial,sans-serif;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;">See what a Context layer looks like in production &#8594;</a>
+      </td>
+    </tr></table>
+  </td></tr>
+
+  <!-- footer -->
+  <tr><td bgcolor="#0D0D11" style="background-color:#0D0D11;padding:20px 24px;">
+    <div style="font-family:'Outfit',Arial,sans-serif;font-size:12px;line-height:1.7;color:#9aa1ad;">
+      The Graas Retail Commerce Index &#183; 100 enterprises &#183; India &amp; Southeast Asia &#183; published Aug 2026<br>
+      Compiled by Graas Insights from enterprise engagements.
+    </div>
+    <div style="font-family:'Outfit',Arial,sans-serif;font-size:12px;line-height:1.7;padding-top:8px;">
+      <a target="_blank" rel="noopener" href="https://www.graas.ai/?utm_source=graas_index&utm_content=footer_text" style="color:#9fb4ff;text-decoration:none;">graas.ai</a>
+      <span style="color:#6b7280;">&nbsp;&#183;&nbsp;</span>
+      <a target="_blank" rel="noopener" href="mailto:insights@graas.ai?subject=Unsubscribe" style="color:#9fb4ff;text-decoration:none;">Unsubscribe</a>
+    </div>
+  </td></tr>
+
+</table>
+</td></tr></table>
+</body>
+</html>

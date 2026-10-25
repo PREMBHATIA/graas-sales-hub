@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<title>The Graas Retail AI Index</title>
+<!-- Subject: Measuring AI readiness across Retail Commerce enterprises -->
+<!--[if mso]>
+<noscript>
+<xml>
+<o:OfficeDocumentSettings>
+<o:PixelsPerInch>96</o:PixelsPerInch>
+</o:OfficeDocumentSettings>
+</xml>
+</noscript>
+<![endif]-->
+<!--[if !mso]><!-->
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+<!--<![endif]-->
+<style>
+  body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+  table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+  img { -ms-interpolation-mode: bicubic; border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; display: block; }
+  body { margin: 0; padding: 0; width: 100% !important; height: 100% !important; background-color: #f4f5f7; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; }
+
+  .wrapper { width: 100%; background-color: #f4f5f7; }
+  .container { max-width: 600px; margin: 0 auto; }
+  .card-bg { background-color: #ffffff; }
+
+  .content-pad { padding: 28px 22px; }
+  .header-pad { padding: 26px 22px 30px 22px; }
+
+  /* header */
+  .logo-text { font-size: 19px; font-weight: 800; color: #ffffff; letter-spacing: -0.01em; }
+  .tagline-text { font-size: 10.5px; font-weight: 600; color: #b9b9b9; letter-spacing: 0.4px; text-transform: uppercase; }
+  .gradient-bar { height: 3px; line-height: 3px; font-size: 1px; background-image: linear-gradient(90deg,#1CBEFF 0%,#58B3FF 50%,#8B81FF 100%); }
+  .header-kicker { font-size: 11px; line-height: 1.4; letter-spacing: 1.5px; text-transform: uppercase; color: #58B3FF; font-weight: 700; margin: 26px 0 14px 0; }
+  .header-headline { font-size: 22px; line-height: 1.3; color: #ffffff; margin: 0; font-weight: 800; letter-spacing: -0.01em; }
+
+  .kicker { font-size: 11px; line-height: 1.4; letter-spacing: 1.5px; text-transform: uppercase; color: #1585d8; font-weight: 700; margin: 0 0 10px 0; }
+
+  p.body-text { font-size: 14.5px; line-height: 1.65; color: #3a3a3a; margin: 0 0 16px 0; }
+  p.body-text:last-child { margin-bottom: 0; }
+  p.body-text b { color: #0a0a0a; font-weight: 700; }
+
+  .section-divider { margin: 34px 0 0 0; }
+  .section-divider td { border-top: 1px solid #ececec; padding-top: 26px; }
+
+  .anchor-line { font-size: 18px; line-height: 1.3; color: #0a0a0a; font-weight: 800; margin: 0 0 16px 0; }
+
+  /* gradient number treatment - major stats only */
+  .num-grad { font-weight: 800; color: #1585d8; background-image: linear-gradient(90deg,#1CBEFF 0%,#58B3FF 60%,#8B81FF 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+
+  /* bar rows */
+  .bar-row { margin: 0 0 16px 0; }
+  .bar-row:last-child { margin-bottom: 0; }
+  .bar-label { font-size: 13.5px; font-weight: 700; color: #0a0a0a; padding-bottom: 7px; }
+  .bar-value { font-size: 13.5px; font-weight: 800; color: #1585d8; padding-bottom: 7px; }
+  .bar-track-outer { background-color: #ececec; border-radius: 3px; }
+  .bar-fill-cell { background-color: #1585d8; border-radius: 3px; height: 9px; line-height: 9px; font-size: 1px; }
+  .bar-spacer-cell { height: 9px; line-height: 9px; font-size: 1px; }
+
+  /* funnel */
+  .funnel-wrap { margin: 4px 0 22px 0; }
+  .funnel-step { margin: 0 0 18px 0; }
+  .funnel-step:last-child { margin-bottom: 0; }
+  .funnel-label { font-size: 13px; font-weight: 600; color: #3a3a3a; margin: 0 0 4px 0; }
+  .funnel-number { font-size: 21px; font-weight: 800; margin: 0; }
+
+  .callout-box { background-color: #f7f8fa; border-radius: 4px; padding: 16px 18px; margin: 0 0 20px 0; }
+  .callout-text { font-size: 14px; font-weight: 700; color: #0a0a0a; margin: 0; }
+  .callout-text .num-grad { font-size: 16px; }
+
+  /* mini stat cards - 2 up */
+  .mini-stat-cell { background-color: #f7f8fa; border-radius: 4px; padding: 18px 16px; }
+  .mini-stat-number { font-size: 24px; font-weight: 800; margin: 0 0 4px 0; }
+  .mini-stat-label { font-size: 12.5px; line-height: 1.4; color: #767676; font-weight: 600; margin: 0; }
+
+  /* quote block */
+  .quote-block { border-left: 3px solid #1585d8; padding: 2px 0 2px 16px; margin: 0 0 14px 0; }
+  .quote-block:last-child { margin-bottom: 0; }
+  .quote-text { font-size: 14px; line-height: 1.6; color: #3a3a3a; font-style: italic; margin: 0; }
+
+  .stack-line { font-size: 19px; line-height: 1.35; color: #0a0a0a; font-weight: 800; margin: 22px 0 0 0; }
+
+  .term-highlight { color: #1585d8; font-weight: 700; }
+
+  .cta-wrap { text-align: center; padding: 8px 0 40px 0; }
+  .cta-button { background-color: #0a0a0a; color: #ffffff !important; font-size: 15.5px; font-weight: 700; text-decoration: none; padding: 16px 32px; display: inline-block; border-radius: 26px; }
+
+  .data-cut-note { font-size: 13px; line-height: 1.6; color: #767676; margin: 18px 0 0 0; text-align: center; }
+  .data-cut-note a { color: #1585d8; text-decoration: none; font-weight: 700; }
+
+  .footer-wrap { padding: 30px 22px 34px 22px; text-align: center; }
+  .footer-tagline { font-size: 12.5px; color: #ffffff; font-weight: 700; margin: 0 0 10px 0; letter-spacing: 0.2px; }
+  .footer-sub { font-size: 11.5px; color: #9a9a9a; font-weight: 600; margin: 0 0 3px 0; }
+  .footer-links { font-size: 12px; margin: 20px 0 14px 0; }
+  .footer-links a { color: #58B3FF; text-decoration: none; font-weight: 700; letter-spacing: 0.3px; }
+  .footer-unsub { font-size: 11.5px; color: #767676; margin: 0; }
+
+  .preheader { display: none !important; visibility: hidden; opacity: 0; color: transparent; height: 0; width: 0; overflow: hidden; mso-hide: all; }
+
+  @media only screen and (min-width: 600px) {
+    .content-pad { padding: 48px 56px; }
+    .header-pad { padding: 34px 56px 40px 56px; }
+    .logo-text { font-size: 22px; }
+    .header-kicker { font-size: 12px; margin: 32px 0 16px 0; }
+    .header-headline { font-size: 30px; }
+    .kicker { font-size: 12px; }
+    p.body-text { font-size: 16px; }
+    .anchor-line { font-size: 21px; }
+    .bar-label, .bar-value { font-size: 14.5px; }
+    .funnel-number { font-size: 24px; }
+    .mini-stat-number { font-size: 28px; }
+    .stack-line { font-size: 23px; }
+    .footer-wrap { padding: 32px 56px 40px 56px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="preheader">100 enterprise conversations across India and Southeast Asia. The stack exists. Context does not.</div>
+
+<div class="wrapper">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+<tr>
+<td align="center">
+
+<table role="presentation" class="container" width="100%" cellpadding="0" cellspacing="0" border="0">
+
+<!-- HEADER -->
+<tr>
+<td style="background-color:#0a0a0a; border-radius:12px 12px 0 0;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+<tr>
+<td class="header-pad" style="border-radius:12px 12px 0 0;">
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr>
+    <td class="logo-text" valign="middle">graas</td>
+    <td class="tagline-text" align="right" valign="middle">Growth as a Service</td>
+  </tr>
+  </table>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:22px;">
+  <tr><td class="gradient-bar">&nbsp;</td></tr>
+  </table>
+
+  <p class="header-kicker">The Graas Retail AI Index</p>
+  <p class="header-headline">Measuring AI readiness across Retail Commerce enterprises</p>
+
+</td>
+</tr>
+</table>
+</td>
+</tr>
+
+<!-- BODY -->
+<tr>
+<td class="card-bg">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+<tr>
+<td class="content-pad">
+
+  <!-- WHO WE SPOKE TO -->
+  <p class="kicker">Who we spoke to</p>
+  <p class="body-text">100 enterprise conversations across India and Southeast Asia, with enterprise revenues of US$200M+, conducted in Q2 2026.</p>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="bar-row"><tr><td>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+    <tr><td class="bar-label">Industrial &amp; Electrical</td><td class="bar-value" align="right">44</td></tr>
+    </table>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="bar-track-outer">
+    <tr><td width="44%" class="bar-fill-cell">&nbsp;</td><td class="bar-spacer-cell">&nbsp;</td></tr>
+    </table>
+  </td></tr></table>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="bar-row"><tr><td>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+    <tr><td class="bar-label">Fashion, Home &amp; Lifestyle</td><td class="bar-value" align="right">21</td></tr>
+    </table>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="bar-track-outer">
+    <tr><td width="21%" class="bar-fill-cell">&nbsp;</td><td class="bar-spacer-cell">&nbsp;</td></tr>
+    </table>
+  </td></tr></table>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="bar-row"><tr><td>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+    <tr><td class="bar-label">FMCG, Food &amp; Groceries</td><td class="bar-value" align="right">20</td></tr>
+    </table>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="bar-track-outer">
+    <tr><td width="20%" class="bar-fill-cell">&nbsp;</td><td class="bar-spacer-cell">&nbsp;</td></tr>
+    </table>
+  </td></tr></table>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="bar-row"><tr><td>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+    <tr><td class="bar-label">Pharma, Agro &amp; Others</td><td class="bar-value" align="right">14</td></tr>
+    </table>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="bar-track-outer">
+    <tr><td width="14%" class="bar-fill-cell">&nbsp;</td><td class="bar-spacer-cell">&nbsp;</td></tr>
+    </table>
+  </td></tr></table>
+
+  <!-- INSIGHT 01 -->
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="section-divider"><tr><td>
+  <p class="kicker">Insight 01</p>
+  <p class="anchor-line">Everyone is evaluating. Few are live.</p>
+  </td></tr></table>
+
+  <div class="funnel-wrap">
+    <div class="funnel-step">
+      <p class="funnel-label">Bot deployed in 2025</p>
+      <p class="funnel-number num-grad">1/100</p>
+    </div>
+    <div class="funnel-step">
+      <p class="funnel-label">Actively evaluating AI in 2026</p>
+      <p class="funnel-number num-grad">36/100</p>
+    </div>
+    <div class="funnel-step">
+      <p class="funnel-label">AI agent live in 2026</p>
+      <p class="funnel-number num-grad">7/100</p>
+    </div>
+  </div>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="callout-box"><tr><td>
+    <p class="callout-text"><span class="num-grad">1/100</span> is using AI for ordering today.</p>
+  </td></tr></table>
+
+  <p class="body-text">Sevenfold growth in a year, yet only seven of the 36 actively evaluating AI have reached production.<br><br>Support remains the dominant starting point; ordering and other revenue-generating use cases are still early.</p>
+
+  <!-- INSIGHT 02 -->
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="section-divider"><tr><td>
+  <p class="kicker">Insight 02</p>
+  <p class="anchor-line">What CXOs want AI to accomplish</p>
+  </td></tr></table>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="bar-row"><tr><td>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+    <tr><td class="bar-label">Incremental revenue increase</td><td class="bar-value" align="right">48%</td></tr>
+    </table>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="bar-track-outer">
+    <tr><td width="48%" class="bar-fill-cell">&nbsp;</td><td class="bar-spacer-cell">&nbsp;</td></tr>
+    </table>
+  </td></tr></table>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="bar-row"><tr><td>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+    <tr><td class="bar-label">Cost reduction</td><td class="bar-value" align="right">38%</td></tr>
+    </table>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="bar-track-outer">
+    <tr><td width="38%" class="bar-fill-cell">&nbsp;</td><td class="bar-spacer-cell">&nbsp;</td></tr>
+    </table>
+  </td></tr></table>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="bar-row"><tr><td>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+    <tr><td class="bar-label">Customer satisfaction improvement</td><td class="bar-value" align="right">33%</td></tr>
+    </table>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="bar-track-outer">
+    <tr><td width="33%" class="bar-fill-cell">&nbsp;</td><td class="bar-spacer-cell">&nbsp;</td></tr>
+    </table>
+  </td></tr></table>
+
+  <p class="body-text" style="font-size:12.5px; color:#9a9a9a; margin-top:4px;">CXO includes CEO, CIO, CTO, CMO, CSO and Heads of Digital Transformation / Innovation.</p>
+
+  <!-- INSIGHT 03 -->
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="section-divider"><tr><td>
+  <p class="kicker">Insight 03</p>
+  <p class="anchor-line">Voice is the #1 ask</p>
+  </td></tr></table>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr>
+    <td width="48%" class="mini-stat-cell" valign="top">
+      <p class="mini-stat-number num-grad">31/100</p>
+      <p class="mini-stat-label">Evaluating voice-to-voice agents</p>
+    </td>
+    <td width="4%">&nbsp;</td>
+    <td width="48%" class="mini-stat-cell" valign="top">
+      <p class="mini-stat-number num-grad">4/100</p>
+      <p class="mini-stat-label">Have live deployments</p>
+    </td>
+  </tr>
+  </table>
+
+  <p class="body-text" style="margin-top:18px;">The appetite for voice is clear, but robust evaluation for agent misbehaviour remains an emerging capability.</p>
+
+  <!-- INSIGHT 04 -->
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="section-divider"><tr><td>
+  <p class="kicker">Insight 04</p>
+  <p class="anchor-line">Where enterprises want AI to help</p>
+  </td></tr></table>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="bar-row"><tr><td>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+    <tr><td class="bar-label">Customer support</td><td class="bar-value" align="right">53%</td></tr>
+    </table>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="bar-track-outer">
+    <tr><td width="53%" class="bar-fill-cell">&nbsp;</td><td class="bar-spacer-cell">&nbsp;</td></tr>
+    </table>
+  </td></tr></table>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="bar-row"><tr><td>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+    <tr><td class="bar-label">Supply chain &amp; decision analytics</td><td class="bar-value" align="right">45%</td></tr>
+    </table>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="bar-track-outer">
+    <tr><td width="45%" class="bar-fill-cell">&nbsp;</td><td class="bar-spacer-cell">&nbsp;</td></tr>
+    </table>
+  </td></tr></table>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="bar-row"><tr><td>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+    <tr><td class="bar-label">Search, discovery &amp; ordering</td><td class="bar-value" align="right">43%</td></tr>
+    </table>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="bar-track-outer">
+    <tr><td width="43%" class="bar-fill-cell">&nbsp;</td><td class="bar-spacer-cell">&nbsp;</td></tr>
+    </table>
+  </td></tr></table>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="bar-row"><tr><td>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+    <tr><td class="bar-label">Channel operations</td><td class="bar-value" align="right">29%</td></tr>
+    </table>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="bar-track-outer">
+    <tr><td width="29%" class="bar-fill-cell">&nbsp;</td><td class="bar-spacer-cell">&nbsp;</td></tr>
+    </table>
+  </td></tr></table>
+
+  <p class="body-text" style="margin-top:4px;">Demand is moving beyond support, into decisions, customer interactions and revenue-generating workflows across the enterprise.</p>
+
+  <!-- INSIGHT 05 -->
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="section-divider"><tr><td>
+  <p class="kicker">Insight 05</p>
+  <p class="anchor-line">In their own words</p>
+  </td></tr></table>
+
+  <div class="quote-block"><p class="quote-text">&ldquo;I worry about agent hallucination around my product range and warranty.&rdquo;</p></div>
+  <div class="quote-block"><p class="quote-text">&ldquo;The agent does not know my pricing.&rdquo;</p></div>
+  <div class="quote-block"><p class="quote-text">&ldquo;The agent cannot bring a human into the conversation when required.&rdquo;</p></div>
+  <div class="quote-block" style="margin-bottom:20px;"><p class="quote-text">&ldquo;The agent is unaware of my inventory in the warehouse.&rdquo;</p></div>
+
+  <p class="body-text">Four different concerns, one cause: the agent doesn't have the Context it needs to act. The answers already sit across ERP, DMS, SFA, dealer apps, CRM and WMS, but only <span class="num-grad" style="font-size:15px;">3/100</span> enterprises have a Context layer connecting them.</p>
+
+  <p class="stack-line">The stack exists.<br>Context does not.</p>
+
+  <p class="body-text" style="margin-top:18px;">Across 100 enterprise conversations, the constraint is rarely the absence of data. The systems already hold the facts: price, stock, credit, product, customer and transaction data. What's missing is the <span class="term-highlight">Context</span> that connects them.</p>
+
+  <p class="body-text">At Graas, we call this the Commerce Knowledge Graph: the layer that connects enterprise systems and gives AI agents the context they need to reason and act.</p>
+
+  <p class="body-text">The next wave of enterprise AI won't be defined by models alone. It will be defined by the Context those models can access.</p>
+
+</td>
+</tr>
+</table>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+<tr>
+<td class="cta-wrap">
+  <!--[if mso]>
+  <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="https://www.graas.ai/commerce-knowledge-graph?utm_source=composer&utm_medium=email&utm_campaign=re-engagement_e1" style="height:50px;v-text-anchor:middle;width:290px;" arcsize="50%" fillcolor="#0a0a0a" stroke="f">
+  <w:anchorlock/>
+  <center style="color:#ffffff;font-family:Arial,sans-serif;font-size:15.5px;font-weight:bold;">See the Commerce Knowledge Graph</center>
+  </v:roundrect>
+  <![endif]-->
+  <!--[if !mso]><!-->
+  <a href="https://www.graas.ai/commerce-knowledge-graph?utm_source=composer&utm_medium=email&utm_campaign=re-engagement_e1" class="cta-button" target="_blank">See the Commerce Knowledge Graph &rarr;</a>
+  <!--<![endif]-->
+  <p class="data-cut-note">For the full data, email <a href="mailto:insights@graas.ai">insights@graas.ai</a>.</p>
+</td>
+</tr>
+</table>
+
+</td>
+</tr>
+
+<!-- FOOTER -->
+<tr>
+<td style="background-color:#0a0a0a; border-radius:0 0 12px 12px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+<tr><td class="gradient-bar">&nbsp;</td></tr>
+</table>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+<tr>
+<td class="footer-wrap" style="border-radius:0 0 12px 12px;">
+  <p class="footer-tagline">The Graas Index for Enterprise Retail</p>
+  <p class="footer-sub">100 enterprise conversations across India and Southeast Asia</p>
+  <p class="footer-sub">Compiled by the Graas team from enterprise engagements, Q2 2026</p>
+  <p class="footer-links">
+    <a href="https://www.graas.ai/?utm_source=composer&utm_medium=email&utm_campaign=re-engagement_e1" target="_blank">graas.ai</a>
+  </p>
+  <p class="footer-unsub">Don't want to receive these emails? Reply unsubscribe.</p>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+
+</table>
+
+</td>
+</tr>
+</table>
+</div>
+
+</body>
+</html>
