@@ -157,6 +157,10 @@ st.markdown("""
     }
     .rumi-row a { color: #1F2937; text-decoration: none; }
     .rumi-row a:hover { text-decoration: underline; }
+    .rumi-about { color: #6B7280; font-size: 0.8rem; flex: 1;
+                  border-left: 2px solid #E5E7EB; padding-left: 12px;
+                  margin-left: 4px; }
+    .rumi-subj  { min-width: 270px; font-weight: 600; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -327,10 +331,19 @@ except Exception:
 
 if _rumi:
     _label("Monthly Ruminations &nbsp;·&nbsp; forward one to a customer")
+    st.caption("To send one: open it in **Key Collateral**, press Preview, then "
+               "copy the whole page into a Gmail compose window — the "
+               "formatting comes with it. Forwarding the original from "
+               "insights@ in your own inbox works too, and keeps your name on "
+               "the thread.")
+    # "Send to" on the right: the headline alone does not tell anyone which
+    # customer this one suits, which is what stops it being forwarded.
     _rows = "".join(
         f'<div class="rumi-row">'
         f'<span class="rumi-date">{str(r.get("sent",""))[3:].strip()}</span>'
-        f'<a href="collateral" target="_self">{r.get("subject","")}</a>'
+        f'<span class="rumi-subj"><a href="collateral" target="_self">'
+        f'{r.get("subject","")}</a></span>'
+        f'<span class="rumi-about">{r.get("send_to","")}</span>'
         f'</div>'
         for r in sorted(_rumi, key=lambda x: x.get("n", 0), reverse=True))
     st.markdown(_rows, unsafe_allow_html=True)

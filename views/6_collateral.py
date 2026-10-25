@@ -164,7 +164,10 @@ except Exception:
 
 if _rumi:
     st.markdown("### 📬 Monthly Ruminations")
-    st.caption("The Index emails, newest first. Forward one to a customer — "
+    st.caption("The Index emails, newest first. **To send one:** press "
+               "Preview, select the whole page, copy, and paste into a Gmail "
+               "compose window — the formatting travels with it. Downloading "
+               "the HTML is for editing, not sending. "
                "or open the original in your inbox from **insights@** and "
                "forward that, which keeps your name on it. No tracking pixel "
                "in these copies. ✅ Safe to share.")
@@ -174,8 +177,12 @@ if _rumi:
             continue
         with st.container(border=True):
             st.markdown(f"**{_r.get('subject', 'Untitled')}**")
+            if _r.get("about"):
+                st.markdown(_r["about"])
             st.caption(f"Sent {_r.get('sent', '')} · "
-                       f"{_r.get('recipients', 0)} recipients")
+                       f"{_r.get('recipients', 0)} recipients"
+                       + (f" · **Send to:** {_r['send_to']}"
+                          if _r.get("send_to") else ""))
             if _r.get("sent_subject"):
                 # Say it plainly rather than quietly showing a subject that
                 # differs from the one in anyone's inbox.

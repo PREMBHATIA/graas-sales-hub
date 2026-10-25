@@ -5,7 +5,9 @@
     "file": "content/collateral/ruminations/01_we-spoke-to-100-enterprises-about-ai-in-retail-c.html",
     "sent": "21 Aug 2026",
     "recipients": 163,
-    "chars": 21192
+    "chars": 21192,
+    "about": "The research. 100 enterprises, $200M+ revenue, India and SEA: 36 evaluating AI, only 7 live. Send to someone who thinks they are behind — they are not.",
+    "send_to": "Anyone early in AI. Opens a conversation without a pitch."
   },
   {
     "n": 2,
@@ -13,7 +15,9 @@
     "file": "content/collateral/ruminations/02_seven-of-100-enterprises-have-ai-live-the-missin.html",
     "sent": "24 Sep 2026",
     "recipients": 160,
-    "chars": 26593
+    "chars": 26593,
+    "about": "Why the pilots stall. Understanding what a buyer says is solved; knowing what is true for that buyer today is not. Send after a demo that impressed but did not close.",
+    "send_to": "A prospect who has seen a demo and gone quiet."
   },
   {
     "n": 3,
@@ -23,6 +27,8 @@
     "recipients": 474,
     "chars": 16903,
     "sent_subject": "Agentic mistakes retail keep making",
-    "subject_corrected": "Sent as 'keep'; 'retail' takes a singular verb. Label corrected 25 Oct — the 474 delivered emails are unchanged."
+    "subject_corrected": "Sent as 'keep'; 'retail' takes a singular verb. Label corrected 25 Oct — the 474 delivered emails are unchanged.",
+    "about": "Too much AI noise. Every vendor now ships an agent, and one company sent us two RFIs needing the same underlying facts. Send to someone comparing vendors.",
+    "send_to": "A buyer in an evaluation, or drowning in pitches."
   }
 ]
