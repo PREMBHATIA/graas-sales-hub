@@ -34,25 +34,6 @@ st.markdown("""
 st.markdown('<p class="main-header">Graas Sales Hub</p>', unsafe_allow_html=True)
 st.markdown('<p class="sub-header">Pipeline, All-e & Hoppr — shared team view</p>', unsafe_allow_html=True)
 
-# ── Email outreach ────────────────────────────────────────────────────────────
-# The campaign stats table lived here and has been removed (Prem, 25 Oct): the
-# homepage is navigation, and the numbers belong where they can be read in
-# context — one tap away in Emails & Segments, which also has the per-campaign
-# intent breakdown this table could never show. Links only now.
-
-st.markdown('<p class="section-label">Email outreach</p>', unsafe_allow_html=True)
-st.markdown("Campaigns, intent and the follow-up list")
-_hl, _hr, _ = st.columns([1, 1, 2])
-with _hl:
-    st.page_link("pages/3_crm.py", label="Open Emails & Segments →")
-with _hr:
-    st.markdown(
-        "[Outreach log (Google Sheet) ↗]"
-        "(https://docs.google.com/spreadsheets/d/"
-        "1Vcu7ZkAjGbzpKH2CUGoSuLUGIfwYBT-GlpNN0zMKJMY/edit)"
-    )
-st.markdown("---")
-
 # ── Cross-Product ─────────────────────────────────────────────────────────────
 
 st.markdown('<p class="section-label">Cross-Product · 🔒 restricted</p>', unsafe_allow_html=True)
@@ -69,7 +50,7 @@ st.markdown("---")
 
 st.markdown('<p class="section-label">All-e</p>', unsafe_allow_html=True)
 
-c1, c2, c3, c4 = st.columns(4)
+c1, c2, c3, c4, c5 = st.columns(5)
 
 with c1:
     st.markdown("### 🤖 All-e")
@@ -84,11 +65,25 @@ with c2:
 with c3:
     # Gated page inside the open All-e section — mark the tile so the lock isn't
     # a surprise on click, the same way the Pipeline and Hoppr tiles do.
+    # The standalone "Email outreach" section that used to head this page was
+    # the same link twice (Prem, 25 Oct) — outreach IS All-e, so it lives here.
     st.markdown("### 📧 CRM 🔒")
-    st.markdown("Contacts & email outreach")
+    st.markdown("Contacts, campaigns & intent")
     st.page_link("pages/3_crm.py", label="Open CRM →")
+    st.markdown(
+        "[Outreach log (Sheet) ↗]"
+        "(https://docs.google.com/spreadsheets/d/"
+        "1Vcu7ZkAjGbzpKH2CUGoSuLUGIfwYBT-GlpNN0zMKJMY/edit)"
+    )
 
 with c4:
+    # Open, unlike Resources beside it — onboarding material the sales team
+    # needs cannot sit behind the team password (Prem, 25 Oct).
+    st.markdown("### 🎒 Collateral")
+    st.markdown("Start here · decks & courses")
+    st.page_link("pages/6_collateral.py", label="Open Collateral →")
+
+with c5:
     st.markdown("### 📚 Resources 🔒")
     st.markdown("Key decks & docs")
     st.page_link("pages/5_resources.py", label="Open Resources →")

@@ -1,12 +1,33 @@
 {
   "decks": [
     {
+      "title": "GTM Immersion — sales onboarding",
+      "description": "The full course: routes to market, the Agent Fit Test, what we don't sell, the GT leak map. Links out to the videos and collateral. Start here if you're new.",
+      "url": "https://docs.google.com/presentation/d/1-wnQq32Kh8PXWMRunJs1q3lb1JFXaudt5SUSfETnGh4/edit",
+      "type": "Google Slides",
+      "added": "2026-10-25",
+      "tags": [
+        "onboarding",
+        "gtm",
+        "all-e",
+        "start-here"
+      ],
+      "featured": true,
+      "sales_facing": true
+    },
+    {
       "title": "All-e Business Overview — Jan to Apr 2026",
       "description": "Q1/Q2 business review: All-e presales pipeline performance, meeting targets, key wins, and strategic outlook",
       "url": "https://docs.google.com/presentation/d/1auuUQ80J8EsnELxsLCgAPCYGLgmyk0cg_v743G8EmkE/edit",
       "type": "Google Slides",
       "added": "2026-05-04",
-      "tags": ["all-e", "business review", "Q1", "Q2", "2026"]
+      "tags": [
+        "all-e",
+        "business review",
+        "Q1",
+        "Q2",
+        "2026"
+      ]
     }
   ],
   "docs": []

@@ -287,10 +287,10 @@ st.markdown("---")
 # MANUAL RESOURCES — existing card grid (decks, slides, external links)
 # ═════════════════════════════════════════════════════════════════════════════
 
+resources = load_resources()
+
 st.markdown("### 📂 Decks & Docs")
 st.caption("Manually-curated decks, slides, and external links")
-
-resources = load_resources()
 decks = resources.get("decks", [])
 docs = resources.get("docs", [])
 
