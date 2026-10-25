@@ -161,12 +161,17 @@ _label("All-e — where the work happens")
 
 c1, c2, c3, c4 = st.columns(4)
 with c1:
-    _tile("🤖", "All-e", "Presales pipeline &amp; deals",
-          "pages/2_alle.py", "Open All-e →")
-with c2:
     _tile("📋", "Prospect Brief", "Pre-call two-pager research",
           "pages/9_prospect_brief.py", "Create a brief →")
+with c2:
+    # Open, unlike the Knowledge Base below — onboarding material the sales
+    # team needs cannot sit behind the team password (Prem, 25 Oct).
+    _tile("🎒", "Key Collateral", "GTM Immersion · videos · creds",
+          "pages/6_collateral.py", "Open collateral →")
 with c3:
+    _tile("🤖", "All-e", "Presales pipeline &amp; deals",
+          "pages/2_alle.py", "Open All-e →")
+with c4:
     # Gated page inside an open section — the pill warns before the click.
     _tile("📧", "CRM", "Contacts, campaigns &amp; intent",
           "pages/3_crm.py", "Open CRM →", locked=True)
@@ -175,11 +180,7 @@ with c3:
         '<a href="https://docs.google.com/spreadsheets/d/'
         '1Vcu7ZkAjGbzpKH2CUGoSuLUGIfwYBT-GlpNN0zMKJMY/edit" target="_blank">'
         'Outreach log ↗</a></div>', unsafe_allow_html=True)
-with c4:
-    # Open, unlike Resources beside it — onboarding material the sales team
-    # needs cannot sit behind the team password (Prem, 25 Oct).
-    _tile("🎒", "Key Collateral", "GTM Immersion · videos · creds",
-          "pages/6_collateral.py", "Open collateral →")
+
 st.markdown("")
 
 # ── Security & compliance ────────────────────────────────────────────────────
