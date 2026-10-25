@@ -117,6 +117,59 @@
       "sales_facing": true,
       "audience": "Share with customers",
       "source": "linked from the 23 Oct campaign"
+    },
+    {
+      "title": "SOC 2 Type 2",
+      "description": "Independent audit of security, availability and confidentiality controls. 2025 report.",
+      "url": "https://drive.google.com/file/d/1dp4JtYOw8QyThQZsc47OjVNl8_prWAhQ/view?usp=drivesdk",
+      "type": "PDF",
+      "added": "2026-10-25",
+      "tags": [
+        "security"
+      ],
+      "category": "Security & Compliance",
+      "sales_facing": true,
+      "audience": "Share under NDA"
+    },
+    {
+      "title": "ISO 27001 (ISMS)",
+      "description": "Information Security Management System certification.",
+      "url": "https://drive.google.com/file/d/1yEk73tmITz2RrfH2QAUmjl7hcFeqfuW0/view?usp=drivesdk",
+      "type": "PDF",
+      "added": "2026-10-25",
+      "tags": [
+        "security"
+      ],
+      "category": "Security & Compliance",
+      "sales_facing": true,
+      "audience": "Share under NDA"
+    },
+    {
+      "title": "GDPR",
+      "description": "EU data protection compliance report, 2026.",
+      "url": "https://drive.google.com/file/d/1_X8hfR19S5VB8nFGBny0vdb3uPHEAtZ5/view?usp=drivesdk",
+      "type": "PDF",
+      "added": "2026-10-25",
+      "tags": [
+        "security"
+      ],
+      "category": "Security & Compliance",
+      "sales_facing": true,
+      "audience": "Share under NDA"
+    },
+    {
+      "title": "PDPA",
+      "description": "Singapore Personal Data Protection Act compliance report, 2026.",
+      "url": "https://drive.google.com/file/d/1y8YC0g4d2L-qUw08b6Fyz_9FlE2C-kRM/view?usp=drivesdk",
+      "type": "PDF",
+      "added": "2026-10-25",
+      "tags": [
+        "security"
+      ],
+      "category": "Security & Compliance",
+      "sales_facing": true,
+      "audience": "Share under NDA"
     }
-  ]
+  ],
+  "_security_folder": "https://drive.google.com/drive/folders/15uPqFL0AgU4nufXRNJqikCXK-g4FlR6N"
 }

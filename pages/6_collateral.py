@@ -32,6 +32,9 @@ SECTIONS = [
     ("Videos", "🎬",
      "Customer stories to send a prospect, or to watch before a first call. "
      "✅ All safe to share with customers."),
+    ("Security & Compliance", "🔐",
+     "SOC 2, ISO 27001, GDPR, PDPA. Procurement and security reviews ask "
+     "for these — send the link, not the file."),
     ("Creds Deck", "📊",
      "Who Graas is, who we work with, what we've shipped. The deck you leave "
      "behind."),

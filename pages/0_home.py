@@ -147,6 +147,26 @@ with c4:
           "pages/6_collateral.py", "Open collateral →")
 st.markdown("")
 
+# ── Security & compliance ────────────────────────────────────────────────────
+# A strip, not a tile: the certs are a thing you point a procurement team at
+# a few times a year, so it earns one line and a link — the documents
+# themselves live in Key Collateral (Prem, 25 Oct).
+st.markdown(
+    '<div class="sec-strip">'
+    '<span class="s-ttl">🔐 Security &amp; compliance</span>'
+    '<span class="sec-badge">SOC 2 Type 2</span>'
+    '<span class="sec-badge">ISO 27001</span>'
+    '<span class="sec-badge">GDPR</span>'
+    '<span class="sec-badge">PDPA</span>'
+    '<span style="color:#6B7280;font-size:0.82rem">'
+    'Reports live in Key Collateral — send the link, not the file.</span>'
+    '</div>', unsafe_allow_html=True)
+_s1, _ = st.columns([1, 3])
+with _s1:
+    st.page_link("pages/6_collateral.py", label="Get the certificates →")
+
+st.markdown("")
+
 # ── News you can Use ─────────────────────────────────────────────────────────
 # Reads content/news.json and NOTHING else — no API call, no Sheets read. The
 # file is rewritten by .github/workflows/refresh-news.yml at 16:00 UTC
