@@ -11,14 +11,6 @@
       "source_url": "https://news.sap.com/2026/10/joule-assistants-agents-advance-autonomous-scm/"
     },
     {
-      "tag": "Global - enterprise AI architecture",
-      "title": "Atlan Frames the 'Context Layer' as the Missing Enterprise Infrastructure Before Agents Can Work",
-      "body": "Atlan's 2026 enterprise guide defines a context layer for retail AI as the shared infrastructure — spanning SKU definitions, live inventory truth, resolved customer identity, and policy rules — that merchandising, inventory, and customer-facing agents all draw from instead of each rebuilding their own version. The architecture distinguishes between a knowledge layer (what exists and what it means), a context graph (situational facts tied to a specific decision), and a context layer (the full governed delivery stack). Gartner cited in the piece projects that 40% of enterprise applications will include task-specific AI agents by end of 2026, up from less than 5% in 2025.",
-      "why": "This is the clearest vendor-side articulation of why retail AI pilots stall: agents querying fragmented POS, ERP, and catalog systems each inherit a different 'version of truth,' and no model can fix that without a governed context layer underneath. A Graas salesperson can use this framing to reframe the conversation from 'which AI tool' to 'what data foundation do your agents actually run on.'",
-      "source_label": "Atlan",
-      "source_url": "https://atlan.com/know/context-layer-for-retail-ai/"
-    },
-    {
       "tag": "US - analyst research",
       "title": "McKinsey (Oct 9, 2026): CPG Companies Are Using Agentic AI to Cut Costs When They Should Be Using It to Recapture Growth",
       "body": "McKinsey's October 9, 2026 article argues that CPG businesses are leaving growth on the table because most deployments of agentic AI are focused on cost reduction and accelerating existing work rather than top-line recovery. The article notes that investors in CPG companies reward top-line growth more than margin expansion, and that the real opportunity lies in the increasingly complex CPG–retailer relationship. In performance management specifically, McKinsey finds AI can track KPIs, detect variances, and recommend actions while cutting the human effort required by roughly half — freeing commercial teams to act on growth opportunities rather than reporting.",
