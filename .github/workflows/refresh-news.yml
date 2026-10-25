@@ -1,0 +1,37 @@
+name: Refresh "News you can Use"
+
+# Midnight SGT = 16:00 UTC. Deliberately when nobody is in SalesHub: the
+# fetch is a Claude + web_search call that takes a minute or two, and the
+# homepage must never pay that cost on a page load.
+on:
+  schedule:
+    - cron: "0 16 * * *"
+  workflow_dispatch:        # lets Prem run it by hand from the Actions tab
+
+permissions:
+  contents: write           # needs to commit content/news.json
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install anthropic streamlit
+      - name: Fetch the stories
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python3 scripts/refresh_news.py --count 5 --days 30
+      - name: Commit if it changed
+        run: |
+          git config user.name  "saleshub-bot"
+          git config user.email "noreply@graas.ai"
+          if git diff --quiet content/news.json 2>/dev/null; then
+            echo "No change — nothing to commit."
+          else
+            git add content/news.json
+            git commit -m "News you can Use: refresh $(date -u +%Y-%m-%d)"
+            git push
+          fi

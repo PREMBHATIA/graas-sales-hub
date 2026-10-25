@@ -27,7 +27,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from dotenv import load_dotenv
 load_dotenv(dotenv_path=str(Path(__file__).resolve().parent.parent / ".env"))
 
-st.set_page_config(page_title="Resources | Graas", page_icon="📚", layout="wide")
+st.set_page_config(page_title="Knowledge Base | Graas", page_icon="📚", layout="wide")
 
 # Restricted section — gate BEFORE any Drive read. The KB holds internal-only
 # material (GTM Immersion, commercials, lessons learnt) and its Drive folders are
@@ -54,7 +54,7 @@ def save_resources(data):
 
 # ── Page ──────────────────────────────────────────────────────────────────────
 
-st.markdown("## 📚 Resources")
+st.markdown("## 🧠 Knowledge Base")
 st.caption("Knowledge Base (Drive-backed, auto) + manual decks & docs")
 
 

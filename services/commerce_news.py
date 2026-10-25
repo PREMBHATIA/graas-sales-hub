@@ -23,9 +23,9 @@ import streamlit as st
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 
 
-_PROMPT = (
-    "Use web_search to find UP TO 3 distinct, HIGH-IMPACT commerce-tech "
-    "news stories from the LAST 21 DAYS. These will be used as email "
+_PROMPT_TMPL = (
+    "Use web_search to find UP TO {count} distinct, HIGH-IMPACT commerce-tech "
+    "news stories from the LAST {days} DAYS. These will be used as email "
     "talking points to commerce executives — they MUST be substantive "
     "enough to anchor a sales outreach (not blog posts, not minor "
     "feature launches).\n\n"
@@ -54,7 +54,7 @@ _PROMPT = (
     "  • Modern Retail, Retail Dive, Bloomberg/Reuters retail desk\n\n"
     "Each story MUST cover a DIFFERENT angle/topic from the others.\n\n"
     "Return ONLY a JSON object with key 'stories' whose value is an "
-    "array of 1-3 story objects. Each story object has these EXACT keys:\n"
+    "array of 1-{count} story objects. Each story object has these EXACT keys:\n"
     "  • tag: country flag + short topic, e.g. '🇺🇸 US · agentic "
     "commerce', '🇮🇳 India · quick commerce'\n"
     "  • title: the actual headline (verbatim or close paraphrase)\n"
@@ -71,12 +71,14 @@ _PROMPT = (
 )
 
 
-@st.cache_data(
-    ttl=86400,
-    show_spinner="🔍 Searching the last 21 days of commerce-tech news…",
-)
-def fetch_commerce_tech_stories() -> list:
-    """Returns a list of 0-3 story dicts. Cached 24h."""
+def fetch_stories(count: int = 3, days: int = 21) -> list:
+    """Uncached core. Returns 0..count story dicts.
+
+    Separated from the cached wrapper so a scheduled job can call it
+    without Streamlit's cache in the way — the homepage must never trigger
+    a web_search on page load, which is why the Newsworthy tab was removed
+    on 2026-08-22.
+    """
     if not ANTHROPIC_API_KEY:
         return []
     try:
@@ -87,7 +89,8 @@ def fetch_commerce_tech_stories() -> list:
         resp = client.messages.create(
             model="claude-sonnet-4-6",
             max_tokens=4000,
-            messages=[{"role": "user", "content": _PROMPT}],
+            messages=[{"role": "user", "content":
+                       _PROMPT_TMPL.format(count=count, days=days)}],
             tools=[{
                 "type": "web_search_20250305",
                 "name": "web_search",
@@ -107,7 +110,7 @@ def fetch_commerce_tech_stories() -> list:
             return []
         stories_raw = parsed.get("stories", []) if isinstance(parsed, dict) else []
         out = []
-        for s in stories_raw[:3]:
+        for s in stories_raw[:count]:
             if not isinstance(s, dict):
                 continue
             url = (s.get("source_url") or "").strip()
@@ -126,6 +129,15 @@ def fetch_commerce_tech_stories() -> list:
         return out
     except Exception:
         return []
+
+
+@st.cache_data(
+    ttl=86400,
+    show_spinner="🔍 Searching the last 21 days of commerce-tech news…",
+)
+def fetch_commerce_tech_stories() -> list:
+    """Returns a list of 0-3 story dicts. Cached 24h. Prospect Brief uses this."""
+    return fetch_stories(count=3, days=21)
 
 
 def pick_story_for_session(stories: list | None) -> dict | None:

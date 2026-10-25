@@ -37,8 +37,8 @@ pg = st.navigation(
         # Shared / cross-product reference material — kept at the bottom so it
         # reads as "the team's library", not as an All-e-specific page.
         # 🔒 Gated section — the KB holds internal-only material.
-        "Knowledge 🔒": [
-            st.Page("pages/5_resources.py",  title="📚 Resources",  url_path="resources"),
+        "Reference 🔒": [
+            st.Page("pages/5_resources.py",  title="🧠 Knowledge Base",  url_path="resources"),
         ],
     },
     position="sidebar",

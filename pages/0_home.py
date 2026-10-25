@@ -88,11 +88,6 @@ st.markdown("""
         font-weight: 700;
         font-size: 0.84rem;
     }
-    .foot-tip {
-        color: #6B7280; font-size: 0.86rem;
-        background: #F9FAFB; border: 1px solid #F3F4F6;
-        border-radius: 10px; padding: 10px 14px;
-    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -126,7 +121,7 @@ st.markdown('<p class="sub-header">Pipeline, All-e &amp; Hoppr — shared team v
 
 _label("All-e — where the work happens")
 
-c1, c2, c3, c4, c5 = st.columns(5)
+c1, c2, c3, c4 = st.columns(4)
 with c1:
     _tile("🤖", "All-e", "Presales pipeline &amp; deals",
           "pages/2_alle.py", "Open All-e →")
@@ -147,27 +142,21 @@ with c4:
     # needs cannot sit behind the team password (Prem, 25 Oct).
     _tile("🎒", "Key Collateral", "GTM Immersion · videos · creds",
           "pages/6_collateral.py", "Open collateral →")
-with c5:
-    _tile("📚", "Resources", "Key decks &amp; docs",
-          "pages/5_resources.py", "Open Resources →", locked=True)
-
 st.markdown("")
 
 # ── Restricted ────────────────────────────────────────────────────────────────
 
-_label("Cross-product &amp; Hoppr", locked=True)
+# Resources sits here, not in the All-e row: it is cross-product reference
+# material, which is how app.py has always grouped it (Prem, 25 Oct).
+_label("Cross-product, Hoppr &amp; reference", locked=True)
 
-r1, r2, _ = st.columns([1, 1, 3])
+r1, r2, r3, _ = st.columns([1, 1, 1, 1])
 with r1:
     _tile("📋", "Pipeline", "Meetings &amp; proposals — All-e + Hoppr",
           "pages/1_pipeline.py", "Open Pipeline →", locked=True)
 with r2:
     _tile("📊", "Hoppr", "Usage, accounts &amp; MCP Beta",
           "pages/7_hoppr.py", "Open Hoppr →", locked=True)
-
-st.markdown("")
-st.markdown(
-    '<div class="foot-tip">🔒 <b>Locked</b> tiles need the team password — '
-    'one unlock covers them all for this browser session. '
-    'Everything else is open to the whole team.</div>',
-    unsafe_allow_html=True)
+with r3:
+    _tile("🧠", "Knowledge Base", "Source docs, decks &amp; KB health",
+          "pages/5_resources.py", "Open the KB →", locked=True)
