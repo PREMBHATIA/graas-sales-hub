@@ -32,9 +32,6 @@ SECTIONS = [
     ("Videos", "🎬",
      "Customer stories to send a prospect, or to watch before a first call. "
      "✅ All safe to share with customers."),
-    ("Security & Compliance", "🔐",
-     "SOC 2, ISO 27001, GDPR, PDPA. Procurement and security reviews ask "
-     "for these — send the link, not the file."),
     ("Creds Deck", "📊",
      "Who Graas is, who we work with, what we've shipped. The deck you leave "
      "behind."),
@@ -168,9 +165,7 @@ if _rumi:
     except Exception:
         _want = ""
     st.markdown("### 📬 Monthly Ruminations")
-    st.caption("The Index emails, newest first. **To send one: download the "
-               "PDF and attach it.** The HTML is for reading here or for "
-               "editing — it is not something you can attach to a mail. "
+    st.caption("**To send one: download the PDF and attach it.** "
                "or open the original in your inbox from **insights@** and "
                "forward that, which keeps your name on it. No tracking pixel "
                "in these copies. ✅ Safe to share.")
@@ -182,27 +177,23 @@ if _rumi:
         if not _rp.exists():
             continue
         with st.container(border=True):
+            # One title line, one caption, one row of buttons. This used to
+            # stack a title, a paragraph, a caption, a warning and a button
+            # row — six blocks of vertical space for what is a link and a
+            # sentence (Prem, 25 Oct).
+            _warn = (f"  ·  ⚠️ went out as “{_r['sent_subject']}”"
+                     if _r.get("sent_subject") else "")
             st.markdown(f"**{_r.get('subject', 'Untitled')}**")
-            if _r.get("about"):
-                st.markdown(_r["about"])
-            st.caption(f"Sent {_r.get('sent', '')} · "
-                       f"{_r.get('recipients', 0)} recipients"
-                       + (f" · **Send to:** {_r['send_to']}"
-                          if _r.get("send_to") else ""))
-            if _r.get("sent_subject"):
-                # Say it plainly rather than quietly showing a subject that
-                # differs from the one in anyone's inbox.
-                st.caption(f"⚠️ Went out as *“{_r['sent_subject']}”* — "
-                           "grammar corrected here only.")
+            st.caption(
+                f"{_r.get('about','')}  \n"
+                f"**Send to:** {_r.get('send_to','—')}  ·  "
+                f"{_r.get('sent','')} · {_r.get('recipients',0)} recipients"
+                + _warn)
             try:
                 _rhtml = _rp.read_text(encoding="utf-8")
             except Exception as _e:
                 st.warning(f"Couldn't read it: {_e}")
                 continue
-            # PDF first: it is the only form a salesperson can actually send.
-            # The HTML is for reading here or for editing — you cannot usefully
-            # attach it to a mail, and "copy the preview" does not work because
-            # the preview is inside an iframe (Prem, 25 Oct).
             _pdf_path = _root_dir / str(_r.get("pdf", ""))
             _q1, _q2, _q3, _ = st.columns([1, 1, 1, 2])
             with _q1:
@@ -218,9 +209,6 @@ if _rumi:
                                    file_name=_rp.name, mime="text/html",
                                    key=f"rumi_dl_{_r.get('n')}")
             with _q3:
-                # Deep link: the homepage sends ?r=<n>, so clicking a headline
-                # there opens THAT email rather than dropping you at the top
-                # of this page to find it again.
                 _rshow = st.toggle("Preview", key=f"rumi_pv_{_r.get('n')}",
                                    value=(_want == str(_r.get("n", ""))))
             if _rshow:
@@ -257,6 +245,23 @@ for _rep in LOCAL_REPORTS:
         if _open:
             import streamlit.components.v1 as _cmp
             _cmp.html(_html, height=760, scrolling=True)
+    st.markdown("")
+
+# ── Security & compliance — last, and in one block ───────────────────────────
+# Four links do not need four cards. Procurement asks a few times a year;
+# it earns a tight block at the bottom, not a grid up top (Prem, 25 Oct).
+_sec = _items.get("Security & Compliance", [])
+if _sec:
+    st.markdown("### 🔐 Security & Compliance")
+    st.caption("Procurement and security reviews ask for these. "
+               "🔒 Share under NDA — send the link, not the file.")
+    st.markdown(
+        " &nbsp;·&nbsp; ".join(
+            f'<a href="{x.get("url","#")}" target="_blank"><b>{x.get("title","")}</b></a>'
+            for x in _sec),
+        unsafe_allow_html=True)
+    st.caption(" &nbsp;|&nbsp; ".join(
+        f"{x.get('title','')}: {x.get('description','')}" for x in _sec))
     st.markdown("")
 
 st.markdown("---")
