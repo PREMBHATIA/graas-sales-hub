@@ -19,6 +19,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Optional
 
@@ -26,6 +27,24 @@ ROOT = Path(__file__).resolve().parent.parent
 RUMI = ROOT / "content" / "collateral" / "ruminations"
 PDF_DIR = RUMI / "pdf"
 INDEX = RUMI / "index.json"
+
+# Print CSS injected before rendering. The emails are a 552px column built
+# for a phone, so on A4 they printed as a narrow strip down the middle with
+# enormous side margins and ran to six pages. Widening the tables and easing
+# the zoom down fills the page and gets the same content into four, still at
+# a comfortable reading size (Prem, 25 Oct).
+PRINT_CSS = (
+    "<style>"
+    "@page{size:A4;margin:9mm 8mm;}"
+    "html,body{background:#fff !important;}"
+    "body{zoom:0.85;}"
+    "table{max-width:100% !important;width:100% !important;}"
+    "table[bgcolor]{background:#fff !important;}"
+    "img{max-width:100% !important;height:auto !important;"
+    "page-break-inside:avoid;}"
+    "tr,td{page-break-inside:avoid;}"
+    "</style>"
+)
 
 CHROME_CANDIDATES = [
     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
@@ -64,10 +83,20 @@ def main() -> int:
                 and pdf.stat().st_mtime >= html.stat().st_mtime):
             skipped.append(pdf.name)
             continue
-        subprocess.run(
-            [chrome, "--headless", "--disable-gpu", "--no-pdf-header-footer",
-             f"--print-to-pdf={pdf}", html.resolve().as_uri()],
-            check=False, capture_output=True, timeout=120)
+        doc = html.read_text(encoding="utf-8")
+        doc = (doc.replace("</head>", PRINT_CSS + "</head>", 1)
+               if "</head>" in doc else PRINT_CSS + doc)
+        with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False,
+                                         encoding="utf-8") as tmp:
+            tmp.write(doc)
+            tmp_path = tmp.name
+        try:
+            subprocess.run(
+                [chrome, "--headless", "--disable-gpu", "--no-pdf-header-footer",
+                 f"--print-to-pdf={pdf}", "file://" + tmp_path],
+                check=False, capture_output=True, timeout=120)
+        finally:
+            os.unlink(tmp_path)
         if pdf.exists():
             made.append(pdf.name)
         else:

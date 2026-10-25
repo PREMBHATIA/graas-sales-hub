@@ -9,7 +9,7 @@
     "about": "The research. 100 enterprises, $200M+ revenue, India and SEA: 36 evaluating AI, only 7 live. Send to someone who thinks they are behind — they are not.",
     "send_to": "Anyone early in AI. Opens a conversation without a pitch.",
     "pdf": "content/collateral/ruminations/pdf/01_we-spoke-to-100-enterprises-about-ai-in-retail-c.pdf",
-    "pdf_kb": 319
+    "pdf_kb": 427
   },
   {
     "n": 2,
@@ -21,7 +21,7 @@
     "about": "Why the pilots stall. Understanding what a buyer says is solved; knowing what is true for that buyer today is not. Send after a demo that impressed but did not close.",
     "send_to": "A prospect who has seen a demo and gone quiet.",
     "pdf": "content/collateral/ruminations/pdf/02_seven-of-100-enterprises-have-ai-live-the-missin.pdf",
-    "pdf_kb": 417
+    "pdf_kb": 422
   },
   {
     "n": 3,
@@ -35,6 +35,6 @@
     "about": "Too much AI noise. Every vendor now ships an agent, and one company sent us two RFIs needing the same underlying facts. Send to someone comparing vendors.",
     "send_to": "A buyer in an evaluation, or drowning in pitches.",
     "pdf": "content/collateral/ruminations/pdf/03_agentic-mistakes-retail-keep-making.pdf",
-    "pdf_kb": 570
+    "pdf_kb": 572
   }
 ]
