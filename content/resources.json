@@ -12,8 +12,8 @@
         "all-e",
         "start-here"
       ],
-      "featured": true,
-      "sales_facing": true
+      "sales_facing": true,
+      "category": "GTM Immersion"
     },
     {
       "title": "All-e Business Overview — Jan to Apr 2026",
@@ -30,5 +30,45 @@
       ]
     }
   ],
-  "docs": []
+  "docs": [
+    {
+      "title": "Six systems. Three channels. One brain to own.",
+      "description": "",
+      "url": "https://www.youtube.com/watch?v=CU4yn0kIdno",
+      "type": "Video",
+      "added": "2026-10-25",
+      "tags": [
+        "video"
+      ],
+      "category": "Videos",
+      "sales_facing": true,
+      "needs_review": true
+    },
+    {
+      "title": "Graas — agentic commerce",
+      "description": "",
+      "url": "https://www.youtube.com/watch?v=8e48UEAjvGA",
+      "type": "Video",
+      "added": "2026-10-25",
+      "tags": [
+        "video"
+      ],
+      "category": "Videos",
+      "sales_facing": true,
+      "needs_review": true
+    },
+    {
+      "title": "Graas — product walkthrough",
+      "description": "",
+      "url": "https://www.youtube.com/watch?v=jDJfMnR3OYE",
+      "type": "Video",
+      "added": "2026-10-25",
+      "tags": [
+        "video"
+      ],
+      "category": "Videos",
+      "sales_facing": true,
+      "needs_review": true
+    }
+  ]
 }

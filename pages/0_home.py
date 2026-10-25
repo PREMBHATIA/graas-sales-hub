@@ -79,9 +79,9 @@ with c3:
 with c4:
     # Open, unlike Resources beside it — onboarding material the sales team
     # needs cannot sit behind the team password (Prem, 25 Oct).
-    st.markdown("### 🎒 Collateral")
-    st.markdown("Start here · decks & courses")
-    st.page_link("pages/6_collateral.py", label="Open Collateral →")
+    st.markdown("### 🎒 Key Collateral")
+    st.markdown("GTM Immersion · videos · creds")
+    st.page_link("pages/6_collateral.py", label="Open Key Collateral →")
 
 with c5:
     st.markdown("### 📚 Resources 🔒")

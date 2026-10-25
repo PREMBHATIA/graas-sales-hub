@@ -1,14 +1,17 @@
-"""Sales collateral — the OPEN page.
+"""Key Collateral — the OPEN page under All-e.
 
-Resources (5_resources.py) is gated behind the team password, and the sales
-team doesn't have it (Prem, 25 Oct). Onboarding material that every
-salesperson needs cannot live behind a lock, so it lives here instead.
+Resources (5_resources.py) is gated behind the team password and the sales
+team doesn't have it (Prem, 25 Oct), so onboarding material every salesperson
+needs cannot live there. It lives here instead.
 
-This page deliberately shares the Resources store (content/resources.json)
-rather than keeping a second list that drifts, but it renders ONLY items
-explicitly marked `"sales_facing": true`. That flag is the whole security
-boundary: an item is visible here because someone decided it should be, never
-because it happened to be in the file. Nothing is listed by default.
+This page shares the Resources store (content/resources.json) rather than
+keeping a second list that drifts, but renders ONLY entries flagged
+`"sales_facing": true`. That flag is the whole boundary: an item appears here
+because someone decided it should, never because it happens to be in the file.
+
+Three fixed sections, in this order — GTM Immersion, Videos, Creds Deck — set
+per item with `"category"`. A section with nothing in it still renders, saying
+what's missing, so a gap is visible rather than silently absent.
 """
 
 from pathlib import Path
@@ -16,78 +19,85 @@ import json
 
 import streamlit as st
 
-st.set_page_config(page_title="Sales Collateral | Graas", page_icon="🎒",
+st.set_page_config(page_title="Key Collateral | Graas", page_icon="🎒",
                    layout="wide")
 
 RESOURCES_PATH = Path(__file__).parent.parent / "content" / "resources.json"
 
+# Order matters — this is the order a new salesperson should meet them in.
+SECTIONS = [
+    ("GTM Immersion", "🎓",
+     "The course. Routes to market, the Agent Fit Test, what we don't sell, "
+     "the GT leak map. Start here if you're new."),
+    ("Videos", "🎬",
+     "Short films to send a prospect, or to watch before a first call."),
+    ("Creds Deck", "📊",
+     "Who Graas is, who we work with, what we've shipped. The deck you leave "
+     "behind."),
+]
+
 
 @st.cache_data(ttl=300, show_spinner=False)
 def _sales_items():
-    """(featured, rest) — only entries flagged sales_facing.
+    """Sales-facing entries grouped by category.
 
-    Returns empty lists on any read failure rather than raising: a missing or
-    malformed file should show "nothing here yet", not a stack trace, but it
-    must never fall back to showing everything.
+    Empty on any read failure rather than raising — a missing or malformed
+    file should read as "nothing here yet", never as a stack trace, and must
+    never fall back to showing everything.
     """
     try:
         data = json.loads(RESOURCES_PATH.read_text(encoding="utf-8"))
     except Exception:
-        return [], []
-    items = [r for r in (data.get("decks", []) + data.get("docs", []))
-             if isinstance(r, dict) and r.get("sales_facing") is True]
-    return ([r for r in items if r.get("featured")],
-            [r for r in items if not r.get("featured")])
+        return {}
+    out = {}
+    for r in (data.get("decks", []) + data.get("docs", [])):
+        if isinstance(r, dict) and r.get("sales_facing") is True:
+            out.setdefault(str(r.get("category", "")).strip(), []).append(r)
+    return out
 
 
-def _tags(item):
-    t = item.get("tags") or []
-    if isinstance(t, str):                      # older rows stored a str(list)
-        t = [x.strip(" '\"[]") for x in t.split(",")]
-    return [str(x) for x in t if str(x).strip()]
-
-
-def _card(item, big=False):
+def _card(item):
     with st.container(border=True):
-        if big:
-            st.markdown(f"#### [{item.get('title', 'Untitled')}]({item.get('url', '#')})")
-        else:
-            st.markdown(f"**[{item.get('title', 'Untitled')}]({item.get('url', '#')})**")
+        st.markdown(f"**[{item.get('title', 'Untitled')}]({item.get('url', '#')})**")
         if item.get("description"):
             st.markdown(item["description"])
-        bits = _tags(item)
+        bits = []
         if item.get("type"):
-            bits = [item["type"]] + bits
+            bits.append(item["type"])
+        tags = item.get("tags") or []
+        if isinstance(tags, str):
+            tags = [t.strip(" '\"[]") for t in tags.split(",")]
+        bits += [str(t) for t in tags if str(t).strip()]
         if bits:
             st.caption(" · ".join(bits))
+        if item.get("needs_review"):
+            st.caption("⚠️ Pulled from a past campaign link — confirm this is "
+                       "the right one before sending it to a customer.")
 
 
-st.markdown("## 🎒 Sales Collateral")
-st.caption("Everything a salesperson needs, open to the whole team — no "
-           "password. Decks, courses and links you can share internally.")
+st.markdown("## 🎒 Key Collateral")
+st.caption("Open to the whole team — no password. The decks, courses and "
+           "videos a salesperson needs.")
 
-_feat, _rest = _sales_items()
+_items = _sales_items()
 
-if not _feat and not _rest:
-    st.info(
-        "Nothing here yet. Collateral is added in **Resources** — set "
-        "`\"sales_facing\": true` on an entry in `content/resources.json` and "
-        "it appears on this page. Items without that flag stay in Resources, "
-        "which is password-protected."
-    )
-else:
-    if _feat:
-        st.markdown("### 🚀 Start here")
-        for _f in _feat:
-            _card(_f, big=True)
-        st.markdown("")
-    if _rest:
-        st.markdown("### 📂 More collateral")
-        _cols = st.columns(2)
-        for _i, _r in enumerate(_rest):
-            with _cols[_i % 2]:
+for _name, _icon, _blurb in SECTIONS:
+    st.markdown(f"### {_icon} {_name}")
+    st.caption(_blurb)
+    _group = _items.get(_name, [])
+    if not _group:
+        st.info(f"No {_name} added yet. Add an entry to "
+                "`content/resources.json` with "
+                f"`\"category\": \"{_name}\"` and `\"sales_facing\": true`.")
+    elif len(_group) == 1:
+        _card(_group[0])
+    else:
+        _cols = st.columns(min(len(_group), 3))
+        for _i, _r in enumerate(_group):
+            with _cols[_i % len(_cols)]:
                 _card(_r)
+    st.markdown("")
 
 st.markdown("---")
-st.caption("Looking for pipeline decks, the Knowledge Base or customer "
-           "proposals? Those are in **Resources** and need the team password.")
+st.caption("Pipeline decks, the Knowledge Base and customer proposals are in "
+           "**Resources**, which needs the team password.")
