@@ -206,11 +206,19 @@ with c4:
     # Gated page inside an open section — the pill warns before the click.
     _tile("📧", "CRM", "Contacts, campaigns &amp; intent",
           "views/3_crm.py", "Open CRM →", locked=True)
+    # The intent list is the sheet salespeople actually work from — who
+    # engaged, at what level, and who not to contact. The raw outreach log
+    # (every send, every beacon) is plumbing and was the only thing linked
+    # here, which is why nobody could find the list (Prem, 25 Oct).
     st.markdown(
-        '<div style="font-size:0.78rem;margin-top:6px">'
+        '<div style="font-size:0.78rem;margin-top:6px;line-height:1.7">'
         '<a href="https://docs.google.com/spreadsheets/d/'
-        '1Vcu7ZkAjGbzpKH2CUGoSuLUGIfwYBT-GlpNN0zMKJMY/edit" target="_blank">'
-        'Outreach log ↗</a></div>', unsafe_allow_html=True)
+        '1zGr-Brg_uuHuICDgJJ36ctUnnf7Yluw1Yd0fAy44AaM/edit" target="_blank">'
+        '<b>Who to follow up ↗</b></a><br>'
+        '<a href="https://docs.google.com/spreadsheets/d/'
+        '1Vcu7ZkAjGbzpKH2CUGoSuLUGIfwYBT-GlpNN0zMKJMY/edit" target="_blank" '
+        'style="color:#9CA3AF">Raw outreach log ↗</a></div>',
+        unsafe_allow_html=True)
 
 st.markdown("")
 
