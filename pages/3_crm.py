@@ -985,6 +985,10 @@ def _tab_guard(label):
 # page for minutes on a cache miss. The Context arc + per-segment suggestions
 # superseded its talking-points job. services/commerce_news.py still serves the
 # Prospect Brief 'While you wait' card.
+# Subjects that belong on the investor shelf rather than the campaign shelf.
+_INVESTOR_RE = re.compile(r"shareholder|investor\s+(update|letter|report)", re.IGNORECASE)
+
+
 # Markers a human types into the subject while testing. Matched at the START of
 # the subject (where they get typed) or anywhere as a bracketed tag, so a real
 # subject containing the word "test" — "Why most AI pilots never leave test" —
@@ -3117,7 +3121,8 @@ with tab_calendar, _tab_guard("Creatives"):
         # cluttering the shelf (Prem). Raise/lower here if a genuinely small
         # campaign ever needs to appear.
         _cr_groups = [(sub, g) for sub, g in _crv.groupby("subject")
-                      if g["to_email"].nunique() >= 20]
+                      if g["to_email"].nunique() >= 20
+                      and not _INVESTOR_RE.search(str(sub))]
         _cr_groups.sort(key=lambda x: x[1]["_ts"].min(), reverse=True)
         if not _cr_groups:
             st.info("No campaign creatives yet.")
@@ -3140,6 +3145,73 @@ with tab_calendar, _tab_guard("Creatives"):
                     _show = st.toggle("Preview", key=f"cr_pv_{_slug}")
                 if _show:
                     _cmp_html.html(_body, height=640, scrolling=True)
+
+    # ── Investor & shareholder updates ───────────────────────────────────
+    # Kept apart from the monthly customer-facing campaigns: different
+    # audience, different cadence, and they never clear the 20-recipient bar
+    # the campaign shelf uses — the October update exists only as test sends
+    # to one person, which is why it was invisible here.
+    st.markdown("---")
+    st.markdown("### 📈 Investor & shareholder updates")
+    st.caption("Separate from the customer campaigns above. Test sends count "
+               "here — these go out from a personal mailbox, not the composer, "
+               "so the log's test copy is usually the only archive there is.")
+    _inv = _cached_log_df()
+    _inv_groups = []
+    if _inv is not None and not _inv.empty and "body" in _inv.columns:
+        _inv = _inv.copy()
+        _inv["_ts"] = pd.to_datetime(_inv["timestamp_utc"], errors="coerce", utc=True)
+        _inv = _inv[(_inv["status"] == "sent") & _inv["_ts"].notna()
+                    & (_inv["body"].astype(str).str.strip() != "")]
+        _inv["subject"] = _inv["subject"].astype(str).str.strip()
+        _inv = _inv[_inv["subject"].apply(lambda x: bool(_INVESTOR_RE.search(x)))]
+        if not _inv.empty:
+            # Group on the subject with any [TEST]/[Internal] prefix stripped, so
+            # six test sends of one letter make one card, not six.
+            _inv["_key"] = (_inv["subject"]
+                            .str.replace(r"^\s*\[(TEST|Internal|Audit)\]\s*", "",
+                                         regex=True, case=False).str.strip())
+            _inv_groups = sorted(_inv.groupby("_key"),
+                                 key=lambda x: x[1]["_ts"].max(), reverse=True)
+    if not _inv_groups:
+        st.info("No investor or shareholder updates in the send log yet. "
+                "Anything with \"shareholder\" or \"investor\" in the subject "
+                "lands here automatically.")
+    else:
+        import streamlit.components.v1 as _cmp_inv
+        for _ik, _ig in _inv_groups:
+            _ilatest = _ig.sort_values("_ts").iloc[-1]
+            _ibody = str(_ilatest["body"])
+            _islug = re.sub(r"[^a-z0-9]+", "-", _ik.lower()).strip("-")[:60] or "update"
+            _n_ver = len(_ig)
+            with st.container(border=True):
+                st.markdown(f"**{_ik}**")
+                st.caption(
+                    f"Latest version {_ilatest['_ts'].strftime('%d %b %Y · %H:%M')} UTC"
+                    + (f" · {_n_ver} versions in the log" if _n_ver > 1 else "")
+                    + f" · {len(_ibody):,} chars"
+                    + ("  \n⚠️ Only ever test-sent — not sent to a real "
+                       "distribution list from here."
+                       if _ig["template"].astype(str).str.contains(r"\(test\)").all()
+                       else ""))
+                _i1, _i2, _ = st.columns([1, 1, 3])
+                with _i1:
+                    st.download_button("⬇️ HTML", _ibody.encode("utf-8"),
+                                       file_name=f"{_islug}.html", mime="text/html",
+                                       key=f"inv_dl_{_islug}")
+                with _i2:
+                    _ishow = st.toggle("Preview", key=f"inv_pv_{_islug}")
+                if _ishow:
+                    _cmp_inv.html(_ibody, height=700, scrolling=True)
+                if _n_ver > 1:
+                    with st.expander(f"All {_n_ver} versions"):
+                        _iv = _ig.sort_values("_ts", ascending=False)
+                        st.dataframe(pd.DataFrame({
+                            "When (UTC)": _iv["_ts"].dt.strftime("%d %b %H:%M"),
+                            "To": _iv["to_email"],
+                            "Chars": _iv["body"].astype(str).str.len(),
+                            "Subject as sent": _iv["subject"],
+                        }), use_container_width=True, hide_index=True)
 
     st.markdown("---")
     st.markdown("#### 👀 Preview the next creative (not sent yet)")
