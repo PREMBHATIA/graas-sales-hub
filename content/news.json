@@ -1,38 +1,46 @@
 {
-  "generated_utc": "2026-10-25T03:45:32Z",
+  "generated_utc": "2026-10-25T18:44:31Z",
   "window_days": 30,
   "stories": [
     {
-      "tag": "US - analyst research",
-      "title": "McKinsey (Oct 9, 2026): CPG Companies Are Using Agentic AI to Cut Costs When They Should Be Using It to Recapture Growth",
-      "body": "McKinsey's October 9, 2026 article argues that CPG businesses are leaving growth on the table because most deployments of agentic AI are focused on cost reduction and accelerating existing work rather than top-line recovery. The article notes that investors in CPG companies reward top-line growth more than margin expansion, and that the real opportunity lies in the increasingly complex CPG–retailer relationship. In performance management specifically, McKinsey finds AI can track KPIs, detect variances, and recommend actions while cutting the human effort required by roughly half — freeing commercial teams to act on growth opportunities rather than reporting.",
-      "why": "McKinsey naming the 'cost-only' AI deployment as the wrong strategy is a gift for an enterprise retail-AI sales team: it validates that the market is stuck in efficiency pilots and has not yet wired agents into commercial growth workflows. Graas can position its context and data layer as the prerequisite that lets CPG commercial teams move from variance-reporting agents to revenue-recovery agents.",
-      "source_label": "McKinsey & Company",
-      "source_url": "https://www.mckinsey.com/industries/consumer-packaged-goods/our-insights/for-cpg-companies-agentic-ais-real-payoff-is-growth"
+      "tag": "US - agent infrastructure / open standard",
+      "title": "Sierra and Meta Unveil Personal Agent Protocol — Walmart, Shopify, Stripe Named as Partners",
+      "body": "On October 6, 2026, Sierra and Meta announced the Personal Agent Protocol (PAP), an OAuth-based open standard defining how consumers' personal AI agents authenticate and interact with enterprise systems via websites, APIs, or a company's own agent. Partners named at launch include Walmart, Shopify, Stripe, Genesys, Rocket, and Instinct; Meta's list also adds NiCE and Decagon. Sierra published a Draft 0.1 on October 9 and named 35 additional design partners including OpenAI, with a reference implementation and design workshops to follow later in October.",
+      "why": "PAP directly changes the enterprise architecture conversation: retailers must now decide whether to expose their product catalog, inventory, and order APIs to incoming personal agents or risk being skipped entirely — Meta's own post stated 'turning away a personal agent means turning away the customer behind it.' For a Graas seller, this is proof that the context layer (governed SKU data, live inventory, policy rules) is no longer optional back-office plumbing — it becomes the handshake point every inbound agent will hit first.",
+      "source_label": "Unite.AI / Sierra Blog",
+      "source_url": "https://www.unite.ai/sierra-unveils-personal-agent-protocol-built-with-meta-and-partners/"
     },
     {
-      "tag": "US/Global - named enterprise deployment",
-      "title": "SAP Launches Joule Agents Across Supply Chain at SAP Connect 2026, Grounded in SAP Knowledge Graph",
-      "body": "At SAP Connect on October 6–8, 2026, SAP made its Autonomous Enterprise architecture generally available, deploying Joule Work and 50 domain-specific Joule Assistants across finance, procurement, HR, and supply chain — with new agents specifically targeting supply chain planning, warehousing, outbound optimization, fulfillment, and transportation dispatching. The agents are architecturally grounded in the SAP Knowledge Graph, which maps more than 7 million data fields to provide reliable business context, plus customer-specific process logic and approval workflows stored in HANA Cloud. SAP's Q3 2026 earnings simultaneously crossed €10 billion in quarterly revenue for the first time, with cloud backlog growing 28% to €24.1 billion, which SAP CEO Christian Klein attributed to agentic AI deployment as a distinct demand driver — not merely an ERP migration feature.",
-      "why": "SAP's explicit architecture decision — agents must be grounded in a governed knowledge graph before they can touch live ERP data — is the strongest enterprise proof point available that context infrastructure is table stakes, not a nice-to-have. For Graas, this is the anchor case that shows retail and CPG buyers what 'agent-ready' ERP looks like, and surfaces the gap for customers not yet on that foundation.",
-      "source_label": "SAP News / TechTimes",
-      "source_url": "https://news.sap.com/2026/10/joule-assistants-agents-advance-autonomous-scm/"
+      "tag": "US - analyst research / why pilots stall",
+      "title": "Gartner: 40% of Agentic AI Projects Will Be Canceled by 2027 — Costs, Unclear ROI, and Governance Are the Killers",
+      "body": "Gartner's widely-cited forecast predicts more than 40% of enterprise agentic AI projects will be canceled by end of 2027, with analyst Anushree Verma identifying three root causes: escalating costs, unclear business value, and inadequate risk controls — not model failure. Separately, Gartner also warns that 40% of companies will need to roll back or disable already-live autonomous agents by 2027 after governance gaps surface in production incidents. McKinsey's August 2026 State of AI survey reinforces the picture: only about 20% of organizations have scaled agents in any function, and 80% of firms using AI see no P&L impact at all.",
+      "why": "This is the exact objection retail CIOs raise in the second meeting — 'we tried a pilot and it went nowhere.' Gartner names the three failure drivers (cost, value definition, governance) that a governed context layer directly addresses by giving agents a trustworthy, auditable data foundation before they touch production workflows. Sellers can use this to reframe Graas not as another pilot but as the prerequisite infrastructure that makes the 60% of projects that do survive stick.",
+      "source_label": "Gartner / deployedlabs.com summary (Oct 2026)",
+      "source_url": "https://www.deployedlabs.com/blog/why-ai-agent-projects-fail-2026-data"
     },
     {
-      "tag": "Global - analyst research",
-      "title": "BCG Survey (Oct 21, 2026): 68% of Retailers Expect Agentic Commerce to Be Significant or Transformational Within Two Years — But Most Haven't Rewired Their Data",
-      "body": "BCG's October 21, 2026 survey of 150 retailers and brands finds that 68% expect agentic commerce to have a significant or transformational effect within two years, and that eight in ten retailers have already taken a position on external AI agents — with 42% making their data discoverable by any agent, 32% giving access only to chosen agents, and 6% blocking agents entirely. BCG argues retailers must now win two games simultaneously: the direct shopper visit and the external agent's recommendation, which place fundamentally different demands on loyalty programs, retail media, and personalization infrastructure. Traditional growth levers like banner ads and sponsored search are expected to slow as discovery moves off retailers' own websites and into agent-mediated flows.",
-      "why": "The BCG finding that only 42% of retailers have made their data machine-readable to any agent — while 68% expect agentic commerce to be transformational — defines the exact gap Graas addresses. A salesperson can use this to show retail and CPG prospects that the strategy decision is already being made by their competitors, while the data readiness work has barely started.",
-      "source_label": "BCG",
-      "source_url": "https://www.bcg.com/publications/2026/retailers-win-ai-shopping-agents"
+      "tag": "US - agent vendor / architecture commitment",
+      "title": "Uvi Launches Knowledge Graph Platform to Stop Enterprises Paying Frontier Models to Re-Learn Their Own Business",
+      "body": "Israeli startup Uvi, covered by Blocks & Files on October 12, 2026, argues that every AI agent an enterprise deploys starts with zero institutional knowledge and must reconstruct that context from scratch — with the enterprise paying a frontier model each time it does. Uvi's platform uses knowledge graph technology to surface the hidden enterprise context that existing systems hold but cannot expose, so agents can act on it without repeated re-grounding costs. The company positions its offering directly against the pattern of per-query frontier model spend that compounds as agent deployments scale.",
+      "why": "Uvi names exactly the architecture gap Graas fills: agents that lack a governed context layer burn token budget re-learning what the enterprise already knows, making agentic AI economically unsustainable at scale. On a sales call, this is a concrete cost-of-inaction argument — the longer a retailer waits to build a context layer, the more they pay frontier models to rediscover their own SKU logic, pricing rules, and customer identity.",
+      "source_label": "Blocks & Files",
+      "source_url": "https://www.blocksandfiles.com/ai-ml/2026/10/12/uvi-gives-ai-agents-enterprise-context/5302514"
     },
     {
-      "tag": "US - AI economics / build-vs-buy",
-      "title": "BCG and Futurum Data: AI Now Consumes 17% of IT Budgets, Non-AI SaaS Licenses Being Cut to Fund It — and Gartner Warns 40%+ of Agentic Projects Will Be Canceled by 2027",
-      "body": "BCG's 2026 CIO survey finds AI's share of IT budgets has more than tripled, from 5% to 17%, with server prices running 80% above 2025 rates and CIOs now required to tie every AI dollar to measurable business value. Futurum's concurrent 2H 2026 CIO survey finds that 36.4% of organizations that reallocated funds to cover AI overruns did so by cutting non-AI software licenses, while 27.5% of buyers expect to purchase fewer core SaaS seats as their use of vendors' AI features grows. Gartner's positioning, cited in multiple analyst notes, calls 2026 a 'trough of disillusionment' year and expects more than 40% of agentic AI projects to be canceled by end of 2027 absent proven ROI.",
-      "why": "The budget squeeze is the forcing function for every enterprise AI conversation in late 2026: CIOs are cutting point-solution SaaS to fund agents, but Gartner warns that 40%+ of agentic projects will be canceled if they can't prove ROI. Graas can use this to reframe its pitch — a governed context and data layer is not an added cost, it is what separates the 60% of projects that survive from the 40% that get cut.",
-      "source_label": "BCG / Futurum Group",
-      "source_url": "https://www.bcg.com/publications/2026/ai-share-it-budgets-rising-fast"
+      "tag": "US - agent vendor / competitive landscape",
+      "title": "Sierra Raises $950M at $15.8B; Salesforce Acquires Fin for ~$3.6B — Agent Vendor Consolidation Accelerates",
+      "body": "Sierra raised $950 million in a May 2026 Series E led by Tiger Global and GV at a $15.8 billion post-money valuation, with CEO Bret Taylor telling CNBC that Sierra now serves more than 40% of the Fortune 50. Salesforce agreed to acquire Intercom's Fin agent for approximately $3.6 billion in June 2026, the first major exit check on what an AI customer-service business is actually worth outside a funding round. Decagon, the closest pure-play rival, had tripled its own valuation to $4.5 billion in January 2026 after a $250 million Series D, but now faces a competitor with three times its funding and a CRM bundle threat from Salesforce-Fin.",
+      "why": "Retailers evaluating agent vendors are walking into a market where the top two or three platforms are pulling away fast on capital and Fortune 50 logos — price leverage and negotiating room for buyers will shrink quickly. For Graas sellers, the consolidation argument is that vendor-specific agent platforms (Sierra, Fin/Salesforce, Decagon) each own their own context store, creating lock-in risk; a vendor-neutral context layer lets the retailer switch or run multiple agent runtimes without rebuilding their data foundation each time.",
+      "source_label": "Revenue Memo / ValueAdd VC (Oct 2026)",
+      "source_url": "https://www.revenuememo.com/p/decagon-funding"
+    },
+    {
+      "tag": "US - named CPG deployment / outcomes",
+      "title": "BCG: Agentic Supply Chain Platform Delivers +2–4% In-Stock Lift and 40–60% Admin Savings for CPG Client",
+      "body": "BCG's May 2026 Executive Perspectives report on AI in supply chains documents a CPG company that deployed a multi-subagent planning platform covering inventory replenishment, order optimization, and S&OP allocation — with human analysts retaining final decision authority during the pilot phase. Measured outcomes include a 2–4 percentage point improvement in in-stock rate (driving direct revenue lift), a 4–10% fill-rate improvement, and 40–60% administrative time savings. BCG's framing is that the pilot is explicitly designed as a template for an organization-wide model shift, with agents taking progressively more direct system actions as trust is established.",
+      "why": "This is a named-outcome proof point in the exact workflow category — replenishment and ordering — where Graas agents operate, and BCG's human-in-the-loop architecture mirrors the staged deployment model retailers need to hear about to get budget approved. Sellers can use the 40–60% admin savings figure and the in-stock lift to anchor ROI conversations with supply chain and merchandising leaders who need P&L-linked numbers before they escalate to the CIO.",
+      "source_label": "BCG Executive Perspectives (May 2026)",
+      "source_url": "https://www.bcg.com/assets/2026/executive-perspectives-ais-new-mandate-in-supply-chains.pdf"
     }
   ]
 }
