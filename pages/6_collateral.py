@@ -30,7 +30,8 @@ SECTIONS = [
      "The course. Routes to market, the Agent Fit Test, what we don't sell, "
      "the GT leak map. Start here if you're new."),
     ("Videos", "🎬",
-     "Customer stories to send a prospect, or to watch before a first call."),
+     "Customer stories to send a prospect, or to watch before a first call. "
+     "✅ All safe to share with customers."),
     ("Creds Deck", "📊",
      "Who Graas is, who we work with, what we've shipped. The deck you leave "
      "behind."),
@@ -66,6 +67,16 @@ def _sales_items():
         if isinstance(r, dict) and r.get("sales_facing") is True:
             out.setdefault(str(r.get("category", "")).strip(), []).append(r)
     return out
+
+
+def _card_compact(item):
+    """Title + one line. Used for Videos, where the per-card type, tag and
+    audience captions tripled the height of a link and a sentence — and said
+    the same thing on every card, so the section header says it once."""
+    st.markdown(f"**[{item.get('title', 'Untitled')}]({item.get('url', '#')})**  \n"
+                f"<span style='font-size:0.82rem;color:#6B7280'>"
+                f"{item.get('description', '')}</span>",
+                unsafe_allow_html=True)
 
 
 def _card(item):
@@ -116,6 +127,13 @@ for _name, _icon, _blurb in SECTIONS:
         st.info(f"No {_name} added yet. Add an entry to "
                 "`content/resources.json` with "
                 f"`\"category\": \"{_name}\"` and `\"sales_facing\": true`.")
+    elif _name == "Videos":
+        # Compact: these are all customer-safe and all the same type, so the
+        # per-card badges were noise. Said once, above.
+        _cols = st.columns(min(len(_group), 3))
+        for _i, _r in enumerate(_group):
+            with _cols[_i % len(_cols)]:
+                _card_compact(_r)
     elif len(_group) == 1:
         _card(_group[0])
     else:

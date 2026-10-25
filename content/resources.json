@@ -48,7 +48,7 @@
   "docs": [
     {
       "title": "Schneider",
-      "description": "Retailer-to-distributor ordering. A handwritten list turned into an order via OCR.",
+      "description": "Handwritten list → order, via OCR.",
       "url": "https://www.youtube.com/watch?v=jDJfMnR3OYE",
       "type": "Video",
       "added": "2026-10-25",
@@ -63,7 +63,7 @@
     },
     {
       "title": "PI",
-      "description": "Distributor ordering in English and Hinglish. 45% conversation-to-order conversion; 20% of volume moved to WhatsApp in 3 months.",
+      "description": "WhatsApp distributor ordering. 45% convert to orders.",
       "url": "https://www.youtube.com/watch?v=8e48UEAjvGA",
       "type": "Video",
       "added": "2026-10-25",
@@ -78,7 +78,7 @@
     },
     {
       "title": "Agricon",
-      "description": "Field agents digitizing secondary invoices in Bahasa and English. Capture to digitization down from 8 days to half a day.",
+      "description": "Invoice capture: 8 days → half a day.",
       "url": "https://youtu.be/OawHO-fcSBI",
       "type": "Video",
       "added": "2026-10-25",
@@ -92,8 +92,21 @@
       "source": "Prem's intro email, 13 Oct 2026"
     },
     {
+      "title": "Canon (B2C)",
+      "description": "Ad funnel clean-up. Keeps the high-intent leads.",
+      "url": "https://www.youtube.com/watch?v=EFucGh9v44c&t=10s",
+      "type": "Video",
+      "added": "2026-10-25",
+      "tags": [
+        "video"
+      ],
+      "category": "Videos",
+      "sales_facing": true,
+      "audience": "Share with customers"
+    },
+    {
       "title": "KG & Context",
-      "description": "The knowledge graph and why agents need shared context.",
+      "description": "Why agents need shared context.",
       "url": "https://www.youtube.com/watch?v=CU4yn0kIdno",
       "type": "Video",
       "added": "2026-10-25",
