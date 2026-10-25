@@ -3,6 +3,14 @@
   "window_days": 30,
   "stories": [
     {
+      "tag": "US/Global - named enterprise deployment",
+      "title": "SAP Launches Joule Agents Across Supply Chain at SAP Connect 2026, Grounded in SAP Knowledge Graph",
+      "body": "At SAP Connect on October 6–8, 2026, SAP made its Autonomous Enterprise architecture generally available, deploying Joule Work and 50 domain-specific Joule Assistants across finance, procurement, HR, and supply chain — with new agents specifically targeting supply chain planning, warehousing, outbound optimization, fulfillment, and transportation dispatching. The agents are architecturally grounded in the SAP Knowledge Graph, which maps more than 7 million data fields to provide reliable business context, plus customer-specific process logic and approval workflows stored in HANA Cloud. SAP's Q3 2026 earnings simultaneously crossed €10 billion in quarterly revenue for the first time, with cloud backlog growing 28% to €24.1 billion, which SAP CEO Christian Klein attributed to agentic AI deployment as a distinct demand driver — not merely an ERP migration feature.",
+      "why": "SAP's explicit architecture decision — agents must be grounded in a governed knowledge graph before they can touch live ERP data — is the strongest enterprise proof point available that context infrastructure is table stakes, not a nice-to-have. For Graas, this is the anchor case that shows retail and CPG buyers what 'agent-ready' ERP looks like, and surfaces the gap for customers not yet on that foundation.",
+      "source_label": "SAP News / TechTimes",
+      "source_url": "https://news.sap.com/2026/10/joule-assistants-agents-advance-autonomous-scm/"
+    },
+    {
       "tag": "Global - enterprise AI architecture",
       "title": "Atlan Frames the 'Context Layer' as the Missing Enterprise Infrastructure Before Agents Can Work",
       "body": "Atlan's 2026 enterprise guide defines a context layer for retail AI as the shared infrastructure — spanning SKU definitions, live inventory truth, resolved customer identity, and policy rules — that merchandising, inventory, and customer-facing agents all draw from instead of each rebuilding their own version. The architecture distinguishes between a knowledge layer (what exists and what it means), a context graph (situational facts tied to a specific decision), and a context layer (the full governed delivery stack). Gartner cited in the piece projects that 40% of enterprise applications will include task-specific AI agents by end of 2026, up from less than 5% in 2025.",
@@ -17,14 +25,6 @@
       "why": "McKinsey naming the 'cost-only' AI deployment as the wrong strategy is a gift for an enterprise retail-AI sales team: it validates that the market is stuck in efficiency pilots and has not yet wired agents into commercial growth workflows. Graas can position its context and data layer as the prerequisite that lets CPG commercial teams move from variance-reporting agents to revenue-recovery agents.",
       "source_label": "McKinsey & Company",
       "source_url": "https://www.mckinsey.com/industries/consumer-packaged-goods/our-insights/for-cpg-companies-agentic-ais-real-payoff-is-growth"
-    },
-    {
-      "tag": "US/Global - named enterprise deployment",
-      "title": "SAP Launches Joule Agents Across Supply Chain at SAP Connect 2026, Grounded in SAP Knowledge Graph",
-      "body": "At SAP Connect on October 6–8, 2026, SAP made its Autonomous Enterprise architecture generally available, deploying Joule Work and 50 domain-specific Joule Assistants across finance, procurement, HR, and supply chain — with new agents specifically targeting supply chain planning, warehousing, outbound optimization, fulfillment, and transportation dispatching. The agents are architecturally grounded in the SAP Knowledge Graph, which maps more than 7 million data fields to provide reliable business context, plus customer-specific process logic and approval workflows stored in HANA Cloud. SAP's Q3 2026 earnings simultaneously crossed €10 billion in quarterly revenue for the first time, with cloud backlog growing 28% to €24.1 billion, which SAP CEO Christian Klein attributed to agentic AI deployment as a distinct demand driver — not merely an ERP migration feature.",
-      "why": "SAP's explicit architecture decision — agents must be grounded in a governed knowledge graph before they can touch live ERP data — is the strongest enterprise proof point available that context infrastructure is table stakes, not a nice-to-have. For Graas, this is the anchor case that shows retail and CPG buyers what 'agent-ready' ERP looks like, and surfaces the gap for customers not yet on that foundation.",
-      "source_label": "SAP News / TechTimes",
-      "source_url": "https://news.sap.com/2026/10/joule-assistants-agents-advance-autonomous-scm/"
     },
     {
       "tag": "Global - analyst research",

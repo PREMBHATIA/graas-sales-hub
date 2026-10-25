@@ -13,6 +13,9 @@ releases; the st-emotion-cache-* classes beside it are not, so don't target
 those.
 """
 
+import json
+from pathlib import Path
+
 import streamlit as st
 
 st.markdown("""
@@ -143,6 +146,48 @@ with c4:
     _tile("🎒", "Key Collateral", "GTM Immersion · videos · creds",
           "pages/6_collateral.py", "Open collateral →")
 st.markdown("")
+
+# ── News you can Use ─────────────────────────────────────────────────────────
+# Reads content/news.json and NOTHING else — no API call, no Sheets read. The
+# file is rewritten by .github/workflows/refresh-news.yml at 16:00 UTC
+# (midnight SGT), deliberately when nobody is here. The Newsworthy tab was
+# deleted in Aug 2026 for fetching on page load; this must never do that.
+_NEWS = Path(__file__).parent.parent / "content" / "news.json"
+_news = {}
+try:
+    _news = json.loads(_NEWS.read_text(encoding="utf-8"))
+except Exception:
+    _news = {}
+_stories = _news.get("stories") or []
+
+if _stories:
+    _when = str(_news.get("generated_utc", ""))[:10]
+    _label(f"News you can Use &nbsp;·&nbsp; {_when}")
+    # Story 0 is the lead — the prompt orders by how much an item changes what
+    # a seller says, so a vendor architecture commitment outranks a survey.
+    _ld = _stories[0]
+    st.markdown(
+        f'<div class="news-lead">'
+        f'<div class="n-tag">{_ld.get("tag","")}</div>'
+        f'<div class="n-ttl"><a href="{_ld.get("source_url","#")}" '
+        f'target="_blank" style="text-decoration:none;color:#111827">'
+        f'{_ld.get("title","")}</a></div>'
+        f'<div class="n-why">{_ld.get("why","")}</div>'
+        f'<div style="font-size:0.74rem;color:#6B7280;margin-top:7px">'
+        f'{_ld.get("source_label","")} ↗</div></div>',
+        unsafe_allow_html=True)
+    if len(_stories) > 1:
+        _nc = st.columns(2)
+        for _i, _st in enumerate(_stories[1:]):
+            with _nc[_i % 2]:
+                st.markdown(
+                    f'<div class="news-item">'
+                    f'<span class="n-tag">{_st.get("tag","")}</span><br>'
+                    f'<a href="{_st.get("source_url","#")}" target="_blank" '
+                    f'style="color:#1F2937">{_st.get("title","")}</a> '
+                    f'<span style="color:#9CA3AF">· {_st.get("source_label","")}</span>'
+                    f'</div>', unsafe_allow_html=True)
+    st.markdown("")
 
 # ── Restricted ────────────────────────────────────────────────────────────────
 

@@ -37,7 +37,12 @@ _PROMPT_TMPL = (
     "  3. NAMED ENTERPRISE DEPLOYMENTS: a large retailer, CPG or distributor "
     "putting agents into a real workflow — ordering, service, supply chain — "
     "with outcomes attached.\n"
-    "  4. The economics: AI spend, build-vs-buy, what CIOs are cutting.\n\n"
+    "  4. AGENT VENDORS we compete with or sit beside - Sierra, Decagon, "
+    "Intercom Fin, Cresta, Parloa, Forethought, Ada, Observe.AI. Funding, "
+    "customer wins, product launches, pricing moves, published outcome "
+    "numbers, or a customer saying it did not work. Name the company in "
+    "the title.\n"
+    "  5. The economics: AI spend, build-vs-buy, what CIOs are cutting.\n\n"
 
     "WHAT WE DO NOT WANT — these crowd out the above and are not useful "
     "to us:\n"
@@ -47,7 +52,7 @@ _PROMPT_TMPL = (
     "strategy.\n"
     "  • Consumer shopping-app news, Black Friday campaigns, promotions.\n"
     "  • Funding rounds, unless the company sells enterprise AI "
-    "infrastructure.\n"
+    "infrastructure or is one of the agent vendors named above.\n"
     "  • Model releases with no enterprise retail angle.\n\n"
 
     "SOURCES to search first (never fabricate to fit; fall back to other "
@@ -62,7 +67,17 @@ _PROMPT_TMPL = (
     "DealStreetAsia (SEA)\n\n"
 
     "Each item MUST cover a DIFFERENT angle from the others. Aim for at "
-    "least 2 from category 1 or 2.\n\n"
+    "least 2 from categories 1-2, and at least 1 from category 4 when "
+    "anything real has happened there.\n\n"
+
+    "ORDER THE ARRAY BY IMPORTANCE, most important first - the first item "
+    "is shown as the lead story. Rank by how much it changes what a seller "
+    "says on a call:\n"
+    "  - A major vendor making an architecture commitment (e.g. shipping "
+    "agents grounded in a knowledge graph) or a named enterprise deployment "
+    "with outcomes ranks HIGHEST - that is proof, not opinion.\n"
+    "  - Analyst survey findings rank next.\n"
+    "  - Market and budget commentary ranks last.\n\n"
 
     "Return ONLY a JSON object with key 'stories' whose value is an array "
     "of 1-{count} story objects. Each story object has these EXACT keys:\n"
