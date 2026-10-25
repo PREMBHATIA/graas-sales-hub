@@ -3221,6 +3221,7 @@ with tab_analytics, _tab_guard("Analytics"):
         preflight_check as _preflight_check,
         fetch_suppressions as _fetch_suppressions,
         add_to_suppression as _add_to_suppression,
+        has_late_engagement as _has_late_engagement,
     )
 
     a_pre_err = _preflight_check()
@@ -4181,13 +4182,27 @@ with tab_analytics, _tab_guard("Analytics"):
                          "they'll keep consuming sends until suppressed.")
                 if st.button(f"🚫 Suppress {len(_open_hard)} bounced address(es)",
                              type="primary", key="supp_bounces"):
-                    _ok = 0
+                    # Veto: never suppress a mailbox that has fetched a pixel
+                    # well after its send. On 25 Oct a loose parser read every
+                    # address in the quoted original and suppressed six live
+                    # contacts, one of whom had opened the campaign 3 times.
+                    _ok, _vetoed = 0, []
                     for _, _br in _open_hard.iterrows():
+                        if _has_late_engagement(_br["email"]):
+                            _vetoed.append(_br["email"])
+                            continue
                         if _add_to_suppression(_br["email"],
                                                f"hard bounce — {_br['reason']}",
                                                "bounce scanner"):
                             _ok += 1
                     st.success(f"✅ Suppressed {_ok} address(es).")
+                    if _vetoed:
+                        st.warning(
+                            f"⚠️ Skipped {len(_vetoed)} address(es) reported as "
+                            "bounced whose mailbox opened an email well after "
+                            "the send — a dead mailbox cannot do that, so the "
+                            "bounce report is almost certainly naming the wrong "
+                            "recipient: " + ", ".join(_vetoed[:6]))
                     st.rerun()
             _bshow = (_bdf.rename(columns={"email": "Address", "reason": "Reason",
                                            "date": "Bounced", "subject": "Report"})

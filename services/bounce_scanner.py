@@ -106,17 +106,48 @@ def _classify(text: str) -> tuple:
 
 
 def _failed_recipients(msg, text: str) -> list:
-    """Addresses the report says failed — header first, then body scan."""
+    """Addresses the report says failed.
+
+    Only authoritative sources are trusted, in order:
+      1. RFC 3464 Final-Recipient / Original-Recipient, inside the
+         message/delivery-status part. This is the field that exists to
+         answer precisely this question.
+      2. X-Failed-Recipients (Gmail).
+      3. "Recipient Address:" in an Office 365 report.
+
+    There is deliberately NO "scan the body for anything@anything" fallback.
+    It used to be here, and it read every address in the quoted original —
+    To, Cc, signatures — so one bounce suppressed everyone the message had
+    been addressed to. On 25 Oct that wrongly killed six live contacts,
+    including one whose mailbox had opened the campaign three times. Missing
+    a bounce is recoverable; suppressing a live prospect is not.
+    """
     out = []
-    hdr = msg.get("X-Failed-Recipients", "")
-    if hdr:
-        out += [a.strip() for a in hdr.split(",") if "@" in a]
+
+    # 1. the delivery-status part — the authoritative answer
+    try:
+        for part in msg.walk():
+            if part.get_content_type() == "message/delivery-status":
+                for sub in part.get_payload():
+                    for field in ("Final-Recipient", "Original-Recipient"):
+                        val = sub.get(field, "") if hasattr(sub, "get") else ""
+                        if val and "@" in val:
+                            # "rfc822; someone@example.com"
+                            out.append(val.split(";")[-1])
+    except Exception:
+        pass
+
+    # 2. Gmail's own header
     if not out:
-        # "Original Message Details / Recipient Address: x@y.com" (Office 365)
-        for m in re.finditer(r"(?:recipient(?:'s)?\s*address|to)\s*[:=]\s*([\w.+-]+@[\w-]+\.[\w.-]+)", text, re.I):
-            out.append(m.group(1))
+        hdr = msg.get("X-Failed-Recipients", "")
+        if hdr:
+            out += [a.strip() for a in hdr.split(",") if "@" in a]
+
+    # 3. Office 365 phrasing — anchored on "recipient address", never bare "to"
     if not out:
-        for m in re.finditer(r"<?([\w.+-]+@[\w-]+\.[\w.-]+)>?", text):
+        for m in re.finditer(
+                r"recipient(?:'s)?\s*address\s*[:=]\s*([\w.+-]+@[\w-]+\.[\w.-]+)",
+                text, re.I):
             out.append(m.group(1))
     seen, clean = set(), []
     for a in out:

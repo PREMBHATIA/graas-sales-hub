@@ -808,6 +808,69 @@ def is_suppressed(email: str) -> tuple[bool, str]:
     return True, str(matches.iloc[0].get("reason", ""))
 
 
+_LATE_CACHE = {"at": None, "ids": None}
+
+
+def late_engagement_ids(ttl_sec: int = 120) -> set:
+    """{lowercased email} for every address with a beacon >1h after its send.
+
+    Built once and cached: has_late_engagement() used to re-read the whole
+    Sends log and Tracking tab on every call, so vetting 50 addresses meant
+    100 Sheets reads and several minutes.
+    """
+    import pandas as _pd
+    now = datetime.now(timezone.utc)
+    if (_LATE_CACHE["ids"] is not None and _LATE_CACHE["at"]
+            and (now - _LATE_CACHE["at"]).total_seconds() < ttl_sec):
+        return _LATE_CACHE["ids"]
+    out = set()
+    try:
+        sends = recent_sends(5000)
+        track = fetch_tracking_events()
+        if sends is not None and track is not None and not sends.empty and not track.empty:
+            sends = sends.copy()
+            sends["_tid"] = sends["tracking_id"].astype(str).str.strip()
+            sends["_ts"] = _pd.to_datetime(sends["timestamp_utc"], errors="coerce", utc=True)
+            track = track.copy()
+            track["tracking_id"] = track["tracking_id"].astype(str).str.strip()
+            track["_t"] = _pd.to_datetime(track["ts_utc"], errors="coerce", utc=True)
+            j = track.merge(sends[["_tid", "_ts", "to_email"]],
+                            left_on="tracking_id", right_on="_tid", how="inner")
+            j = j[j["_t"].notna() & j["_ts"].notna()]
+            late = j[(j["_t"] - j["_ts"]).dt.total_seconds() > 3600]
+            out = set(late["to_email"].astype(str).str.strip().str.lower())
+    except Exception as e:
+        # Do NOT cache a failure as an empty set. An empty set means "nobody
+        # is demonstrably alive", which lets every bounce through — the veto
+        # would fail OPEN, which is the wrong direction for a guard whose
+        # whole job is to stop wrongful suppression.
+        raise SheetReadError(f"could not build late-engagement set: {e}") from e
+    _LATE_CACHE["at"], _LATE_CACHE["ids"] = now, out
+    return out
+
+
+def has_late_engagement(email: str, hours: float = 1.0) -> bool:
+    """True if this address fetched a tracking pixel well after its send.
+
+    A beacon seconds after a send proves nothing — a gateway can scan a
+    message and the server reject it afterwards. One an hour or more later
+    means a mail client opened it, so the mailbox exists and any "hard
+    bounce" claimed against it is wrong.
+
+    Used to veto bounce-driven suppression. Never blocks an unsubscribe:
+    someone who reads an email and then asks to be removed is exactly the
+    person whose request must be honoured.
+    """
+    try:
+        return str(email).strip().lower() in late_engagement_ids()
+    except SheetReadError:
+        # Cannot verify -> veto. Refusing to suppress someone we cannot check
+        # costs one extra email; suppressing a live prospect costs the
+        # relationship, and is invisible until someone asks why they stopped
+        # hearing from us.
+        return True
+
+
 def add_to_suppression(email: str, reason: str, added_by: str = "") -> bool:
     """Add an email to the suppression list. Idempotent — duplicates are skipped."""
     if not email or "@" not in email:
