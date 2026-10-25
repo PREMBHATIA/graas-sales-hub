@@ -165,55 +165,55 @@ if _rumi:
     except Exception:
         _want = ""
     st.markdown("### 📬 Monthly Ruminations")
-    st.caption("**To send one: download the PDF and attach it.** "
-               "or open the original in your inbox from **insights@** and "
-               "forward that, which keeps your name on it. No tracking pixel "
-               "in these copies. ✅ Safe to share.")
+    st.caption("**To send one: download the PDF and attach it.** No tracking "
+               "pixel in these copies — safe to share.")
+
+    # Side by side, not stacked. Three of these as full-width blocks was a
+    # page of scrolling for three links (Prem, 25 Oct). Title, who it suits,
+    # one button; the HTML and the preview move into the expander below.
     _order = sorted(_rumi, key=lambda x: x.get("n", 0), reverse=True)
-    if _want:
-        _order.sort(key=lambda x: str(x.get("n", "")) != _want)
-    for _r in _order:
+    _rc = st.columns(len(_order))
+    for _i, _r in enumerate(_order):
         _rp = _root_dir / _r.get("file", "")
-        if not _rp.exists():
-            continue
-        with st.container(border=True):
-            # One title line, one caption, one row of buttons. This used to
-            # stack a title, a paragraph, a caption, a warning and a button
-            # row — six blocks of vertical space for what is a link and a
-            # sentence (Prem, 25 Oct).
-            _warn = (f"  ·  ⚠️ went out as “{_r['sent_subject']}”"
-                     if _r.get("sent_subject") else "")
-            st.markdown(f"**{_r.get('subject', 'Untitled')}**")
-            st.caption(
-                f"{_r.get('about','')}  \n"
-                f"**Send to:** {_r.get('send_to','—')}  ·  "
-                f"{_r.get('sent','')} · {_r.get('recipients',0)} recipients"
-                + _warn)
-            try:
-                _rhtml = _rp.read_text(encoding="utf-8")
-            except Exception as _e:
-                st.warning(f"Couldn't read it: {_e}")
-                continue
-            _pdf_path = _root_dir / str(_r.get("pdf", ""))
-            _q1, _q2, _q3, _ = st.columns([1, 1, 1, 2])
-            with _q1:
-                if _r.get("pdf") and _pdf_path.exists():
+        with _rc[_i]:
+            with st.container(border=True):
+                st.markdown(f"**{_r.get('subject','Untitled')}**")
+                st.caption(f"{str(_r.get('sent',''))[3:]} · "
+                           f"{_r.get('send_to','')}")
+                _pp = _root_dir / str(_r.get("pdf", ""))
+                if _r.get("pdf") and _pp.exists():
                     st.download_button(
-                        f"📄 PDF ({_r.get('pdf_kb','?')}KB)",
-                        _pdf_path.read_bytes(),
+                        f"📄 PDF · {_r.get('pdf_kb','?')}KB",
+                        _pp.read_bytes(),
                         file_name=f"{_r.get('subject','rumination')[:60]}.pdf",
                         mime="application/pdf", type="primary",
+                        use_container_width=True,
                         key=f"rumi_pdf_{_r.get('n')}")
-            with _q2:
-                st.download_button("⬇️ HTML", _rhtml.encode("utf-8"),
-                                   file_name=_rp.name, mime="text/html",
-                                   key=f"rumi_dl_{_r.get('n')}")
-            with _q3:
-                _rshow = st.toggle("Preview", key=f"rumi_pv_{_r.get('n')}",
-                                   value=(_want == str(_r.get("n", ""))))
-            if _rshow:
-                import streamlit.components.v1 as _cmp_r
-                _cmp_r.html(_rhtml, height=700, scrolling=True)
+
+    with st.expander("What each one argues · preview · HTML"):
+        for _r in _order:
+            _rp = _root_dir / _r.get("file", "")
+            st.markdown(f"**{_r.get('subject','Untitled')}** — "
+                        f"{_r.get('about','')}")
+            st.caption(f"Sent {_r.get('sent','')} · "
+                       f"{_r.get('recipients',0)} recipients"
+                       + (f" · ⚠️ went out as “{_r['sent_subject']}”"
+                          if _r.get("sent_subject") else ""))
+            if _rp.exists():
+                _e1, _e2, _ = st.columns([1, 1, 3])
+                with _e1:
+                    st.download_button("⬇️ HTML",
+                                       _rp.read_text(encoding="utf-8").encode("utf-8"),
+                                       file_name=_rp.name, mime="text/html",
+                                       key=f"rumi_dl_{_r.get('n')}")
+                with _e2:
+                    _show = st.toggle("Preview", key=f"rumi_pv_{_r.get('n')}",
+                                      value=(_want == str(_r.get("n", ""))))
+                if _show:
+                    import streamlit.components.v1 as _cmp_r
+                    _cmp_r.html(_rp.read_text(encoding="utf-8"),
+                                height=700, scrolling=True)
+            st.markdown("")
     st.markdown("")
 
 # ── Reports served from the repo ─────────────────────────────────────────────
