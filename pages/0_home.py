@@ -106,23 +106,24 @@ st.markdown("""
         font-size: 0.84rem;
     }
 
-    /* News */
-    .news-lead {
-        border: 1px solid #E5E7EB; border-left: 4px solid #4F46E5;
-        background: linear-gradient(90deg, #F5F3FF, #FFFFFF 60%);
-        border-radius: 12px; padding: 16px 18px; margin: 4px 0 14px;
+    /* News — every card carries its own accent colour, set inline from the
+       story's tag, so the band reads as a set rather than one highlight and
+       a grey list. */
+    .news-lead, .news-card {
+        border: 1px solid #E5E7EB; border-radius: 12px;
+        padding: 14px 16px; height: 100%;
     }
-    .news-lead .n-tag { font-size: 0.66rem; font-weight: 800; color: #4F46E5;
-                        letter-spacing: .08em; text-transform: uppercase; }
-    .news-lead .n-ttl { font-size: 1.05rem; font-weight: 800; margin: 6px 0 7px;
+    .news-lead { padding: 17px 19px; margin: 4px 0 12px; }
+    .news-lead .n-ttl { font-size: 1.06rem; font-weight: 800; margin: 6px 0 7px;
                         line-height: 1.3; letter-spacing: -0.01em; }
     .news-lead .n-why { font-size: 0.86rem; color: #374151; line-height: 1.45; }
-    .news-item  { font-size: 0.84rem; line-height: 1.45; padding: 9px 0;
-                  border-bottom: 1px solid #F3F4F6; }
-    .news-item:last-child { border-bottom: none; }
-    .news-item .n-tag { font-size: 0.62rem; font-weight: 800; color: #9CA3AF;
-                        letter-spacing: .07em; text-transform: uppercase;
-                        display: block; margin-bottom: 3px; }
+    .news-card .n-ttl { font-size: 0.87rem; font-weight: 700; margin: 5px 0 0;
+                        line-height: 1.36; }
+    .n-tag  { font-size: 0.63rem; font-weight: 800; letter-spacing: .08em;
+              text-transform: uppercase; display: block; }
+    .n-src  { font-size: 0.73rem; color: #6B7280; margin-top: 7px; }
+    .news-lead a, .news-card a { text-decoration: none; }
+    .news-lead a:hover, .news-card a:hover { text-decoration: underline; }
 
     /* Security strip */
     .sec-strip {
@@ -231,32 +232,62 @@ except Exception:
     _news = {}
 _stories = _news.get("stories") or []
 
+# Accent by subject, matched on the tag the model writes. Unknown tags fall
+# back to slate rather than going uncoloured, so a new category never renders
+# as a broken-looking grey card.
+_ACCENTS = [
+    (("architecture", "context layer", "knowledge graph", "ontolog"),
+     ("#4F46E5", "#EEF2FF")),
+    (("deployment", "vendor", "launch", "sap", "ships"),
+     ("#059669", "#ECFDF5")),
+    (("analyst", "research", "survey", "report"),
+     ("#7C3AED", "#F5F3FF")),
+    (("econom", "budget", "spend", "build-vs-buy", "cost"),
+     ("#B45309", "#FFFBEB")),
+    (("sierra", "decagon", "cresta", "intercom", "agent vendor"),
+     ("#DB2777", "#FDF2F8")),
+]
+
+
+def _accent(tag: str):
+    t = str(tag).lower()
+    for keys, colours in _ACCENTS:
+        if any(k in t for k in keys):
+            return colours
+    return ("#475569", "#F8FAFC")
+
+
 if _stories:
     _when = str(_news.get("generated_utc", ""))[:10]
     _label(f"News you can Use &nbsp;·&nbsp; {_when}")
-    # Story 0 is the lead — the prompt orders by how much an item changes what
-    # a seller says, so a vendor architecture commitment outranks a survey.
+
     _ld = _stories[0]
+    _c, _bg = _accent(_ld.get("tag", ""))
     st.markdown(
-        f'<div class="news-lead">'
-        f'<div class="n-tag">{_ld.get("tag","")}</div>'
+        f'<div class="news-lead" style="border-left:4px solid {_c};'
+        f'background:linear-gradient(90deg,{_bg},#FFFFFF 62%)">'
+        f'<span class="n-tag" style="color:{_c}">{_ld.get("tag","")}</span>'
         f'<div class="n-ttl"><a href="{_ld.get("source_url","#")}" '
-        f'target="_blank" style="text-decoration:none;color:#111827">'
-        f'{_ld.get("title","")}</a></div>'
+        f'target="_blank" style="color:#111827">{_ld.get("title","")}</a></div>'
         f'<div class="n-why">{_ld.get("why","")}</div>'
-        f'<div style="font-size:0.74rem;color:#6B7280;margin-top:7px">'
-        f'{_ld.get("source_label","")} ↗</div></div>',
+        f'<div class="n-src">{_ld.get("source_label","")} ↗</div></div>',
         unsafe_allow_html=True)
-    if len(_stories) > 1:
-        _nc = st.columns(2)
-        for _i, _st in enumerate(_stories[1:]):
-            with _nc[_i % 2]:
+
+    _rest = _stories[1:]
+    if _rest:
+        _nc = st.columns(min(len(_rest), 3))
+        for _i, _s in enumerate(_rest):
+            _c2, _bg2 = _accent(_s.get("tag", ""))
+            with _nc[_i % len(_nc)]:
                 st.markdown(
-                    f'<div class="news-item">'
-                    f'<span class="n-tag">{_st.get("tag","")}</span><br>'
-                    f'<a href="{_st.get("source_url","#")}" target="_blank" '
-                    f'style="color:#1F2937">{_st.get("title","")}</a> '
-                    f'<span style="color:#9CA3AF">· {_st.get("source_label","")}</span>'
+                    f'<div class="news-card" style="border-left:4px solid {_c2};'
+                    f'background:linear-gradient(135deg,{_bg2},#FFFFFF 70%)">'
+                    f'<span class="n-tag" style="color:{_c2}">'
+                    f'{_s.get("tag","")}</span>'
+                    f'<div class="n-ttl"><a href="{_s.get("source_url","#")}" '
+                    f'target="_blank" style="color:#1F2937">'
+                    f'{_s.get("title","")}</a></div>'
+                    f'<div class="n-src">{_s.get("source_label","")} ↗</div>'
                     f'</div>', unsafe_allow_html=True)
     st.markdown("")
 
