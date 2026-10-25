@@ -30,7 +30,9 @@ SECTIONS = [
      "The course. Routes to market, the Agent Fit Test, what we don't sell, "
      "the GT leak map. Start here if you're new."),
     ("Videos", "🎬",
-     "Short films to send a prospect, or to watch before a first call."),
+     "Customer stories to send a prospect, or to watch before a first call. "
+     "These change often — the current set is whatever Prem last sent in an "
+     "intro email, so ask him if one looks stale."),
     ("Creds Deck", "📊",
      "Who Graas is, who we work with, what we've shipped. The deck you leave "
      "behind."),
@@ -70,6 +72,17 @@ def _card(item):
         bits += [str(t) for t in tags if str(t).strip()]
         if bits:
             st.caption(" · ".join(bits))
+        # Audience is shown, not implied. This page is ungated and a
+        # salesperson will forward whatever is on it — the GTM course and the
+        # funnel analysis are internal, the creds deck and the customer
+        # stories are not, and nothing here should leave that to guesswork.
+        _aud = str(item.get("audience", "")).strip()
+        if _aud.lower().startswith("internal"):
+            st.caption("🔒 **Internal only** — do not send to a customer.")
+        elif _aud:
+            st.caption(f"✅ {_aud}")
+        if item.get("source"):
+            st.caption(f"Source: {item['source']}")
         if item.get("needs_review"):
             st.caption("⚠️ Pulled from a past campaign link — confirm this is "
                        "the right one before sending it to a customer.")
