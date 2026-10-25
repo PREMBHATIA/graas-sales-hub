@@ -42,10 +42,9 @@ SECTIONS = [
 LOCAL_REPORTS = [
     {"title": "2026 Funnel Overview — All-e, Jan to Sept",
      "file": "content/collateral/alle_funnel_overview_2026.html",
-     "description": "Where meetings came from, how they converted, what the "
-                    "proposals say. 104 net-new leads, 20 proposals, 5 won. "
-                    "Includes the business-led vs tech-led split and time-to-"
-                    "proposal.",
+     "description": "104 net-new leads, 20 proposals, 5 won — and the same "
+                    "funnel broken down by vertical. Trimmed to the headline "
+                    "numbers; the full analysis sits with Prem.",
      "audience": "Internal only"},
 ]
 
@@ -154,7 +153,7 @@ for _rep in LOCAL_REPORTS:
             _open = st.toggle("Read it here", key=f"rep_pv_{_path.stem}")
         if _open:
             import streamlit.components.v1 as _cmp
-            _cmp.html(_html, height=900, scrolling=True)
+            _cmp.html(_html, height=760, scrolling=True)
     st.markdown("")
 
 st.markdown("---")
