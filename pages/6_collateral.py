@@ -30,12 +30,23 @@ SECTIONS = [
      "The course. Routes to market, the Agent Fit Test, what we don't sell, "
      "the GT leak map. Start here if you're new."),
     ("Videos", "🎬",
-     "Customer stories to send a prospect, or to watch before a first call. "
-     "These change often — the current set is whatever Prem last sent in an "
-     "intro email, so ask him if one looks stale."),
+     "Customer stories to send a prospect, or to watch before a first call."),
     ("Creds Deck", "📊",
      "Who Graas is, who we work with, what we've shipped. The deck you leave "
      "behind."),
+]
+
+# Self-contained HTML reports served from the repo rather than linked out —
+# no hosting step, no link to go stale, and they work offline. Keep them
+# self-contained (inline CSS, no external src) or they'll render broken.
+LOCAL_REPORTS = [
+    {"title": "2026 Funnel Overview — All-e, Jan to Sept",
+     "file": "content/collateral/alle_funnel_overview_2026.html",
+     "description": "Where meetings came from, how they converted, what the "
+                    "proposals say. 104 net-new leads, 20 proposals, 5 won. "
+                    "Includes the business-led vs tech-led split and time-to-"
+                    "proposal.",
+     "audience": "Internal only"},
 ]
 
 
@@ -69,7 +80,13 @@ def _card(item):
         tags = item.get("tags") or []
         if isinstance(tags, str):
             tags = [t.strip(" '\"[]") for t in tags.split(",")]
-        bits += [str(t) for t in tags if str(t).strip()]
+        # Case-insensitive dedupe: type "Video" plus tag "video" rendered as
+        # "Video · video · customer story".
+        _seen = {b.lower() for b in bits}
+        for _t in (str(t).strip() for t in tags):
+            if _t and _t.lower() not in _seen:
+                _seen.add(_t.lower())
+                bits.append(_t)
         if bits:
             st.caption(" · ".join(bits))
         # Audience is shown, not implied. This page is ungated and a
@@ -81,8 +98,6 @@ def _card(item):
             st.caption("🔒 **Internal only** — do not send to a customer.")
         elif _aud:
             st.caption(f"✅ {_aud}")
-        if item.get("source"):
-            st.caption(f"Source: {item['source']}")
         if item.get("needs_review"):
             st.caption("⚠️ Pulled from a past campaign link — confirm this is "
                        "the right one before sending it to a customer.")
@@ -109,6 +124,37 @@ for _name, _icon, _blurb in SECTIONS:
         for _i, _r in enumerate(_group):
             with _cols[_i % len(_cols)]:
                 _card(_r)
+    st.markdown("")
+
+# ── Reports served from the repo ─────────────────────────────────────────────
+_root = Path(__file__).parent.parent
+for _rep in LOCAL_REPORTS:
+    _path = _root / _rep["file"]
+    if not _path.exists():
+        continue
+    st.markdown("### 📈 Funnel & performance")
+    st.caption("How the sales engine is actually doing. Read it before your "
+               "first pipeline review.")
+    with st.container(border=True):
+        st.markdown(f"**{_rep['title']}**")
+        st.markdown(_rep["description"])
+        st.caption("🔒 **Internal only** — do not send to a customer. Names "
+                   "live deals, lost deals and why they were lost.")
+        try:
+            _html = _path.read_text(encoding="utf-8")
+        except Exception as _e:
+            st.warning(f"Couldn't read the report: {_e}")
+            continue
+        _c1, _c2, _ = st.columns([1, 1, 3])
+        with _c1:
+            st.download_button("⬇️ HTML", _html.encode("utf-8"),
+                               file_name=_path.name, mime="text/html",
+                               key=f"rep_dl_{_path.stem}")
+        with _c2:
+            _open = st.toggle("Read it here", key=f"rep_pv_{_path.stem}")
+        if _open:
+            import streamlit.components.v1 as _cmp
+            _cmp.html(_html, height=900, scrolling=True)
     st.markdown("")
 
 st.markdown("---")
