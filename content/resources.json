@@ -47,8 +47,8 @@
   ],
   "docs": [
     {
-      "title": "Schneider Electric — retailer-to-distributor ordering",
-      "description": "A handwritten list turned into an order via OCR.",
+      "title": "Schneider",
+      "description": "Retailer-to-distributor ordering. A handwritten list turned into an order via OCR.",
       "url": "https://www.youtube.com/watch?v=jDJfMnR3OYE",
       "type": "Video",
       "added": "2026-10-25",
@@ -62,8 +62,8 @@
       "source": "Prem's intro email, 13 Oct 2026"
     },
     {
-      "title": "PI Industries — distributor ordering, English + Hinglish",
-      "description": "45% conversation-to-order conversion; 20% of volume moved to WhatsApp in 3 months.",
+      "title": "PI",
+      "description": "Distributor ordering in English and Hinglish. 45% conversation-to-order conversion; 20% of volume moved to WhatsApp in 3 months.",
       "url": "https://www.youtube.com/watch?v=8e48UEAjvGA",
       "type": "Video",
       "added": "2026-10-25",
@@ -77,8 +77,8 @@
       "source": "Prem's intro email, 13 Oct 2026"
     },
     {
-      "title": "Agricon — field agents digitizing secondary invoices",
-      "description": "Bahasa and English. Capture to digitization down from 8 days to half a day.",
+      "title": "Agricon",
+      "description": "Field agents digitizing secondary invoices in Bahasa and English. Capture to digitization down from 8 days to half a day.",
       "url": "https://youtu.be/OawHO-fcSBI",
       "type": "Video",
       "added": "2026-10-25",
@@ -90,6 +90,20 @@
       "sales_facing": true,
       "audience": "Share with customers",
       "source": "Prem's intro email, 13 Oct 2026"
+    },
+    {
+      "title": "KG & Context",
+      "description": "The knowledge graph and why agents need shared context.",
+      "url": "https://www.youtube.com/watch?v=CU4yn0kIdno",
+      "type": "Video",
+      "added": "2026-10-25",
+      "tags": [
+        "video"
+      ],
+      "category": "Videos",
+      "sales_facing": true,
+      "audience": "Share with customers",
+      "source": "linked from the 23 Oct campaign"
     }
   ]
 }

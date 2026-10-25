@@ -25,6 +25,10 @@ pg = st.navigation(
             st.Page("pages/3_crm.py",             title="📧 Emails & Segments 🔒",     url_path="crm"),
             st.Page("pages/9_prospect_brief.py",  title="📋 Create Prospect Brief  ✨ NEW",   url_path="prospect-brief"),
             st.Page("pages/B_proposal_bank.py",   title="📑 Proposal Bank",            url_path="proposal-bank"),
+            # Open, unlike Resources at the bottom: onboarding and customer-
+            # facing collateral cannot sit behind the team password, which the
+            # sales team does not have (Prem, 25 Oct).
+            st.Page("pages/6_collateral.py",      title="🎒 Key Collateral",           url_path="collateral"),
         ],
         # 🔒 Gated section — password-protected (Hoppr + MCP Beta).
         "Hoppr 🔒": [
