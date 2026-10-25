@@ -24,29 +24,37 @@ st.markdown("""
        the top of the scroll container. */
     .block-container { padding-top: 3rem; }
 
+    /* !important throughout: Streamlit styles paragraphs inside its own
+       markdown container with a more specific selector, which silently won
+       over font-size here and rendered the title at body size while the
+       gradient still applied. */
     .main-header {
-        font-size: 2.6rem;
-        font-weight: 800;
-        letter-spacing: -0.03em;
-        /* line-height and the padding below matter: -webkit-background-clip
-           crops the glyphs to the painted box, so a tight box cuts the tops
-           and tails off the letters. */
-        line-height: 1.22;
-        padding: 2px 0 4px;
-        background: linear-gradient(90deg, #4F46E5, #7C3AED 55%, #DB2777);
+        font-size: 3.4rem !important;
+        font-weight: 800 !important;
+        letter-spacing: -0.035em;
+        /* line-height and padding matter: -webkit-background-clip crops the
+           glyphs to the painted box, so a tight box cuts the tops and tails
+           off the letters. */
+        line-height: 1.16 !important;
+        padding: 4px 0 8px;
+        background: linear-gradient(95deg, #4F46E5, #7C3AED 48%, #DB2777);
         -webkit-background-clip: text;
         background-clip: text;
         -webkit-text-fill-color: transparent;
-        margin: 0;
+        margin: 0 !important;
         display: inline-block;
     }
     .main-header .mh-graas {
-        font-weight: 500;
-        letter-spacing: -0.01em;
-        opacity: 0.55;
+        font-size: 0.52em;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
+        display: block;
+        margin-bottom: -2px;
+        opacity: 0.7;
     }
     .sub-header {
-        font-size: 0.95rem;
+        font-size: 0.95rem !important;
         color: #9CA3AF;
         margin-top: 2px;
         margin-bottom: 28px;
