@@ -28,10 +28,13 @@ jobs:
         run: |
           git config user.name  "saleshub-bot"
           git config user.email "noreply@graas.ai"
-          if git diff --quiet content/news.json 2>/dev/null; then
+          # git diff errors on an untracked path, so ask git status instead:
+          # it covers "new file" and "modified" alike. The first run had no
+          # news.json at all and this step exited 128.
+          git add content/news.json 2>/dev/null || true
+          if [ -z "$(git status --porcelain content/news.json)" ]; then
             echo "No change — nothing to commit."
           else
-            git add content/news.json
             git commit -m "News you can Use: refresh $(date -u +%Y-%m-%d)"
             git push
           fi

@@ -89,8 +89,13 @@ def fetch_stories(count: int = 3, days: int = 21) -> list:
         resp = client.messages.create(
             model="claude-sonnet-4-6",
             max_tokens=4000,
+            # Plain replace, NOT .format(): the prompt contains a literal
+            # {"stories": []} example, which str.format reads as a field and
+            # dies on — KeyError: '"stories"', swallowed by the except below
+            # as "no stories came back".
             messages=[{"role": "user", "content":
-                       _PROMPT_TMPL.format(count=count, days=days)}],
+                       _PROMPT_TMPL.replace("{count}", str(count))
+                                   .replace("{days}", str(days))}],
             tools=[{
                 "type": "web_search_20250305",
                 "name": "web_search",
