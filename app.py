@@ -41,7 +41,10 @@ pg = st.navigation(
             # facing collateral cannot sit behind the team password, which the
             # sales team does not have (Prem, 25 Oct).
             st.Page("views/6_collateral.py",      title="🎒 Key Collateral",           url_path="collateral"),
-            st.Page("views/4_ask_graas.py",       title="💬 Ask Graas",                url_path="ask-graas"),
+            # Ask Graas is deliberately NOT in the nav (Prem, 26 Oct). The page
+            # file stays in views/ so this is a one-line restore, but views/ is
+            # not auto-discovered by Streamlit, so leaving it out here is what
+            # actually removes it — there is no second route back in.
         ],
         # 🔒 Gated section — password-protected (Hoppr + MCP Beta).
         "Hoppr 🔒": [
