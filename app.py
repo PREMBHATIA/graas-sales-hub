@@ -31,7 +31,6 @@ pg = st.navigation(
             st.Page("views/1_pipeline.py",  title="📋 Pipeline",   url_path="pipeline"),
         ],
         "All-e": [
-            st.Page("views/2_alle.py",            title="📊 Pipeline",                url_path="alle"),
             # 🔒 Gated page inside an otherwise-open section — the lock sits on the
             # page title, not the "All-e" group, because its siblings stay open.
             st.Page("views/3_crm.py",             title="📧 Emails & Segments 🔒",     url_path="crm"),
@@ -41,6 +40,11 @@ pg = st.navigation(
             # facing collateral cannot sit behind the team password, which the
             # sales team does not have (Prem, 25 Oct).
             st.Page("views/6_collateral.py",      title="🎒 Key Collateral",           url_path="collateral"),
+            # Pipeline sits LAST in All-e (Prem, 26 Oct) — the daily-use pages
+            # come first. Safe to reorder only because Home carries
+            # default=True above; otherwise Streamlit's fallback landing page
+            # moves with whatever happens to be first.
+            st.Page("views/2_alle.py",            title="📊 Pipeline",                url_path="alle"),
             # Ask Graas is deliberately NOT in the nav (Prem, 26 Oct). The page
             # file stays in views/ so this is a one-line restore, but views/ is
             # not auto-discovered by Streamlit, so leaving it out here is what
