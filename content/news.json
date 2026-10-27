@@ -1,46 +1,46 @@
 {
-  "generated_utc": "2026-10-26T20:54:53Z",
+  "generated_utc": "2026-10-27T20:26:40Z",
   "window_days": 30,
   "stories": [
     {
       "tag": "US - enterprise AI architecture",
-      "title": "Dell Launches Unified Semantic Layer, Enterprise Knowledge Graph, and Knowledge Agents for Its AI Data Platform",
-      "body": "On October 6, 2026, Dell Technologies announced three new additions to its AI Data Platform: a Unified Semantic Layer, an Enterprise Knowledge Graph, and Knowledge Agents—all designed to give enterprise AI agents trusted, governed context from a company's own structured and unstructured data. Dell's framing is direct: most AI pilots stall not because the model is weak but because production requires accurate, governed context at a scale that pilots never test. The Unified Semantic Layer, Enterprise Knowledge Graph, and Knowledge Agents are slated for general availability in the first half of 2027, with Nvidia Nemotron Retriever models powering reasoning inside the Knowledge Agents.",
-      "why": "This is the clearest infrastructure-layer commitment from a Tier-1 hardware vendor in 2026—and it validates the exact argument Graas makes about context layers being the prerequisite for agents that work in retail. When a prospect asks why their pilot stalled, you can point to Dell acknowledging that 'making data accessible isn't the same as making it usable'—and then show where Graas sits in that architecture today, not in H1 2027.",
-      "source_label": "SiliconANGLE / Dell Technologies Blog",
-      "source_url": "https://www.dell.com/en-us/blog/getting-enterprise-ai-into-production-starts-with-context/"
+      "title": "Dell Extends AI Data Platform with Unified Semantic Layer, Enterprise Knowledge Graph, and Knowledge Agents",
+      "body": "On October 6, 2026, Dell extended its Data Orchestration Engine with three new capabilities: a Unified Semantic Layer, an Enterprise Knowledge Graph, and Knowledge Agents, positioning the stack as the connective layer between enterprise data and production AI. Dell also added a new capability in its Data Processing Engine designed to accelerate enterprise data preparation for AI workloads. The move is a direct vendor commitment that agents require a grounded knowledge layer — not raw data — before they can function reliably at enterprise scale.",
+      "why": "This is proof-of-architecture from a major infrastructure vendor: enterprises need a semantic and graph layer before agents ship, which is exactly the data-foundation argument Graas makes on every discovery call. When a prospect's IT team says 'we'll just connect the agent to our data warehouse,' this Dell launch illustrates why that is insufficient and what the right stack actually looks like.",
+      "source_label": "SiliconAngle",
+      "source_url": "https://siliconangle.com/2026/10/06/agentic-era-dell-ai-data-platform-thecube-dellaidataplatform/"
     },
     {
-      "tag": "US - analyst research / pilot failure",
-      "title": "Gartner: Over 40% of Agentic AI Projects Will Be Canceled by 2027 — Data Quality and Vague ROI Are the Top Killers",
-      "body": "Gartner predicts more than 40% of agentic AI projects will be canceled by the end of 2027, citing escalating costs, unclear business value, and inadequate risk controls as the three primary causes—not model capability. A concurrent Forrester and Anaconda finding shows 88% of pilots never reach production, with the most cited blocker being the absence of pre-agreed success criteria for what 'the agent works' actually means. The MIT NANDA 'GenAI Divide' report adds that 95% of enterprise generative AI pilots produce no measurable P&L impact within six months, and the 5% that do succeed share one trait: they are wired into the company's real operational data.",
-      "why": "These three converging analyst findings are the most powerful objection-handler in the category right now—they give a Graas seller permission to ask a prospect 'what does success look like for your pilot?' before a competitor does. The data-readiness root cause maps directly to Graas's context-layer and semantic-grounding argument, making this the backbone of any 'why pilots stall' slide in a deck.",
-      "source_label": "Pasquale Pillitteri / Gartner, Forrester, MIT NANDA synthesis",
-      "source_url": "https://pasqualepillitteri.it/en/news/19689/why-ai-agent-projects-fail-enterprise"
+      "tag": "US - agent vendor",
+      "title": "Sierra Partners with Stripe to Enable End-to-End Payments Inside AI Agent Calls, Launches Personal Agent Protocol with Meta and Walmart",
+      "body": "On October 20, 2026, Sierra announced a partnership with Stripe allowing customers to converse with a Sierra AI agent, pay, and receive a receipt on the same call — with healthcare payments company Cedar named as an early adopter. Separately, Sierra disclosed it is co-building the Personal Agent Protocol alongside Meta, Genesys, Shopify, Stripe, and Walmart, an open standard defining how personal agents interact with businesses including how payments work when an agent acts on a consumer's behalf. Sierra said it will publish the v0.1 specification later in October 2026.",
+      "why": "Sierra — a direct competitor and frequent name on retail RFPs — is moving fast to own the transaction layer of agentic commerce, not just the conversation layer. A retailer evaluating 'conversation AI' vendors needs to understand Sierra is pitching an end-to-end agent OS with embedded payments; Graas sellers should be ready to position against that full-stack ambition and show where Graas's context and data layer is differentiated.",
+      "source_label": "Unite.AI",
+      "source_url": "https://unite.ai/sierra-partners-with-stripe-to-bring-payments-into-ai-agent-calls"
     },
     {
-      "tag": "US - agent vendor / M&A",
-      "title": "Salesforce Closes $3.6B Acquisition of Fin (Formerly Intercom), Folding Its 76%-Resolution Agent into Agentforce",
-      "body": "Salesforce completed its $3.6 billion acquisition of Fin—the customer-service AI company formerly known as Intercom—on September 10, 2026, bringing more than 30,000 business customers and Fin's proprietary Apex support model into the Agentforce platform. Fin's AI Agent resolves 76% of support volume without a human across live chat, email, WhatsApp, SMS, phone, and Slack, compared to Agentforce's own reported 62% resolution rate. Salesforce positioned the deal as buying speed-to-deploy: Agentforce is deeply customizable but slow to stand up, while Fin is packaged, pre-trained, and live in days.",
-      "why": "The competitive landscape for enterprise support agents just consolidated—any retailer or CPG company that is Salesforce-native now has an out-of-the-box agent option at $0.99 per resolution baked into their existing contract conversation. Graas sellers need to be ready to explain what a domain-specific, context-grounded retail agent delivers that a generic, horizontal support agent cannot, because 'we already have Fin through Salesforce' will become a standard objection.",
-      "source_label": "Salesforce Newsroom / Datafloq",
-      "source_url": "https://datafloq.com/salesforce-closes-3-6-billion-fin-deal-adding-a-fast-deploy-ai-agent-to-agentforce/"
+      "tag": "US - analyst research",
+      "title": "Gartner 2026 Hype Cycle: Agentic AI at Peak of Inflated Expectations — Only 17% of Enterprises Live, 40%+ of Projects Forecast to Be Cancelled by 2027",
+      "body": "Gartner's 2026 Hype Cycle for Artificial Intelligence, published October 1, 2026, places agentic AI at the Peak of Inflated Expectations and finds only 17% of organizations have deployed AI agents, while more than 60% plan to do so within two years. Gartner predicts over 40% of agentic AI projects will be cancelled by end of 2027 due to escalating costs, unclear business value, and inadequate risk controls — not model failure. The report explicitly names 'agent washing' — vendors relabeling chatbots and RPA as agents — as a core hype-cycle symptom, estimating only roughly 130 of thousands of vendors claiming agentic capability are genuine.",
+      "why": "This Gartner report is the single best objection-handling asset for stalled-pilot conversations: when a retail CIO says 'we tried agents and it didn't work,' the data shows governance and data-foundation gaps — not technology — are what kill projects. Graas can use the 40% cancellation forecast to frame its context-layer and pre-built retail ontology as the infrastructure that separates the 17% in production from the 83% still stuck.",
+      "source_label": "Gartner",
+      "source_url": "https://www.gartner.com/en/articles/hype-cycle-for-artificial-intelligence"
+    },
+    {
+      "tag": "US - analyst research / economics",
+      "title": "McKinsey State of AI 2026: 32% of Enterprises Skipped a Software Purchase to Build In-House — But Enterprise EBIT Impact Stays Flat at 37%",
+      "body": "McKinsey's State of AI: Global Survey 2026, published August 25, 2026, and drawing on 1,719 respondents across 97 countries, found that nearly a third of organizations (32%) decided against buying at least one software product or feature because agentic coding tools made an in-house build feasible — a figure that rises to nearly half among McKinsey's 'AI high performers.' At the same time, the share of organizations reporting any enterprise EBIT impact from AI remained flat at 37%, unchanged from 2025, and one in five organizations said AI operating costs are beginning to constrain deployment. Large enterprises scaling AI agents rose from 27% to 40% year-over-year.",
+      "why": "The build-vs-buy shift is live inside every retail and CPG IT budget conversation right now, and the flat EBIT number is the counter-argument Graas needs at hand: building in-house is not translating into bottom-line results. This lets sellers reframe 'we'll build it ourselves' as a risk, not a saving, and position Graas's pre-built retail-domain context layer as the faster, lower-TCO path to production outcomes.",
+      "source_label": "McKinsey Global Survey / The State of AI",
+      "source_url": "https://www.mckinsey.com/capabilities/quantumblack/our-insights/the-state-ai"
     },
     {
       "tag": "US - named enterprise deployment / CPG",
-      "title": "BCG Case: CPG Agentic Planning Platform Delivers +2–4% In-Stock Lift, +4–10% Fill Rate, and 40–60% Admin Savings",
-      "body": "A BCG May 2026 executive perspectives report on supply chain documents a CPG company that deployed a multi-agent planning platform with human-in-the-loop validation across forecast reconciliation, inventory replenishment, order optimization, and S&OP allocation for constrained supply. The deployment produced a 2–4 percentage-point improvement in in-stock rate (driving direct revenue lift), a 4–10% improvement in fill rate, and 40–60% administrative savings, with a +2 percentage-point EBITDA improvement projected from year two onward. The architecture used subagents for rationale tracking and materiality validation, with human analysts making the highest-stakes decisions.",
-      "why": "This is one of the few publicly documented agentic deployments in CPG with named outcome ranges across in-stock, fill rate, and margin—exactly the proof points a Graas seller needs to anchor an ROI conversation with a supply chain or commercial planning buyer. The human-in-the-loop design and subagent architecture also mirror the context-layer approach Graas advocates, making this a credible third-party reference for why the foundation matters.",
-      "source_label": "BCG Executive Perspectives — Supply Chain (May 2026)",
+      "title": "BCG: GenAI-Enabled Supply Chain Agents Deliver +2–4% In-Stock Rate and 40–60% Admin Savings for Global CPG Leader",
+      "body": "A BCG May 2026 executive perspectives report documents a global CPG manufacturer that deployed GenAI-enabled agents to shift replenishment from reactive to proactive, generating in-stock alerts and smart replenishment recommendations — including DC-to-store transfers and expedited orders — validated through a human-in-the-loop workflow. Measured outcomes include a 2–4 percentage point improvement in in-stock rate driving revenue lift, a 4–10 percentage point improvement in fill rate, and 40–60% administrative savings for the planning team. The deployment was built on a modular agent back-end designed for future expansion across additional retailer collaboration workflows.",
+      "why": "This is a named-outcome proof point in the exact workflow — supply chain ordering and replenishment — that Graas sells into. The human-in-the-loop validation model and modular back-end architecture directly mirror what Graas proposes; sellers can use this BCG case to validate the category with skeptical CPG buyers who are still treating AI as an experiment rather than a production system.",
+      "source_label": "BCG Executive Perspectives",
       "source_url": "https://www.bcg.com/assets/2026/executive-perspectives-ais-new-mandate-in-supply-chains.pdf"
-    },
-    {
-      "tag": "US - agent vendor pricing / competitive",
-      "title": "Sierra, Decagon, Fin, Ada: October 2026 Pricing Reality Check — Decagon Median at $432K, Sierra at Six Figures Before Outcome One",
-      "body": "A vendor comparison updated October 14, 2026 across Sierra, Decagon, Fin (now Salesforce), and Ada shows Decagon's median contract at $432,750 per year (Vendr data), Sierra's estimated platform fee starting at $150,000 per year before any per-outcome charge, and Ada's lowest published price at $30,000 per year. Fin prices at $0.99 per resolution with seat fees from $29, making it the only player in the group with transparent, volume-scalable economics. The architectural split is stark: Sierra and Decagon are standalone platforms above the help desk; Fin lives inside a CRM; Ada runs a multi-channel layer—and in every case the agent belongs to the vendor, not the customer.",
-      "why": "Retail and CPG enterprise buyers are increasingly asking 'build vs. buy vs. platform' in the same breath—this pricing map gives a Graas seller a concrete anchor for that conversation, especially where a prospect has received a Decagon or Sierra quote and is weighing it against building on top of an existing CRM. The 'agent belongs to the vendor' framing is a differentiation lever for any solution that grounds the agent in the customer's own data and ontology.",
-      "source_label": "GetMacha / DragApp comparison (prices verified Oct 14, 2026)",
-      "source_url": "https://www.getmacha.com/blog/sierra-vs-decagon-vs-fin-vs-ada"
     }
   ]
 }
