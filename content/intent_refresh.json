@@ -1,0 +1,14 @@
+{
+  "refreshed_utc": "2026-10-27T14:43:30Z",
+  "rows": 474,
+  "tiers": {
+    "1 - Highest intent": 31,
+    "2 - High intent": 59,
+    "3 - Not read": 168,
+    "4 - Not reached": 179,
+    "5 - Bounced": 37
+  },
+  "moved": {},
+  "do_not_contact": 38,
+  "sales_edits": 219
+}

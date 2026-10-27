@@ -214,11 +214,29 @@ with c4:
     # engaged, at what level, and who not to contact. The raw outreach log
     # (every send, every beacon) is plumbing and was the only thing linked
     # here, which is why nobody could find the list (Prem, 25 Oct).
+    # The age matters as much as the link: sales act on these tiers, and a
+    # sheet that silently stopped refreshing looks identical to one that is
+    # current. A nightly job rewrites it; this says when it last ran.
+    _age = ""
+    try:
+        from datetime import datetime as _dt, timezone as _tz
+        _st = json.loads((Path(__file__).parent.parent / "content"
+                          / "intent_refresh.json").read_text("utf-8"))
+        _hrs = (_dt.now(_tz.utc) - _dt.strptime(
+            _st["refreshed_utc"], "%Y-%m-%dT%H:%M:%SZ").replace(
+            tzinfo=_tz.utc)).total_seconds() / 3600
+        _when = ("just now" if _hrs < 1 else
+                 f"{int(_hrs)}h ago" if _hrs < 48 else
+                 f"{int(_hrs / 24)}d ago")
+        _col = "#9CA3AF" if _hrs < 36 else "#D97706"
+        _age = (f'<span style="color:{_col}">· refreshed {_when}</span>')
+    except Exception:
+        pass
     st.markdown(
         '<div style="font-size:0.78rem;margin-top:6px;line-height:1.7">'
         '<a href="https://docs.google.com/spreadsheets/d/'
         '1zGr-Brg_uuHuICDgJJ36ctUnnf7Yluw1Yd0fAy44AaM/edit" target="_blank">'
-        '<b>Who to follow up ↗</b></a><br>'
+        '<b>Who to follow up ↗</b></a> ' + _age + '<br>'
         '<a href="https://docs.google.com/spreadsheets/d/'
         '1Vcu7ZkAjGbzpKH2CUGoSuLUGIfwYBT-GlpNN0zMKJMY/edit" target="_blank" '
         'style="color:#9CA3AF">Raw outreach log ↗</a></div>',

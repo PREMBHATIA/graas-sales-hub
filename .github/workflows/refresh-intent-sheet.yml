@@ -1,0 +1,75 @@
+name: Refresh the follow-up sheet
+
+# 00:30 SGT = 16:30 UTC — half an hour after the news job, so the sheet is
+# current before anyone in Singapore or India opens it. Clicks kept arriving
+# for a week after the agentic send, and the tiers were frozen at whatever
+# they happened to be on the day the sheet was last exported by hand.
+on:
+  schedule:
+    - cron: "30 16 * * *"
+  workflow_dispatch:        # lets Prem refresh it on demand from the Actions tab
+
+permissions:
+  contents: write           # commits content/intent_refresh.json
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install streamlit gspread google-auth pandas
+
+      # The service account key never lands in the repo — it is written from
+      # a secret into a gitignored path for the length of this job only.
+      - name: Write the service account key
+        env:
+          GCP_SERVICE_ACCOUNT_JSON: ${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -z "$GCP_SERVICE_ACCOUNT_JSON" ]; then
+            echo "::error::GCP_SERVICE_ACCOUNT_JSON secret is not set."
+            exit 1
+          fi
+          mkdir -p credentials
+          printf '%s' "$GCP_SERVICE_ACCOUNT_JSON" > credentials/service_account.json
+          python3 -c "import json;json.load(open('credentials/service_account.json'))" \
+            || { echo "::error::The secret is not valid JSON."; exit 1; }
+
+      - name: Refresh the sheet
+        id: refresh
+        env:
+          GOOGLE_CREDENTIALS_PATH: credentials/service_account.json
+        run: |
+          set -o pipefail
+          python3 scripts/refresh_intent_sheet.py 2>/dev/null | tee run.log
+
+      # Put the before/after where Prem can read it without cloning anything:
+      # the run's own summary page, which the Actions email links straight to.
+      - name: Report what moved
+        if: always()
+        run: |
+          {
+            echo '### Follow-up sheet'
+            echo '```'
+            cat run.log 2>/dev/null || echo "The run produced no output."
+            echo '```'
+            echo '[Open the sheet](https://docs.google.com/spreadsheets/d/1zGr-Brg_uuHuICDgJJ36ctUnnf7Yluw1Yd0fAy44AaM/edit)'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove the key
+        if: always()
+        run: rm -f credentials/service_account.json
+
+      - name: Commit the freshness stamp
+        run: |
+          git config user.name  "saleshub-bot"
+          git config user.email "noreply@graas.ai"
+          git add content/intent_refresh.json 2>/dev/null || true
+          if [ -z "$(git status --porcelain content/intent_refresh.json)" ]; then
+            echo "No change — nothing to commit."
+          else
+            git commit -m "Follow-up sheet: refresh $(date -u +%Y-%m-%d)"
+            git push
+          fi
