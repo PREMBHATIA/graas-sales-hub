@@ -1,46 +1,46 @@
 {
-  "generated_utc": "2026-10-28T20:47:00Z",
+  "generated_utc": "2026-10-29T20:53:00Z",
   "window_days": 30,
   "stories": [
     {
-      "tag": "US - enterprise AI architecture",
-      "title": "Dell Launches Unified Semantic Layer, Enterprise Knowledge Graph, and Knowledge Agents for Enterprise AI",
-      "body": "Dell expanded its AI Data Platform on October 6, 2026, shipping three new capabilities: a Unified Semantic Layer, an Enterprise Knowledge Graph, and Knowledge Agents — designed to give AI agents a shared, governed understanding of company data. The semantic layer resolves terminology conflicts across systems (e.g., 'client' vs. 'account'), while the knowledge graph maps how those entities connect, enabling agents to reason across domains rather than within siloed datasets. The announcement is a direct infrastructure commitment: Dell is betting that agents fail without this context foundation, not because of model limitations.",
-      "why": "This is the exact architecture argument Graas makes on every discovery call — agents hallucinate without a semantic context layer, and the problem is data, not the model. A named vendor shipping this stack in October 2026 gives sellers a third-party proof point that the context layer is now table stakes, not a nice-to-have.",
-      "source_label": "BigDATAwire / HPCwire",
-      "source_url": "https://www.hpcwire.com/bigdatawire/2026/10/06/dell-gives-ai-agents-a-map-of-enterprise-data/"
+      "tag": "US - analyst / context layer",
+      "title": "Gartner: 'Context Graphs Ground AI Agents With Enterprise Knowledge' — 42% of Enterprises Say Agent Costs Now Exceed Value",
+      "body": "In a report published 15 September 2026, Gartner identifies context graphs as the foundational layer that grounds AI agents in the declarative, procedural, and causal knowledge required to reason about enterprise tasks, with policies enforced through runtime constraints. The firm reports that 42% of enterprises say AI agent costs now exceed value realized, and that only 39% of enterprises currently use knowledge graphs and 36% use ontologies — the two building blocks the report calls prerequisites. Without a context layer, Gartner warns, agents 'operate on stateless logic over stateful data,' making outputs difficult to trust, audit, or scale.",
+      "why": "This is the single most powerful proof point a Graas seller can put in front of a CIO: Gartner, not a vendor, is saying context infrastructure is the reason agent pilots stall — and fewer than 40% of enterprises have even the basic graph or ontology layer in place. Use it to reframe the conversation from 'which agent should we buy' to 'what context foundation do we have,' which is exactly where Graas lives.",
+      "source_label": "Gartner (via Skan.ai analyst report page)",
+      "source_url": "https://www.skan.ai/analyst-reports/gartner-playbook-for-establishing-an-enterprise-context-layer"
     },
     {
-      "tag": "US - analyst research / pilot failure",
-      "title": "Gartner + Forrester: 40% of Agentic AI Projects Will Be Canceled by 2027; 88% of Pilots Never Reach Production",
-      "body": "Gartner's standing forecast — based on a poll of 3,400+ organizations — predicts more than 40% of agentic AI projects will be canceled by end of 2027, killed by escalating costs, unclear business value, and inadequate risk controls, not model failure. A 2026 Forrester study run with Anaconda sharpens the picture further: 88% of AI agent pilots never reach production, with evaluation gaps (64%), governance friction (57%), and model reliability (51%) as the leading blockers. McKinsey's August 2026 State of AI survey separately found only about 20% of organizations have scaled agents in any function.",
-      "why": "This is the single most powerful objection-handling asset a Graas seller has: when a prospect says 'we're piloting internally,' these numbers show why pilots stall — it is the data and governance foundation that fails, exactly the gap Graas addresses. Cite Gartner's 40% figure and the Forrester 88% figure together to reframe build-vs-buy conversations.",
-      "source_label": "Gartner (via readsignal.io / pasqualepillitteri.it)",
-      "source_url": "https://www.readsignal.io/article/gartner-40-percent-ai-agents-canceled-enterprise-activation-2026"
+      "tag": "US - analyst survey",
+      "title": "McKinsey State of AI 2026: Agent Scaling at Large Enterprises Jumps to 40%, But Only 37% Report Any EBIT Impact",
+      "body": "McKinsey's 'State of AI in 2026: On the Road to ROI,' published 25 August 2026 and fielded across 1,719 respondents in 97 countries, finds that 40% of organizations with more than $1 billion in revenue are now scaling AI agents in at least one function, up from 27% a year earlier — while smaller organizations stayed flat at 22%. Despite record adoption, only 37% of all respondents report any positive EBIT impact from AI, unchanged from 2025, and just 6% of organizations qualify as high performers attributing meaningful profit to AI. Separately, 32% of organizations have already decided against buying at least one software product because they expect to build the capability with AI instead.",
+      "why": "The EBIT flatline at 37% is the sharpest counter-narrative to 'AI is working everywhere' and gives a seller an evidence-backed reason why a retailer's current agent pilots are likely stuck in productivity theatre, not P&L impact. The build-vs-buy finding (32% skipping software purchases) is a live budget threat every SaaS vendor — including competitors — needs to address head-on.",
+      "source_label": "McKinsey & Company — The State of AI 2026",
+      "source_url": "https://digitalstrategy-ai.com/mckinsey-state-of-ai-2026"
     },
     {
-      "tag": "US - named CPG enterprise deployment with outcomes",
-      "title": "BCG May 2026 Report: GenAI Supply Chain Agents Deliver +2–4% In-Stock Lift, +4–10% Fill Rate, and 40–60% Admin Savings at Global CPG Leader",
-      "body": "BCG's May 2026 Executive Perspectives report on supply chain documents a named engagement at a global CPG company where GenAI-enabled agents shifted replenishment from reactive to proactive — delivering smart DC-to-store transfer recommendations and expedited order triggers via a human-in-the-loop feedback loop. Measured outcomes: +2–4 percentage points in in-stock rate driving revenue lift, +4–10% fill rate improvement, and 40–60% administrative savings for the planning team. The agent back end was built modularly for future expansion across additional workflows.",
-      "why": "This is the proof-of-outcome story sellers need for supply chain and replenishment conversations with large CPG and grocery accounts. The BCG authorship adds credibility, and the outcome numbers (in-stock, fill rate, admin savings) map directly to the KPIs retail ops and supply chain buyers measure — making this usable as a leave-behind or talk track anchor.",
-      "source_label": "BCG Executive Perspectives",
+      "tag": "US - named enterprise deployment / CPG",
+      "title": "BCG Case: Global CPG Leader Shifts Replenishment to Agentic AI, Achieves 2–4% In-Stock Lift and 40–60% Admin Savings",
+      "body": "BCG's May 2026 Executive Perspectives report on supply chain documents a global CPG company that redesigned replenishment using GenAI-enabled agents to deliver in-stock alerts and smart replenishment recommendations — including DC-to-store transfers and expedited orders — validated through a human-in-the-loop feedback loop. Outcomes reported: a 2–4 percentage-point improvement in in-stock rate driving revenue lift, a 4–10 point improvement in fill rate, and 40–60% reduction in administrative time. The agent architecture was built with a modular back end designed for future expansion across additional supply chain functions.",
+      "why": "This is a named, outcomes-attached CPG deployment from a top-tier consulting firm — exactly the proof a seller needs when a prospect says 'show me someone like us who has actually done this.' The 40–60% admin savings figure is quotable in a first meeting; the modular back-end framing directly maps to Graas's argument for a governed data foundation before agent expansion.",
+      "source_label": "BCG Executive Perspectives — Supply Chain: From Copilots to Enterprise (May 2026)",
       "source_url": "https://media-publications.bcg.com/assets/2026/bcg-ep-future-of-functions-supply-chain.pdf"
     },
     {
-      "tag": "US - agent vendor / Decagon",
-      "title": "Decagon Crosses $100M ARR in August 2026, Betting Against Forward-Deployed Engineers",
-      "body": "Decagon disclosed in August 2026 that annualized revenue had crossed $100 million — up from an estimated $44 million at end of 2025, representing roughly 3x year-over-year growth — reaching this milestone three years after founding. The company reached $100M ARR while deliberately avoiding the forward-deployed engineer model used by rivals like Sierra, with CEO Jesse Zhang emphasizing speed and self-serve product design as the differentiator. Decagon's enterprise customer base spans F100 companies across airlines, banks, telecom, and retail, including Avis Budget Group and Mercado Libre, with per-resolution and subscription hybrid pricing typically negotiated in the tens of thousands of dollars per month.",
-      "why": "Decagon is a direct competitor in enterprise customer-service agent deals, and its $100M ARR milestone signals that the market for standalone AI agent layers is real and scaling fast. Sellers need to know Decagon's 'no forward-deployed engineers' pitch — it is how they win fast land deals — and understand that its pricing model (per resolution + platform fee) sets the benchmark buyers will use to evaluate Graas on cost-per-outcome.",
-      "source_label": "Newcomer / Sacra (via valueaddvc.com)",
-      "source_url": "https://valueaddvc.com/pulse/decagon-100m-arr-ai-customer-agents-2026"
+      "tag": "US - agent vendor / competitor landscape",
+      "title": "Salesforce Closes $3.6B Acquisition of Fin (Formerly Intercom) in September 2026, Folding It Into Agentforce at $1.2B ARR",
+      "body": "Salesforce completed its acquisition of Fin — the company formerly known as Intercom, which renamed itself in May 2026 — on 10 September 2026 for approximately $3.6 billion. Fin now operates inside Salesforce AI Labs alongside Agentforce, which Salesforce reported at $1.2 billion in annual recurring revenue in its first fiscal quarter of 2027. Fin retains its $0.99-per-outcome pricing and reports a 76% average resolution rate; it now sits in Salesforce's customer-service portfolio beside Agentforce's $2-per-conversation pricing, creating a two-tier offer within a single vendor.",
+      "why": "For a Graas seller, this consolidation means a direct competitor (Fin) is now bundled inside the Salesforce stack that most enterprise retail and CPG accounts already run — lowering the switching cost for incumbents to expand agent coverage without a new vendor relationship. Understanding how Fin's resolution rate and per-outcome model compares to Graas's context-grounded approach is essential before any Salesforce-heavy prospect call.",
+      "source_label": "getmacha.com / guptadeepak.com (prices and deal terms verified Oct 2026)",
+      "source_url": "https://www.getmacha.com/blog/sierra-vs-decagon-vs-fin-vs-ada"
     },
     {
-      "tag": "US - agent vendor / Salesforce + Fin",
-      "title": "Salesforce Completes $3.6B Acquisition of Fin (Formerly Intercom), Folds It Into Agentforce",
-      "body": "Salesforce completed its acquisition of Fin — the AI customer-service agent business formerly known as Intercom — on September 10, 2026, paying approximately $3.6 billion and folding Fin into its Agentforce platform. The deal was framed by Salesforce as a direct bid to own the AI customer-service category before vertical agent startups like Sierra and Decagon capture enterprise budgets. Fin continues to publish $0.99 per resolved conversation pricing, now with the full Salesforce CRM and data stack behind it — a combination that changes the competitive surface for any standalone agent vendor in accounts already on Salesforce.",
-      "why": "Any enterprise retail account already on Salesforce CRM is now a potential Fin/Agentforce cross-sell target, which means Graas will encounter a bundled incumbent in more deals. Sellers need to understand the pricing ($0.99/resolution vs. Sierra's ~$1.50 estimate) and the key weakness: bundled tools inherit Salesforce's data model, meaning the same context-layer gaps Graas solves still exist unless the customer has clean, governed product and order data.",
-      "source_label": "getmacha.com / valueaddvc.com",
-      "source_url": "https://www.getmacha.com/blog/sierra-vs-decagon-vs-fin-vs-ada"
+      "tag": "US - enterprise CPG / trade deductions",
+      "title": "Tredence Agentic AI Recovers $6.5M in CPG Trade Deductions Across 30+ Integrated Systems",
+      "body": "Tredence published details in October 2026 of an agentic AI deduction-management deployment for an enterprise CPG client in which agents integrated across more than 30 systems — including SAP, EDI feeds, retailer portals, and email — to evaluate each deduction, assign reason codes, and recommend next-best actions automatically. The deployment recovered $6.5 million from approximately $40 million in addressable deduction spend for a single enterprise client. The architecture required human approval points for financial exceptions and contractual changes, and the system tracked processing time, exception rate, and document-processing accuracy as primary outcome metrics.",
+      "why": "Trade deductions are one of the highest-friction, data-intensive workflows in CPG-to-retail operations — and this case shows agents can only work across 30+ systems when there is a governed integration and context layer underneath them. A Graas seller can use this to reframe the deduction use case: the agent is the headline, but the cross-system data fabric is what actually made the $6.5M recovery possible.",
+      "source_label": "Tredence / Retail Dive (October 2026)",
+      "source_url": "https://www.tredence.com/eu/blog/ai-agents-in-retail-realworld-use-cases-for-2026"
     }
   ]
 }
