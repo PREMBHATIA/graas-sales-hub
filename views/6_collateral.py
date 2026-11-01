@@ -35,6 +35,12 @@ SECTIONS = [
     ("Creds Deck", "📊",
      "Who Graas is, who we work with, what we've shipped. The deck you leave "
      "behind."),
+    # Last: reference, not onboarding. Third-party work, so these are LINKS —
+    # the rest of this page serves Graas-owned files we can attach freely, and
+    # an analyst PDF is not ours to redistribute.
+    ("Market Research", "📰",
+     "Third-party evidence to quote in a pitch. Send the link, not the PDF — "
+     "these aren't ours to attach."),
 ]
 
 # Self-contained HTML reports served from the repo rather than linked out —

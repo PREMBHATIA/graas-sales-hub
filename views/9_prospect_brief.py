@@ -389,6 +389,11 @@ DEMO_PATTERNS_DOC_IDS = [
     ("Knowledge Graph & Ontology — TECHNICAL BUYERS ONLY", "1gAIxUZWziyXFo78GXfwmA0lCUA2WnuUQx1MIyfLJPek"),
 ]
 
+# The house vocabulary (Eunice's glossary, published on graas.ai). Deliberately
+# NOT in DEMO_PATTERNS_DOC_IDS: those answer "which use case fits?", this one
+# governs HOW the brief says things, so it gets its own block and its own rule.
+GLOSSARY_DOC_ID = "1q8KlStSkwhWFPIgCzhfMTnD22ffmjgBvJSbKX9k9E4Y"
+
 
 def _normalize_company_key(name: str) -> str:
     """Reduce a company name to a dedup key that survives common typing
@@ -526,6 +531,22 @@ def _fetch_demo_patterns_block() -> str:
     return "\n\n".join(parts)
 
 
+@st.cache_data(ttl=3600, show_spinner=False)
+def _fetch_glossary_block() -> str:
+    """The house vocabulary — Eunice's glossary, snapshotted into the KB.
+
+    Governs wording, not content: the brief should call things what graas.ai
+    calls them, because a prospect can read the same words on our own site.
+    Returns "" if unreadable, so the brief degrades rather than failing.
+    """
+    from services.sheets_client import fetch_drive_doc_text
+
+    try:
+        return (fetch_drive_doc_text(GLOSSARY_DOC_ID) or "").strip()
+    except Exception:
+        return ""
+
+
 def _build_new_brief_prompt(
     crm_data: dict,
     research: str,
@@ -537,6 +558,7 @@ def _build_new_brief_prompt(
     today = datetime.now().strftime("%Y-%m-%d")
     proof_points_block = _fetch_proof_points_block()
     demo_patterns_block = _fetch_demo_patterns_block()
+    glossary_block = _fetch_glossary_block()
     crm_block = ""
     if crm_data:
         crm_block = (
@@ -788,6 +810,24 @@ def _build_new_brief_prompt(
             f"the inference to a customer; no standalone dashboard.\n\n"
             f"{demo_patterns_block}\n\n"
             if demo_patterns_block else ""
+        )
+        + (
+            f"**HOUSE VOCABULARY — use these words, and use them this way.** The "
+            f"glossary below is published on our own website, so a prospect can "
+            f"read the same definitions we do. Where you'd otherwise reach for a "
+            f"synonym, use the glossary term; gloss every acronym on first use "
+            f"(\"Distributor Management System (DMS)\"), and don't invent "
+            f"agent-speak that isn't on this list. This governs WORDING only — "
+            f"it never adds a capability, a customer or a claim.\n"
+            f"  — One divergence to handle carefully: the glossary puts the "
+            f"customer's own commercial rules (pricing logic, credit policy, "
+            f"sign-offs) OUTSIDE the ontology, while the Series B press wording "
+            f"puts them inside it. Both are in circulation. If a brief needs to "
+            f"say where business rules live, prefer: the graph holds what is true "
+            f"about the business, the ontology holds what the words mean and what "
+            f"the data may look like.\n\n"
+            f"{glossary_block}\n\n"
+            if glossary_block else ""
         )
         +
         f"**MANDATORY FIELDS — return every one, populated:** company, header "

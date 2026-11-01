@@ -169,6 +169,24 @@
       "category": "Security & Compliance",
       "sales_facing": true,
       "audience": "Share under NDA"
+    },
+    {
+      "title": "McKinsey — Who wins when AI does the shopping?",
+      "description": "**Agentic Commerce Consumer Survey — ~21,000 consumers, 11 markets, June 2026.**\n\n**The stat to quote:** AI searches hitting a *structured* product catalog convert at roughly **twice** the rate of searches relying on scraped or stale data (Shopify). That is the catalog-depth argument, made by someone else.\n\n- **53%** of consumers now shop with AI — **India 76%**, second only to China; US trails at 48%\n- **AI search is 3.2x** more influential than traditional search on the last purchase\n- **Grocery and beauty** — the e-commerce laggards — are catching up fastest through agents, because agents remove friction in exactly the categories e-commerce struggled with\n- Retailer assistants trail standalone AI roughly **2:1** through the journey but **draw level at checkout** (15% vs 14%) — retailers hold live inventory, payments and delivery\n\n**Their test for a brand is ours:** *if an agent asked what a product costs, whether it's in stock, when it could be delivered and whether it could buy it now — could your systems answer?*",
+      "url": "https://www.mckinsey.com/capabilities/growth-marketing-and-sales/our-insights/who-wins-when-ai-does-the-shopping-new-evidence-on-agentic-commerce",
+      "type": "Article",
+      "added": "2026-10-30",
+      "tags": [
+        "market research",
+        "agentic commerce",
+        "catalog",
+        "AEO",
+        "modern trade"
+      ],
+      "category": "Market Research",
+      "sales_facing": true,
+      "audience": "Share the link with customers — don't attach the PDF (McKinsey copyright)",
+      "source": "McKinsey Growth, Marketing & Sales Practice, October 2026"
     }
   ],
   "_security_folder": "https://drive.google.com/drive/folders/15uPqFL0AgU4nufXRNJqikCXK-g4FlR6N"
