@@ -29,8 +29,16 @@ class _Stop(Exception):
     pass
 
 
+class _Col:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+
 class _St:
-    """Only the calls the extracted block makes."""
+    """Only the calls the extracted blocks make."""
 
     def error(self, *a, **k):
         self.last_error = a[0] if a else ""
@@ -40,6 +48,16 @@ class _St:
 
     def caption(self, *a, **k):
         pass
+
+    def info(self, *a, **k):
+        pass
+
+    def columns(self, spec, **k):
+        n = spec if isinstance(spec, int) else len(spec)
+        return [_Col() for _ in range(n)]
+
+    def multiselect(self, label, options, **k):
+        return k.get("default", options)
 
     def stop(self):
         raise _Stop()
@@ -127,9 +145,75 @@ def main() -> int:
 
     n_done = ns.get("_n_done", 0)
     tiers = sorted({o.split(" · ")[0] for o in opts})
-    print(f"COHORT SMOKE OK — branch executed on live data: {len(opts)} "
-          f"options, all labels unique, {n_done} marked chased, "
-          f"tiers {tiers}")
+
+    # ── Laggards must never be in the cohort at all ──────────────────────────
+    # Not a default, not a filter — an exclusion (Prem, 2 Nov). Enforced in
+    # follow_up_cohort() so the 1:1 picker and the bulk audience both inherit
+    # it; checked here because a filter nobody tests is a filter that comes
+    # back on.
+    if "Segment" in coh.columns:
+        _lag = int((coh["Segment"].astype(str).str.strip().str.lower()
+                    == "laggard").sum())
+        if _lag:
+            print(f"FAIL — {_lag} Laggard contact(s) in the follow-up cohort. "
+                  "They must never receive a follow-up.")
+            return 1
+
+    # ── The bulk audience branch ─────────────────────────────────────────────
+    # Higher stakes than the picker above: this one selects everybody a single
+    # run sends to. The stubbed multiselect returns each widget's default, so
+    # this asserts what the composer does when you touch nothing.
+    mb = re.search(r"\n        if _bulk_cohort:\n(.*?)\n        else:\n"
+                   r"            _sc1, _sc2 = st\.columns", src, re.S)
+    if not mb:
+        print("FAIL — could not find the bulk cohort branch in views/3_crm.py.")
+        return 1
+    bblock = textwrap.dedent(mb.group(1))
+
+    labels = re.search(r"\nFOLLOW_UP_TIER_LABELS = \{(.*?)\n\}", src, re.S)
+    if not labels:
+        print("FAIL — could not find FOLLOW_UP_TIER_LABELS.")
+        return 1
+    lns = {}
+    exec(compile("FOLLOW_UP_TIER_LABELS = {" + labels.group(1) + "\n}",
+                 "3_crm.py:labels", "exec"), lns)
+    tier_labels = lns["FOLLOW_UP_TIER_LABELS"]
+
+    bns = {"st": _St(), "pd": pd, "_pool": pool, "_bulk_cohort": True,
+           "_follow_up_cohort_page": lambda: (coh, ""),
+           "FOLLOW_UP_TIER_LABELS": tier_labels,
+           "FOLLOW_UP_TIERS_UI": list(tier_labels.keys()),
+           "set": set, "zip": zip, "sum": sum, "sorted": sorted,
+           "dict": dict, "str": str, "len": len, "enumerate": enumerate}
+    try:
+        exec(compile(bblock, "3_crm.py:bulk-cohort", "exec"), bns)
+    except _Stop:
+        print("FAIL — the bulk branch called st.stop() on live data.")
+        return 1
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"FAIL — the bulk branch raised {type(e).__name__}: {e}")
+        return 1
+
+    rcp = bns.get("recipients")
+    if rcp is None or rcp.empty:
+        print("FAIL — the bulk branch selected nobody on its defaults.")
+        return 1
+    # THE invariant: touching nothing must never produce the whole cohort.
+    if len(rcp) > 60:
+        print(f"FAIL — the bulk defaults select {len(rcp)} recipients. The "
+              "defaults must be one tier and one segment, so a large send is "
+              "always deliberate.")
+        return 1
+    if str(bns.get("comp_ai_seg", "")) != "Follow-up cohort":
+        print("FAIL — comp_ai_seg must label this round for the send log; "
+              f"got {bns.get('comp_ai_seg')!r}.")
+        return 1
+
+    print(f"COHORT SMOKE OK — 1:1 picker: {len(opts)} options, labels unique, "
+          f"{n_done} chased, tiers {tiers}. Bulk defaults: {len(rcp)} "
+          f"recipients, no Laggards in a cohort of {len(coh)}.")
     return 0
 
 

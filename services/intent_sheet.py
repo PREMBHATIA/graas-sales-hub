@@ -52,6 +52,14 @@ TIER_ORDER = {"1 - Highest intent": 0, "2 - High intent": 1,
 # no working mailbox to follow up to (Prem, 2 Nov).
 FOLLOW_UP_TIERS = ["4 - Not reached", "3 - Not read", "2 - High intent"]
 
+# AI segments that never receive a follow-up. Laggard is excluded outright
+# (Prem, 2 Nov) — it is not a filter the sender may switch back on, so it is
+# enforced here rather than in the composer: that way the 1:1 picker, the bulk
+# audience and anything built later all inherit it. It drops the cohort from
+# 405 to 209, and matches the rule already applied in Analytics, where the
+# personal-follow-up effort goes to Mature and Exploring.
+FOLLOW_UP_EXCLUDED_SEGMENTS = {"laggard"}
+
 
 def follow_up_cohort() -> pd.DataFrame:
     """Read the live follow-up sheet and return just the cohort to chase.
@@ -80,6 +88,12 @@ def follow_up_cohort() -> pd.DataFrame:
     df = df[df["Intent"].isin(FOLLOW_UP_TIERS)]
     if "Do not contact" in df.columns:
         df = df[df["Do not contact"].astype(str).str.strip() == ""]
+    if "Segment" in df.columns:
+        # A blank or unrecognised segment is KEPT — only a positive Laggard
+        # match is dropped. Silently excluding everyone whose segment failed
+        # to load would shrink the round without saying so.
+        df = df[~df["Segment"].astype(str).str.strip().str.lower()
+                 .isin(FOLLOW_UP_EXCLUDED_SEGMENTS)]
     df["_o"] = df["Intent"].map({t: i for i, t in enumerate(FOLLOW_UP_TIERS)})
     return (df.sort_values(["_o", "Company" if "Company" in df.columns else "Email"])
               .drop(columns=["_o"]).reset_index(drop=True))

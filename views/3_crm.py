@@ -1063,6 +1063,18 @@ def _follow_up_cohort_page():
 # or opened once. Prem's two beats, 2 Nov: check it arrived, then offer the
 # call. Deliberately three short lines — it has to read as a person typing a
 # note, not a campaign, or it belongs in the newsletter instead.
+# Tier labels for the composer. The sheet stores "2 - High intent", which is
+# the right name in a ranked list of everyone but a confusing one next to
+# "Not read" — in this round what matters is that they opened it once and went
+# quiet. Maps the plain label back to the sheet's value for filtering.
+FOLLOW_UP_TIER_LABELS = {
+    "Not reached": "4 - Not reached",
+    "Not read": "3 - Not read",
+    "Opened once": "2 - High intent",
+}
+FOLLOW_UP_TIERS_UI = list(FOLLOW_UP_TIER_LABELS.keys())
+
+
 FOLLOW_UP_COPY = {
     "subject": "Did this reach you?",
     "body": (
@@ -2199,45 +2211,170 @@ with tab_compose, _tab_guard("Email Composer"):
         else:
             st.caption("✍️ Sends one personal email to this contact.")
     else:
-        _sc1, _sc2 = st.columns([2, 3])
-        with _sc1:
-            comp_ai_seg = st.selectbox(
-                "AI Segment", AI_SEGMENTS, key="comp_ai_seg",
-                help="Set per company via the 'AI Segment' column in the pipeline sheet.",
-            )
-        with _sc2:
-            with st.expander("Refine (optional) — recency · owner", expanded=False):
-                recency_opts = ["All", "🔥 Hot (<30d)", "☀️ Warm (30-90d)",
-                                "❄️ Cool (90-180d)", "🧊 Cold (180+d)", "⚫ No date"]
-                comp_recency = st.selectbox("Recency", recency_opts, key="comp_recency")
-                _owners = sorted([o for o in contacts['outreach_owner'].unique()
-                                  if o and o not in ('nan', 'Not needed', '')])
-                comp_owner = st.selectbox("Owner", ["All"] + _owners, key="comp_owner")
-        recipients = _pool[_pool['ai_segment'] == comp_ai_seg].copy()
-        if comp_recency != "All":
-            recipients = recipients[recipients['recency'] == comp_recency]
-        if comp_owner != "All":
-            recipients = recipients[recipients['outreach_owner'] == comp_owner]
-        if recipients.empty:
-            _uncl = _isum(_pool['ai_segment'] == 'Unclassified')
-            st.warning(
-                f"No contacts tagged **{comp_ai_seg}** yet. Add an **AI Segment** column to "
-                f"the pipeline sheet and tag companies (values: {', '.join(AI_SEGMENTS)}). "
-                f"{_uncl} contacts are currently Unclassified."
-            )
-        st.caption(
-            f"📣 {len(recipients)} contacts across "
-            f"{recipients['company'].nunique() if not recipients.empty else 0} companies."
+        # Two different audiences, on two different axes. AI Segment is a
+        # property of the ACCOUNT (how far along it is); the follow-up cohort
+        # is a property of what a PERSON did with the last email. The second
+        # cuts across all three segments, so it could never be expressed as a
+        # segment pick — which is why the follow-up round had no way to be
+        # sent in bulk at all (Prem, 2 Nov).
+        _aud = st.radio(
+            "Audience",
+            ["🤖 AI Segment — by how far along the account is",
+             "🎯 Follow-up cohort — not reached · not read · opened once"],
+            key="comp_audience", horizontal=False,
         )
-        # What to send this segment — the Context arc calendar (the audience-list
-        # per-account themes were retired with the playbook; the audience sheet
-        # is still read invisibly for voice-hold exclusions).
-        with st.expander(f"📅 Context arc — what to send {comp_ai_seg}", expanded=False):
-            if not _render_theme_plan(comp_ai_seg):
+        _bulk_cohort = _aud.startswith("🎯")
+
+        if _bulk_cohort:
+            comp_recency, comp_owner = "All", "All"
+            # bucket= on every logged send, so this round is identifiable in
+            # analytics instead of being filed under an AI segment it ignores.
+            comp_ai_seg = "Follow-up cohort"
+            _coh2, _coh2_err = _follow_up_cohort_page()
+            if _coh2 is None:
+                st.error(
+                    f"**Couldn't read the follow-up sheet** — {_coh2_err}. The "
+                    "cohort is **unknown, not empty**, so nothing is listed "
+                    "below rather than a short list that looks complete. "
+                    "Refresh it from the Operations tab and try again.",
+                    icon="⚠️")
+                st.stop()
+
+            _tier_of = dict(zip(_coh2["Email"], _coh2["Intent"]))
+            _seg_col = (_coh2["Segment"].astype(str).str.strip()
+                        if "Segment" in _coh2.columns else None)
+            _f1, _f2 = st.columns(2)
+            with _f1:
+                # Defaults are ONE tier and ONE segment, not everything. That
+                # is what keeps a 405-person send from being the thing that
+                # happens when you touch nothing (Prem, 2 Nov): you have to
+                # add tiers and segments deliberately to grow the list.
+                _tiers_pick = st.multiselect(
+                    "What they did with the last email",
+                    FOLLOW_UP_TIERS_UI, default=[FOLLOW_UP_TIERS_UI[0]],
+                    key="comp_coh_tiers",
+                    help="Not reached = no evidence it ever arrived. Not read = "
+                         "arrived, never opened. Opened once = opened a single "
+                         "time, then quiet.")
+            with _f2:
+                _segs_all = (sorted({s for s in _seg_col if s and s != "nan"})
+                             if _seg_col is not None else [])
+                _segs_def = ([s for s in _segs_all if s.lower() == "mature"]
+                             or _segs_all[:1])
+                _segs_pick = st.multiselect(
+                    "AI segment of the account", _segs_all, default=_segs_def,
+                    key="comp_coh_segs",
+                    help="Laggard accounts never receive a follow-up, so they "
+                         "are not in this list at all — the exclusion is in the "
+                         "cohort itself, not a filter that can be switched back "
+                         "on here.")
+
+            _want = {FOLLOW_UP_TIER_LABELS[t] for t in _tiers_pick}
+            _keep = {e for e, t in _tier_of.items() if str(t) in _want}
+            if _seg_col is not None:
+                _keep &= set(_coh2.loc[_seg_col.isin(_segs_pick), "Email"])
+
+            # Anyone sales already marked chased drops out, so successive
+            # batches walk DOWN the list instead of re-sending to the top of
+            # it. This column is the only record of progress.
+            _keep_all = set(_keep)          # before progress is subtracted
+            _already = set()
+            if "Followed up?" in _coh2.columns:
+                _already = set(_coh2.loc[
+                    _coh2["Followed up?"].astype(str).str.strip() != "", "Email"])
+            _keep -= _already
+
+            recipients = _pool[_pool["email"].astype(str).str.strip().str.lower()
+                               .isin(_keep)].copy()
+
+            # Counts per tier, so the size of what is about to be sent is
+            # visible before the send step rather than after it.
+            _norm2 = recipients["email"].astype(str).str.strip().str.lower()
+            _bits = []
+            for _t in FOLLOW_UP_TIERS_UI:
+                _n = sum(1 for e in _norm2
+                         if str(_tier_of.get(e, "")) == FOLLOW_UP_TIER_LABELS[_t])
+                if _n:
+                    _bits.append(f"**{_n}** {_t.lower()}")
+            if not _tiers_pick or not _segs_pick:
+                st.warning(
+                    "Pick at least one of each — what they did with the last "
+                    "email, and which segment the account is in.")
+            elif recipients.empty and _already:
+                st.success(
+                    f"Nothing left here — everyone matching this filter is "
+                    "already marked **Followed up?** in the sheet. Pick another "
+                    "tier or segment.", icon="✅")
+            elif recipients.empty:
+                st.warning(
+                    "Nobody matches that combination. Widen either box above.")
+            else:
                 st.caption(
-                    "Context arc not readable yet — check the 'Context arc - v2' tab in "
-                    "the content calendar workbook is shared with the app's service account."
+                    f"🎯 **{len(recipients)}** people across "
+                    f"{recipients['company'].nunique()} companies — "
+                    + " · ".join(_bits)
+                    + (f". {len(_already & _keep_all)} more already marked done "
+                       "and skipped" if (_already and _keep_all & _already)
+                       else "")
+                    + ". Anyone who clicked, watched the video or opened "
+                      "repeatedly is excluded; so is every bounced and "
+                      "do-not-contact address.")
+                # The backstop for "never to 405": the defaults can't produce a
+                # list this big, so getting here means tiers and segments were
+                # added on purpose. Say what it costs before the send step,
+                # because eunice@graas.ai has no sending history and a few
+                # hundred messages in one burst from a cold mailbox gets it
+                # throttled — losing the only reason to use her address on the
+                # people who were blocked the first time.
+                if len(recipients) > 60:
+                    st.error(
+                        f"**{len(recipients)} in one run is too many from a new "
+                        "mailbox.** `eunice@graas.ai` has no sending history; a "
+                        "burst this size risks it being throttled or blocked, "
+                        "which is exactly what you are trying to get around for "
+                        "the people who never received the first email. Narrow "
+                        "to one tier and one segment — or send it as Insights "
+                        "instead, which has the history.", icon="🛑")
+        else:
+            _sc1, _sc2 = st.columns([2, 3])
+            with _sc1:
+                comp_ai_seg = st.selectbox(
+                    "AI Segment", AI_SEGMENTS, key="comp_ai_seg",
+                    help="Set per company via the 'AI Segment' column in the pipeline sheet.",
                 )
+            with _sc2:
+                with st.expander("Refine (optional) — recency · owner", expanded=False):
+                    recency_opts = ["All", "🔥 Hot (<30d)", "☀️ Warm (30-90d)",
+                                    "❄️ Cool (90-180d)", "🧊 Cold (180+d)", "⚫ No date"]
+                    comp_recency = st.selectbox("Recency", recency_opts, key="comp_recency")
+                    _owners = sorted([o for o in contacts['outreach_owner'].unique()
+                                      if o and o not in ('nan', 'Not needed', '')])
+                    comp_owner = st.selectbox("Owner", ["All"] + _owners, key="comp_owner")
+            recipients = _pool[_pool['ai_segment'] == comp_ai_seg].copy()
+            if comp_recency != "All":
+                recipients = recipients[recipients['recency'] == comp_recency]
+            if comp_owner != "All":
+                recipients = recipients[recipients['outreach_owner'] == comp_owner]
+            if recipients.empty:
+                _uncl = _isum(_pool['ai_segment'] == 'Unclassified')
+                st.warning(
+                    f"No contacts tagged **{comp_ai_seg}** yet. Add an **AI Segment** column to "
+                    f"the pipeline sheet and tag companies (values: {', '.join(AI_SEGMENTS)}). "
+                    f"{_uncl} contacts are currently Unclassified."
+                )
+            st.caption(
+                f"📣 {len(recipients)} contacts across "
+                f"{recipients['company'].nunique() if not recipients.empty else 0} companies."
+            )
+            # What to send this segment — the Context arc calendar (the audience-list
+            # per-account themes were retired with the playbook; the audience sheet
+            # is still read invisibly for voice-hold exclusions).
+            with st.expander(f"📅 Context arc — what to send {comp_ai_seg}", expanded=False):
+                if not _render_theme_plan(comp_ai_seg):
+                    st.caption(
+                        "Context arc not readable yet — check the 'Context arc - v2' tab in "
+                        "the content calendar workbook is shared with the app's service account."
+                    )
 
     # View / edit recipient greeting names — feeds {name} in sends.
     with st.expander(f"View / edit recipient name(s) ({len(recipients)})", expanded=False):
