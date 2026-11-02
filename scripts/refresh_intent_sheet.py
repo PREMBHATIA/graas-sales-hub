@@ -18,14 +18,11 @@ Exit:   0 on success, 1 if the sheet could not be read or written.
 """
 
 import argparse
-import json
 import os
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-STAMP = ROOT / "content" / "intent_refresh.json"
 TIERS = ["1 - Highest intent", "2 - High intent", "3 - Not read",
          "4 - Not reached", "5 - Bounced"]
 
@@ -91,26 +88,8 @@ def main() -> int:
     if not moved and before:
         print("\n  nothing moved since the last refresh")
 
-    # Stamp the run so the app can say how fresh the sheet is. Without this
-    # a salesperson has no way to tell a sheet refreshed an hour ago from one
-    # last written a week back, and the whole point of the daily job is that
-    # they can trust the tiers.
-    if not args.dry_run:
-        try:
-            STAMP.parent.mkdir(parents=True, exist_ok=True)
-            STAMP.write_text(json.dumps({
-                "refreshed_utc": datetime.now(timezone.utc)
-                                 .strftime("%Y-%m-%dT%H:%M:%SZ"),
-                "rows": summary["rows"],
-                "tiers": {t: int(after.get(t, 0)) for t in TIERS},
-                "moved": {t: int(after.get(t, 0)) - int(before.get(t, 0))
-                          for t in TIERS
-                          if int(after.get(t, 0)) != int(before.get(t, 0))},
-                "do_not_contact": summary["do_not_contact"],
-                "sales_edits": summary["human_cells_preserved"],
-            }, indent=2), encoding="utf-8")
-        except Exception as e:
-            print(f"  (could not write the freshness stamp: {e})")
+    # The freshness stamp is written by intent_sheet.refresh() itself, so the
+    # button in CRM stamps it too — this script is no longer the only path.
     return 0
 
 

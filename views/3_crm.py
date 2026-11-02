@@ -1043,6 +1043,39 @@ def _fetch_watchers_page() -> list:
     return out
 
 
+@st.cache_data(ttl=600, show_spinner=False)
+def _follow_up_cohort_page():
+    """The 1:1 follow-up cohort, or an error string to show instead.
+
+    Returns (DataFrame, "") on success and (None, reason) on failure. The
+    reason is carried rather than swallowed: "0 people to follow up" and
+    "couldn't read the sheet" would otherwise look identical in the picker,
+    which is the failure that left 371 contacts silently missing in October.
+    """
+    try:
+        from services.intent_sheet import follow_up_cohort
+        return follow_up_cohort(), ""
+    except Exception as e:
+        return None, f"{type(e).__name__}: {e}"
+
+
+# Subject + body for the follow-up to everyone who never reached, never read,
+# or opened once. Prem's two beats, 2 Nov: check it arrived, then offer the
+# call. Deliberately three short lines — it has to read as a person typing a
+# note, not a campaign, or it belongs in the newsletter instead.
+FOLLOW_UP_COPY = {
+    "subject": "Did this reach you?",
+    "body": (
+        "Hi {name},\n\n"
+        "I wrote to you recently and wanted to check it reached you.\n\n"
+        "If it would be useful, I can set up a short call with our CEO or one "
+        "of our senior solution architects — how brands and retailers are "
+        "using agentic AI today, particularly voice. Happy to arrange it.\n\n"
+        "{sender}"
+    ),
+}
+
+
 # Abridged title: seniority + primary function, so a list can be scanned for
 # "is this a CEO or an eCom head?" without reading 291 distinct job titles.
 # Function is whichever keyword appears EARLIEST in the title, so a title
@@ -1856,34 +1889,87 @@ def _inbox_scan_results() -> dict:
     return st.session_state.get("_inbox_scan", {"bounces": [], "unsubs": [], "at": None})
 
 
+def _reply_mailboxes() -> list:
+    """Every mailbox that bounces and unsubscribes can land in.
+
+    insights@ plus any sender configured to send under its own address: a
+    bounce goes back to the ENVELOPE sender, so once Eunice's round goes out
+    from eunice@, its DSNs arrive in her inbox and nowhere else. Scanning only
+    insights@ would then report zero bounces for that entire round — the same
+    shape of lie as the rejected IMAP login that showed "0 unsubscribes" for
+    weeks (2 Nov).
+    """
+    import os as _os
+    boxes = [(_os.getenv("SMTP_USER", ""), _os.getenv("SMTP_PASS", ""))]
+    try:
+        from services.email_sender import SENDER_SMTP
+        for _addr, _var in SENDER_SMTP.values():
+            _pw = _os.getenv(_var, "").strip()
+            if _pw and _addr:
+                boxes.append((_addr, _pw))
+    except Exception:
+        pass
+    return [(u, p) for u, p in boxes if u and p]
+
+
 @st.cache_data(ttl=900, show_spinner=False)
 def _cached_unsubs(_v: int = 1):
-    """Unsubscribe requests in the insights@ inbox (15-min cache).
+    """Unsubscribe requests across every reply mailbox (15-min cache).
 
-    Returns None when the mailbox could not be READ. It used to return [] on
+    Returns None when ANY mailbox could not be READ. It used to return [] on
     any failure, so a rejected IMAP login displayed as "0 unsubscribes" — and
-    did, for every campaign, while the credentials were invalid.
+    did, for every campaign, while the credentials were invalid. A partial
+    read is treated as a failure for the same reason: an unsubscribe we never
+    saw is one we go on emailing.
     """
-    try:
-        from services.bounce_scanner import scan_unsubscribes
-        return scan_unsubscribes()
-    except Exception:
+    from services.bounce_scanner import scan_unsubscribes
+    boxes = _reply_mailboxes()
+    if not boxes:
         return None
+    out, seen = [], set()
+    for _u, _p in boxes:
+        try:
+            rows = scan_unsubscribes(user=_u, password=_p)
+        except Exception:
+            return None
+        if rows is None:
+            return None
+        for r in rows:
+            _k = str(r).lower() if not isinstance(r, dict) else \
+                str(r.get("email", r)).lower()
+            if _k not in seen:
+                seen.add(_k)
+                out.append(r)
+    return out
 
 
 @st.cache_data(ttl=900, show_spinner=False)
 def _cached_bounces(_v: int = 1):
-    """Bounce reports from the insights@ inbox (15-min cache).
+    """Bounce reports across every reply mailbox (15-min cache).
 
-    Returns None when the mailbox could not be READ. A bounce is the only hard
+    Returns None when ANY mailbox could not be READ. A bounce is the only hard
     proof a send never landed, so reporting zero of them because nobody could
     log in is the most misleading number on the page.
     """
-    try:
-        from services.bounce_scanner import scan_bounces
-        return scan_bounces()
-    except Exception:
+    from services.bounce_scanner import scan_bounces
+    boxes = _reply_mailboxes()
+    if not boxes:
         return None
+    out, seen = [], set()
+    for _u, _p in boxes:
+        try:
+            rows = scan_bounces(user=_u, password=_p)
+        except Exception:
+            return None
+        if rows is None:
+            return None
+        for r in rows:
+            _k = str(r).lower() if not isinstance(r, dict) else \
+                str(r.get("email", r)).lower()
+            if _k not in seen:
+                seen.add(_k)
+                out.append(r)
+    return out
 
 
 # ── Forward-safety for pasted HTML ───────────────────────────────────────────
@@ -2039,15 +2125,79 @@ with tab_compose, _tab_guard("Email Composer"):
                  "who receives this")
 
     if is_1to1:
-        _pool['_label'] = _pool.apply(
-            lambda r: f"{r['company']} — {r['person_name']} <{r['email']}>", axis=1)
-        _opts = _pool.sort_values(['company', 'person_name'])['_label'].tolist()
+        # Who's in the dropdown. "Everyone" is the whole book in company order;
+        # the cohort is the people a follow-up is actually for — never reached,
+        # never read, or opened once. Without this the follow-up round means
+        # finding ~400 names inside a 600-name alphabetical list, which is how
+        # a 1:1 round quietly doesn't happen (Prem, 2 Nov).
+        _who = st.radio(
+            "Which contacts?",
+            ["📋 Everyone", "🎯 Follow-up cohort — not reached · not read · opened once"],
+            key="one_to_one_scope", horizontal=False,
+            help="The cohort comes from the follow-up sheet sales work from, so "
+                 "it is the same tiers they see. Bounced addresses and anyone "
+                 "flagged do-not-contact are left out.",
+        )
+        _use_cohort = _who.startswith("🎯")
+        _coh_df, _coh_err = (_follow_up_cohort_page() if _use_cohort
+                             else (None, ""))
+
+        if _use_cohort and _coh_df is None:
+            st.error(
+                f"**Couldn't read the follow-up sheet** — {_coh_err}. So the "
+                "cohort is **unknown, not empty**. Pick *Everyone* and choose "
+                "by hand, or refresh the sheet from the Operations tab.",
+                icon="⚠️")
+            st.stop()
+
+        if _use_cohort:
+            _done = {}
+            if "Followed up?" in _coh_df.columns:
+                _done = dict(zip(_coh_df["Email"],
+                                 _coh_df["Followed up?"].astype(str).str.strip()))
+            _tier = dict(zip(_coh_df["Email"], _coh_df["Intent"]))
+            _rank = {e: i for i, e in enumerate(_coh_df["Email"])}
+            _pool = _pool[_pool["email"].astype(str).str.strip().str.lower()
+                          .isin(set(_coh_df["Email"]))].copy()
+            if _pool.empty:
+                st.warning(
+                    "Nobody in the cohort matches a contact in this CRM — the "
+                    "follow-up sheet and the contact sheets may have drifted "
+                    "apart. Pick *Everyone* to send by hand.")
+                st.stop()
+            _norm = _pool["email"].astype(str).str.strip().str.lower()
+            _pool["_rank"] = _norm.map(_rank).fillna(9999)
+            # Tier first so the hardest cases (never arrived) are at the top,
+            # and a tick on anyone sales already marked chased, so the same
+            # person doesn't get the same note from two people.
+            _pool["_label"] = [
+                f"{str(_tier.get(e, '')).split(' - ')[-1]} · {r['company']} — "
+                f"{r['person_name']} <{r['email']}>"
+                + ("  ✅ already chased" if _done.get(e, "") else "")
+                for e, (_, r) in zip(_norm, _pool.iterrows())]
+            _opts = _pool.sort_values(["_rank"])["_label"].tolist()
+            _n_done = sum(1 for e in _norm if _done.get(e, ""))
+        else:
+            _pool['_label'] = _pool.apply(
+                lambda r: f"{r['company']} — {r['person_name']} <{r['email']}>", axis=1)
+            _opts = _pool.sort_values(['company', 'person_name'])['_label'].tolist()
+            _n_done = 0
+
         if not _opts:
             st.warning("No contacts with an email address found.")
             st.stop()
         _pick = st.selectbox("Contact", _opts, key="one_to_one_pick")
         recipients = _pool[_pool['_label'] == _pick].copy()
-        st.caption("✍️ Sends one personal email to this contact.")
+        if _use_cohort:
+            st.caption(
+                f"🎯 **{len(_opts)}** in the cohort"
+                + (f" · {_n_done} already marked chased in the sheet" if _n_done
+                   else "")
+                + ". Mark **Followed up?** in the sheet as you go — this list "
+                  "reads that column back, so it is the only thing stopping a "
+                  "second person sending the same note.")
+        else:
+            st.caption("✍️ Sends one personal email to this contact.")
     else:
         _sc1, _sc2 = st.columns([2, 3])
         with _sc1:
@@ -2152,17 +2302,58 @@ with tab_compose, _tab_guard("Email Composer"):
             "AND clicks show in Analytics."
         )
 
+    # Streamlit can't push into a widget's state once that widget has been
+    # instantiated on the same run (same constraint the HTML upload works
+    # around below), so the button only stages a flag and the copy is applied
+    # here — before the subject and body fields exist on this run.
+    if st.session_state.pop("_load_follow_up_copy", False):
+        st.session_state["email_subject"] = FOLLOW_UP_COPY["subject"]
+        st.session_state["email_body"] = FOLLOW_UP_COPY["body"]
+
     with st.container():
         from services.email_sender import SENDERS as _SENDERS
         sender_label = st.selectbox(
             "Send as",
             list(_SENDERS.keys()),
-            help="Visible 'From' is always Graas Insights <insights@graas.ai>. "
-                 "Replies route to the selected person's inbox via Reply-To.",
+            help="Most senders go out as Graas Insights <insights@graas.ai> "
+                 "with their address on Reply-To. A sender with a Gmail App "
+                 "Password of its own sends genuinely from that address — the "
+                 "line below says which applies.",
             key="sender_label",
         )
         sender_display_name, sender_reply_to = _SENDERS[sender_label]
+        # State the actual From line. "Arrives from Eunice" and "arrives from
+        # Graas Insights, replies to Eunice" are different promises to a
+        # prospect, and the difference is invisible unless it is written down.
+        try:
+            from services.email_sender import sender_identity as _sid
+            _si_user, _si_pw, _si_disp, _si_from, _si_own = _sid(sender_label)
+            if _si_own:
+                st.success(
+                    f"Goes out **from {_si_disp} <{_si_from}>** — its own "
+                    "mailbox, so a fresh sending reputation and bounces that "
+                    "come back to that inbox.", icon="📤")
+            else:
+                _cfg = __import__("services.email_sender", fromlist=["x"]) \
+                    .SENDER_SMTP.get(sender_label)
+                st.info(
+                    "Goes out **from Graas Insights <insights@graas.ai>**, with "
+                    f"**{sender_reply_to}** on Reply-To. The recipient sees "
+                    "Graas Insights."
+                    + (f" Set `{_cfg[1]}` in secrets to send genuinely from "
+                       f"{_cfg[0]} instead." if _cfg else ""),
+                    icon="📬")
+        except Exception:
+            pass
         sender_name = sender_display_name.split()[0]  # for {sender} substitution
+        if is_1to1 and not use_raw:
+            if st.button("📨 Load the follow-up copy", key="load_followup_copy",
+                         help="Fills the subject and body with the standard "
+                              "follow-up: checks the first email arrived, then "
+                              "offers a call with the CEO or a senior solution "
+                              "architect. Edit it per person before sending."):
+                st.session_state["_load_follow_up_copy"] = True
+                st.rerun()
         subject = st.text_input("Subject", value=template["subject"], key="email_subject")
         if email_layout == "branded":
             headline = st.text_input(
@@ -4084,6 +4275,58 @@ with tab_analytics, _tab_guard("Analytics"):
         # ══════════════════════════════════════════════════════════════════
         st.markdown("---")
         st.markdown("### 🧰 Operations")
+
+        # ── Follow-up sheet refresh (on demand) ──────────────────────────────
+        # The nightly Action is dormant: Prem chose to keep this manual rather
+        # than put a Drive write key in a public repo (29 Oct). So this button
+        # IS the refresh — it must be here, not in a terminal, or the sheet
+        # goes stale and nobody notices. It sat two days out of date because
+        # the scheduled job was failing silently on a missing secret.
+        _rf1, _rf2 = st.columns([1, 3])
+        with _rf1:
+            if st.button("🔄 Refresh follow-up sheet", key="refresh_intent",
+                         help="Rewrites the tiers salespeople work from. Owner, "
+                              "Followed up? and Notes are carried across by "
+                              "email address — nothing typed by sales is lost."):
+                with st.spinner("Rebuilding the tiers …"):
+                    try:
+                        from services.intent_sheet import refresh as _isrefresh
+                        st.session_state["_intent_refresh"] = {
+                            "ok": True, "summary": _isrefresh(),
+                            "at": datetime.now().strftime("%d %b %H:%M"),
+                        }
+                    except Exception as _e:
+                        st.session_state["_intent_refresh"] = {
+                            "ok": False, "err": f"{type(_e).__name__}: {_e}",
+                            "at": datetime.now().strftime("%d %b %H:%M"),
+                        }
+                st.rerun()
+        with _rf2:
+            _ir = st.session_state.get("_intent_refresh") or {}
+            if _ir and not _ir.get("ok"):
+                st.error(
+                    f"**The sheet was not rewritten** — {_ir.get('err','')}. "
+                    "It still holds whatever it held before, so the tiers are "
+                    "as stale as they were, not wrong. Nothing was part-written.",
+                    icon="⚠️")
+            elif _ir.get("ok"):
+                _s = _ir["summary"]
+                _t = _s.get("tiers", {})
+                st.success(
+                    f"Refreshed **{_ir['at']}** — {_s.get('rows', 0)} rows, "
+                    f"**{_s.get('human_cells_preserved', 0)}** sales edits kept. "
+                    f"{int(_t.get('1 - Highest intent', 0))} highest intent · "
+                    f"{int(_t.get('2 - High intent', 0))} high intent.",
+                    icon="✅")
+            else:
+                st.caption(
+                    "The sheet is only as current as the last press — there is "
+                    "no nightly job. The age next to the homepage link turns "
+                    "amber past 36 hours."
+                    "  ·  [Open the sheet ↗](https://docs.google.com/"
+                    "spreadsheets/d/1zGr-Brg_uuHuICDgJJ36ctUnnf7Yluw1Yd0fAy44AaM/edit)")
+
+        st.markdown("")
 
         # ── Mailbox scan (on demand) ─────────────────────────────────────────
         _scan = _inbox_scan_results()

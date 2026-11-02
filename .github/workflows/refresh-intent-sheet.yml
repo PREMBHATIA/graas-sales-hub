@@ -1,13 +1,23 @@
 name: Refresh the follow-up sheet
 
-# 00:30 SGT = 16:30 UTC — half an hour after the news job, so the sheet is
-# current before anyone in Singapore or India opens it. Clicks kept arriving
-# for a week after the agentic send, and the tiers were frozen at whatever
-# they happened to be on the day the sheet was last exported by hand.
+# DORMANT — on purpose. Prem chose to keep the refresh manual (29 Oct) rather
+# than put a Drive/Sheets write key into a public repo's Actions secrets.
+#
+# It ran on a nightly cron for two nights (27–28 Oct) and failed both times in
+# 30 seconds, because GCP_SERVICE_ACCOUNT_JSON was never added. The guard below
+# caught it correctly; the problem was that a job failing every night is just
+# mail nobody opens. So the cron is gone rather than left to rot.
+#
+# To switch it back on: add the secret, then restore the two commented lines.
+#   gh secret set GCP_SERVICE_ACCOUNT_JSON \
+#     --repo PREMBHATIA/graas-sales-hub < credentials/service_account.json
+#
+# Until then the sheet is refreshed from the Operations tab in CRM, which uses
+# the service account Streamlit Cloud already holds in st.secrets.
 on:
-  schedule:
-    - cron: "30 16 * * *"
-  workflow_dispatch:        # lets Prem refresh it on demand from the Actions tab
+  # schedule:
+  #   - cron: "30 16 * * *"     # 00:30 SGT, half an hour after the news job
+  workflow_dispatch:        # needs the secret above; fails fast without it
 
 permissions:
   contents: write           # commits content/intent_refresh.json

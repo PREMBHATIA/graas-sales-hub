@@ -20,13 +20,21 @@ Owner and Notes columns if those were not preserved.
 
 from __future__ import annotations
 
+import json
 import os
 import re
+from datetime import datetime, timezone
+from pathlib import Path
 
 import pandas as pd
 
 INTENT_SHEET_ID = os.getenv(
     "INTENT_SHEET_ID", "1zGr-Brg_uuHuICDgJJ36ctUnnf7Yluw1Yd0fAy44AaM")
+
+# Freshness stamp. Read by the homepage to put an age next to the sheet link —
+# there is no nightly job, so "when was this last rebuilt" is the only thing
+# standing between sales and a week-old set of tiers.
+STAMP = Path(__file__).resolve().parent.parent / "content" / "intent_refresh.json"
 
 HUMAN_COLS = ["Owner", "Followed up?", "Notes"]
 
@@ -37,6 +45,44 @@ COLUMNS = ["Intent", "Do not contact", "Who", "Level", "Title", "Email",
 
 TIER_ORDER = {"1 - Highest intent": 0, "2 - High intent": 1,
               "3 - Not read": 2, "4 - Not reached": 3, "5 - Bounced": 4}
+
+# The people a 1:1 follow-up is FOR: never arrived, arrived and went unread,
+# or was opened once and went quiet. Tier 1 is excluded because they are
+# already engaged and sales owns them; tier 5 because a bounced address has
+# no working mailbox to follow up to (Prem, 2 Nov).
+FOLLOW_UP_TIERS = ["4 - Not reached", "3 - Not read", "2 - High intent"]
+
+
+def follow_up_cohort() -> pd.DataFrame:
+    """Read the live follow-up sheet and return just the cohort to chase.
+
+    Reads the sheet rather than recomputing from the tracking log: the tiers
+    are already derived there, sales have already been given that view, and a
+    second derivation in the composer would be a second thing to keep in step.
+    Raises on a read failure rather than returning an empty frame — an empty
+    cohort and an unreadable sheet must not look the same.
+    """
+    from services.sheets_client import _get_writer_client
+
+    client = _get_writer_client()
+    if client is None:
+        raise RuntimeError("no Sheets credentials")
+    vals = client.open_by_key(INTENT_SHEET_ID).sheet1.get_all_values()
+    if not vals or len(vals) < 2:
+        return pd.DataFrame(columns=["Email", "Intent", "Who", "Company"])
+
+    df = pd.DataFrame(vals[1:], columns=vals[0])
+    for c in ("Email", "Intent"):
+        if c not in df.columns:
+            raise RuntimeError(f"the follow-up sheet has no '{c}' column")
+    df["Email"] = df["Email"].astype(str).str.strip().str.lower()
+    df = df[df["Email"].str.contains("@", na=False)]
+    df = df[df["Intent"].isin(FOLLOW_UP_TIERS)]
+    if "Do not contact" in df.columns:
+        df = df[df["Do not contact"].astype(str).str.strip() == ""]
+    df["_o"] = df["Intent"].map({t: i for i, t in enumerate(FOLLOW_UP_TIERS)})
+    return (df.sort_values(["_o", "Company" if "Company" in df.columns else "Email"])
+              .drop(columns=["_o"]).reset_index(drop=True))
 
 
 def _abridge(title: str) -> str:
@@ -312,4 +358,28 @@ def refresh(dry_run: bool = False) -> dict:
         ws.format(f"A{len(fresh) + 2 - nb}:{last_col}{len(fresh) + 1}",
                   {"backgroundColor": {"red": 0.98, "green": 0.84, "blue": 0.84}})
     ws.set_basic_filter(f"A1:{last_col}{len(fresh) + 1}")
+    _write_stamp(summary)
     return summary
+
+
+def _write_stamp(summary: dict) -> None:
+    """Record when the sheet was last rebuilt, whoever rebuilt it.
+
+    Called from refresh() rather than from the caller so the button in CRM
+    and the command-line script both stamp it. On Streamlit Cloud the file
+    lives in an ephemeral container, so a different container falls back to
+    whatever was last committed and shows an older age — which errs toward
+    "press refresh", not toward a false all-clear.
+    """
+    try:
+        STAMP.parent.mkdir(parents=True, exist_ok=True)
+        STAMP.write_text(json.dumps({
+            "refreshed_utc": datetime.now(timezone.utc)
+                             .strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "rows": summary.get("rows", 0),
+            "tiers": {k: int(v) for k, v in summary.get("tiers", {}).items()},
+            "do_not_contact": summary.get("do_not_contact", 0),
+            "sales_edits": summary.get("human_cells_preserved", 0),
+        }, indent=2), encoding="utf-8")
+    except Exception:
+        pass        # a missing stamp shows an older age; it never blocks a refresh

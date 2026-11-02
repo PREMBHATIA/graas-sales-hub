@@ -40,12 +40,56 @@ SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = 587
 
 # Display name + email for each sender option in the UI.
+# These set Reply-To, not From — adding one needs no SMTP credential, because
+# every send still authenticates as insights@ (see the module docstring).
 SENDERS = {
     "Prem":           ("Prem Bhatia",    "prem@graas.ai"),
     "Amruta":         ("Amruta",         "amruta@graas.ai"),
+    # Eunice's secondary address, added 2 Nov for the 1:1 follow-ups to people
+    # who never reached, never read, or opened once: those replies should land
+    # in her own inbox, not the shared insights@ mailbox nobody owns.
+    "Eunice":         ("Eunice",         "eunice@graas.ai"),
     "Gaurav (GG)":    ("Gaurav",         "gaurav@graas.ai"),
     "Insights":       ("Graas Insights", "insights@graas.ai"),
 }
+
+# Senders who can send AS THEMSELVES, given a Gmail App Password of their own.
+# Maps the sender label to (login address, env/secret name holding its password).
+#
+# This exists because 177 people on the agentic campaign show no evidence the
+# mail ever arrived. Re-sending those from insights@ would be blocked the same
+# way, and switching the Reply-To does nothing about it: the receiving server
+# judges the envelope sender, which is whoever we authenticate as.
+SENDER_SMTP = {
+    "Eunice": ("eunice@graas.ai", "SMTP_PASS_EUNICE"),
+}
+
+
+def sender_identity(sender_label: str) -> tuple:
+    """Resolve how a send will ACTUALLY be addressed.
+
+    Returns (login_user, login_pass, from_display, from_email, own).
+
+    `own` is False when there is no password for that sender and the send
+    falls back to insights@ with their address in Reply-To. The caller must
+    surface that rather than assume: "it arrives from Eunice" and "it arrives
+    from Graas Insights with Eunice on Reply-To" are different promises, and
+    the whole point of the credential is the difference between them.
+    """
+    sender_name, _reply_to = SENDERS[sender_label]
+    cfg = SENDER_SMTP.get(sender_label)
+    if cfg:
+        addr, pass_var = cfg
+        if os.getenv(pass_var, "").strip():
+            return addr, os.getenv(pass_var).strip(), sender_name, addr, True
+    return (os.getenv("SMTP_USER"), os.getenv("SMTP_PASS"),
+            "Graas Insights", os.getenv("SMTP_USER"), False)
+
+
+def sends_as_self(sender_label: str) -> bool:
+    """True if this sender has its own working credential configured."""
+    cfg = SENDER_SMTP.get(sender_label)
+    return bool(cfg and os.getenv(cfg[1], "").strip())
 
 LOG_TAB_NAME = "Sends"
 LOG_HEADERS = [
@@ -522,10 +566,11 @@ def send_email(
                 f"To override, check 'Send anyway' in the composer."
             )
 
-    smtp_user = os.getenv("SMTP_USER")
-    smtp_pass = os.getenv("SMTP_PASS")
     sender_name, reply_to = SENDERS[sender_label]
-    from_display = "Graas Insights"  # Visible From line — always insights@
+    # Visible From is insights@ UNLESS this sender has a credential of its own,
+    # in which case the mail genuinely originates from them (see SENDER_SMTP).
+    smtp_user, smtp_pass, from_display, _from_email, _sends_own = \
+        sender_identity(sender_label)
 
     # Per-send token — ties the open/click beacons back to this log row.
     tracking_id = uuid.uuid4().hex
