@@ -2121,11 +2121,15 @@ with tab_compose, _tab_guard("Email Composer"):
         "Who are you emailing?",
         ["✍️ 1:1 — one person", "📣 Segment campaign — many"],
         key="compose_mode", horizontal=True,
-        help="1:1 → a clean personal (Minimal) email to one contact. "
-             "Segment campaign → the branded Newsletter to an AI segment.",
+        help="1:1 → one person. Segment campaign → many at once. The look of "
+             "the email is chosen separately in step 2.",
     )
     is_1to1 = compose_mode.startswith("✍️")
-    # Design is implied by mode — no separate toggle. 1:1 = minimal, campaign = branded.
+    # Starting point only — step 2's Body design radio can override it either
+    # way. Until 3 Nov the shell WAS the mode: every bulk send was forced into
+    # the branded Newsletter, so the follow-up cohort (whose defining trait is
+    # that a branded newsletter never reached them or was never opened) could
+    # only be sent as another branded newsletter. Eunice needs both (Prem).
     email_layout = "minimal" if is_1to1 else "branded"
 
     overrides = st.session_state.setdefault("crm_name_overrides", {})
@@ -2415,20 +2419,33 @@ with tab_compose, _tab_guard("Email Composer"):
     # "Use a Graas design"  → today's Minimal (1:1) / Newsletter (Segment) shell.
     # "Paste my own HTML"   → raw: her HTML is sent exactly as authored, no shell,
     #                          no reformatting, no CID logo (email_layout="raw").
-    _graas_shell_name = "Minimal note" if is_1to1 else "Newsletter"
+    # Three designs, all available in BOTH 1:1 and Segment. New widget key
+    # because the old one stored the two-option labels; Streamlit raises if a
+    # key's stored value is not in the current options, which would have met
+    # Eunice with a crashed page on her first load after this shipped.
+    _DESIGN_SIMPLE = "✉️ Simple note"
+    _DESIGN_BRANDED = "🎨 Branded newsletter"
+    _DESIGN_RAW = "📄 Paste my own HTML"
     body_design = st.radio(
         "Body design",
-        ["🎨 Use a Graas design", "📄 Paste my own HTML"],
-        key="body_design", horizontal=True,
-        help=f"🎨 Graas design → your text is wrapped in the {_graas_shell_name} shell. "
-             "📄 Paste my own HTML → your HTML is sent exactly as written — no shell, "
-             "no reformatting — for designed newsletters, images, etc. "
-             "Personalisation ({name}/{company}/{vertical}) still works in both.",
+        [_DESIGN_SIMPLE, _DESIGN_BRANDED, _DESIGN_RAW],
+        index=0 if is_1to1 else 1,          # the old mode-derived default
+        key="body_design_v2", horizontal=True,
+        help="✉️ Simple note → plain personal letter: no masthead, no date, no "
+             "headline. Looks like one person wrote to another. "
+             "🎨 Branded newsletter → dark graas masthead, gradient rule, date "
+             "and a large headline. "
+             "📄 Paste my own HTML → sent exactly as written, no shell, for "
+             "designed emails and images. "
+             "Personalisation ({name}/{company}/{vertical}) works in all three.",
     )
-    use_raw = body_design.startswith("📄")
+    use_raw = body_design == _DESIGN_RAW
     if use_raw:
-        # Override the mode-derived shell. Raw works in BOTH 1:1 and Segment.
         email_layout = "raw"
+    elif body_design == _DESIGN_SIMPLE:
+        email_layout = "minimal"
+    else:
+        email_layout = "branded"
 
     template_name = "Custom"
     template = EMAIL_TEMPLATES["Custom"]
@@ -2437,6 +2454,13 @@ with tab_compose, _tab_guard("Email Composer"):
             "📄 Sent as-authored — no Graas shell. Tokens like `{name}`/`{company}` still "
             "substitute; links are click-tracked (destinations + UTMs preserved), so opens "
             "AND clicks show in Analytics."
+        )
+    elif email_layout == "minimal":
+        st.caption(
+            "✉️ A plain letter — no masthead, no date line, no big headline, so "
+            "the **Headline** and **Deck** boxes are hidden. It opens on "
+            "`Hi {name},`. Best when the point is that a person wrote to a "
+            "person, and the lightest thing to get past a strict gateway."
         )
 
     # Streamlit can't push into a widget's state once that widget has been
