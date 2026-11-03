@@ -969,8 +969,15 @@ with tab_stage:
         except Exception as _e:
             st.error(f"Couldn't read the sales update deck: {_e}")
 
+        # This page is All-e only: Trustana, Extract, Hoppr and Turbo deals in the
+        # same deck are set aside (and listed at the bottom).
+        _other = None
+        if _deals is not None and "All-e" in _deals.columns:
+            _other = _deals[~_deals["All-e"]]
+            _deals = _deals[_deals["All-e"]].reset_index(drop=True)
+
         if _deals is not None and _deals.empty:
-            st.info("The sales update deck has no filled-in Active Deals rows yet.")
+            st.info("The sales update deck has no filled-in All-e deals yet.")
         elif _deals is not None:
             def _usd(x):
                 if x is None or pd.isna(x):
@@ -978,7 +985,7 @@ with tab_stage:
                 return f"${x / 1_000_000:,.2f}M" if abs(x) >= 1_000_000 else f"${x / 1_000:,.0f}K"
 
             st.caption(
-                f"From **{_dmeta['name']}** (edited {_dmeta['modified']:%d %b %Y}). "
+                f"All-e deals only, from **{_dmeta['name']}** (edited {_dmeta['modified']:%d %b %Y}). "
                 f"The deck's values are contract value; GP here is {int(GP_SHARE * 100)}% of that. "
                 "Weighted GP = GP × stage probability, calculated here, not taken from the deck."
             )
@@ -1045,6 +1052,12 @@ with tab_stage:
                     "Needs checking": st.column_config.TextColumn("", width="small"),
                 },
             )
+
+            if _other is not None and len(_other):
+                with st.expander(f"{len(_other)} deals on other products, not shown (Trustana, Extract, Hoppr, Turbo)"):
+                    st.caption("Left out because the Product isn't All-e. If one of these is an All-e deal, tell Prem.")
+                    for _, _r in _other.iterrows():
+                        st.markdown(f"- **{_r['Account']}** ({_r['Person']}): {_r['Product'] or '—'}")
 
             _bad = _deals[_deals["Flags"] != ""]
             if len(_bad):

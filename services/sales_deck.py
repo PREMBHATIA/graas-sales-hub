@@ -175,6 +175,17 @@ def _close_period(s):
     return None
 
 
+# The Pipeline page is All-e only; the deck also carries Trustana, Extract, Hoppr and
+# Turbo deals. A deal counts as All-e when its Product names All-e or one of its
+# agents (WhatsApp / LINE / voice). Anything else is left out and listed on the page
+# so a misread product name can't make a deal vanish unnoticed.
+_ALLE_RE = re.compile(r"\ball[\s\-]?e\b|\bagents?\b|\bvoice\b|\bwhatsapp\b|\bordering\b", re.I)
+
+
+def is_alle(product: str) -> bool:
+    return bool(_ALLE_RE.search(product or ""))
+
+
 def _shape_texts(slide):
     for sh in slide.shapes:
         if getattr(sh, "has_text_frame", False) and sh.text_frame.text.strip():
@@ -242,6 +253,7 @@ def parse_deck(data: bytes, ref_date: datetime):
         gp = None if val is None else val * GP_SHARE
         out.append({
             "Person": r["Person"], "Account": r["Account"], "Product": r["Product"],
+            "All-e": is_alle(r["Product"]),
             "Stage": stage or r["_stage_raw"] or "?", "Prob": prob,
             "Contract value": val, "GP": gp,
             "Weighted GP": None if gp is None or prob is None else gp * prob,
@@ -249,7 +261,7 @@ def parse_deck(data: bytes, ref_date: datetime):
             "Flags": "; ".join(flags),
         })
 
-    df = pd.DataFrame(out, columns=["Person", "Account", "Product", "Stage", "Prob", "Contract value", "GP",
+    df = pd.DataFrame(out, columns=["Person", "Account", "Product", "All-e", "Stage", "Prob", "Contract value", "GP",
                                     "Weighted GP", "Est. close", "Next step", "Flags"])
     if not df.empty:
         df = df.drop_duplicates(subset=["Person", "Account", "Product"], keep="first")
