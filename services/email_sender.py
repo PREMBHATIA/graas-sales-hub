@@ -22,7 +22,7 @@ import os
 import re
 import smtplib
 import uuid
-from html import unescape as _html_unescape
+from html import escape as _html_escape, unescape as _html_unescape
 from urllib.parse import quote
 from datetime import datetime, timezone, timedelta
 from email.mime.multipart import MIMEMultipart
@@ -605,9 +605,21 @@ def send_email(
     tracking_id = uuid.uuid4().hex
     unsub_href = f"mailto:insights@graas.ai?subject=Unsubscribe%20{to_email}"
 
+    # layout="text" is a single text/plain part — no HTML alternative at all.
+    # Every other layout sends HTML inside a table, and Gmail cannot let a
+    # reader type inside a table: quoting such a mail for reply chops the card
+    # into fragments and their typed answers land in the gaps between them.
+    # That makes an answer-inline email (the Retail Commerce Index questions)
+    # unanswerable, which is the whole point of it. Plain text quotes as "> "
+    # lines, so replying works the way it does in any normal mail. The cost is
+    # that an open beacon is an image and a text part cannot carry one, so a
+    # text send is invisible to open and click tracking by construction.
+    _text_only = (layout == "text")
+
     # Root is "related" so the inline graas logo (cid:graaslogo) resolves; it
     # holds an "alternative" part (plain + branded HTML) and the logo image.
-    msg = MIMEMultipart("related")
+    msg = (MIMEText(body, "plain", "utf-8") if _text_only
+           else MIMEMultipart("related"))
     msg["Subject"] = subject
     msg["From"] = formataddr((from_display, smtp_user))
     msg["To"] = formataddr((to_name or "", to_email))
@@ -617,10 +629,16 @@ def send_email(
     # native unsubscribe affordance). Recipient lands in the Suppressions tab.
     msg["List-Unsubscribe"] = f"<{unsub_href}>"
 
-    alt = MIMEMultipart("alternative")
-    msg.attach(alt)
+    if not _text_only:
+        alt = MIMEMultipart("alternative")
+        msg.attach(alt)
 
-    if layout == "raw":
+    if _text_only:
+        # The body IS the whole message. Deliberately no linkification: a
+        # rewritten tracking URL in plain text is a visible wall of characters
+        # where a clean link used to be, and tracking is off here regardless.
+        pass
+    elif layout == "raw":
         # Bring-your-own HTML: render exactly as authored — no escaping, no
         # paragraphising, no Graas shell, no CID logo. Only bare URLs in loose
         # text get tracked links (her <a> tags are left intact), and the open
@@ -687,7 +705,18 @@ def send_email(
                     # here mails a customer.
                     _amsg["Reply-To"] = formataddr((to_name or "", to_email))
                     _amsg["X-Graas-Audit-Copy"] = f"to={to_email}; company={company}"
-                    if layout == "raw":
+                    if _text_only:
+                        # Show the team the plain text that actually went out,
+                        # not a card the recipient never saw. The banner still
+                        # needs HTML, so the body sits inside a <pre>.
+                        _ahtml = (
+                            "<pre style=\"font-family:ui-monospace,Menlo,"
+                            "Consolas,monospace;font-size:13px;line-height:1.5;"
+                            "white-space:pre-wrap;color:#1f2933;margin:0;\">"
+                            + _html_escape(body) + "</pre>"
+                        )
+                        _atext = body
+                    elif layout == "raw":
                         _ahtml = _linkify_raw_html(body, "")
                         _atext = _html_to_text(body)
                     else:

@@ -2425,25 +2425,31 @@ with tab_compose, _tab_guard("Email Composer"):
     # Eunice with a crashed page on her first load after this shipped.
     _DESIGN_SIMPLE = "✉️ Simple note"
     _DESIGN_BRANDED = "🎨 Branded newsletter"
+    _DESIGN_TEXT = "📝 Plain text"
     _DESIGN_RAW = "📄 Paste my own HTML"
     body_design = st.radio(
         "Body design",
-        [_DESIGN_SIMPLE, _DESIGN_BRANDED, _DESIGN_RAW],
+        [_DESIGN_SIMPLE, _DESIGN_BRANDED, _DESIGN_TEXT, _DESIGN_RAW],
         index=0 if is_1to1 else 1,          # the old mode-derived default
-        key="body_design_v2", horizontal=True,
+        key="body_design_v3", horizontal=True,
         help="✉️ Simple note → plain personal letter: no masthead, no date, no "
-             "headline. Looks like one person wrote to another. "
+             "headline, but still HTML. "
              "🎨 Branded newsletter → dark graas masthead, gradient rule, date "
              "and a large headline. "
+             "📝 Plain text → no HTML at all. The only one a recipient can "
+             "answer inline when they hit Reply, and the only one with no open "
+             "or click tracking. "
              "📄 Paste my own HTML → sent exactly as written, no shell, for "
              "designed emails and images. "
-             "Personalisation ({name}/{company}/{vertical}) works in all three.",
+             "Personalisation ({name}/{company}/{vertical}) works in all four.",
     )
     use_raw = body_design == _DESIGN_RAW
     if use_raw:
         email_layout = "raw"
     elif body_design == _DESIGN_SIMPLE:
         email_layout = "minimal"
+    elif body_design == _DESIGN_TEXT:
+        email_layout = "text"
     else:
         email_layout = "branded"
 
@@ -2454,6 +2460,16 @@ with tab_compose, _tab_guard("Email Composer"):
             "📄 Sent as-authored — no Graas shell. Tokens like `{name}`/`{company}` still "
             "substitute; links are click-tracked (destinations + UTMs preserved), so opens "
             "AND clicks show in Analytics."
+        )
+    elif email_layout == "text":
+        st.caption(
+            "📝 Sent as plain text, with no HTML part at all — so a recipient "
+            "can type answers **between your questions** when they reply. Every "
+            "other design is HTML in a table, and Gmail splits that table "
+            "wherever they try to type. The trade: an open beacon is an image, "
+            "so **this round records no opens and no clicks** — you measure it "
+            "by replies arriving. It is also the lightest thing to get past a "
+            "strict gateway."
         )
     elif email_layout == "minimal":
         st.caption(
@@ -2634,6 +2650,17 @@ with tab_compose, _tab_guard("Email Composer"):
                     _components.html(rendered_body, height=760, scrolling=True)
                 else:
                     st.info("Paste your HTML in the box above to see the preview.")
+            elif email_layout == "text":
+                # No shell to render — what goes on the wire IS this text. Shown
+                # monospaced so the question/answer spacing she typed is the
+                # spacing the recipient replies into.
+                st.caption("📝 Plain text, personalised for this recipient — "
+                           "exactly the bytes that go on the wire. No HTML, no "
+                           "tracking, replyable inline.")
+                if rendered_body.strip():
+                    st.code(rendered_body, language=None)
+                else:
+                    st.info("Type the body above to see the preview.")
             else:
                 _pv_headline = _substitute(headline, _pv_subs) if email_layout == "branded" else ""
                 _pv_deck = _substitute(deck, _pv_subs) if email_layout == "branded" else ""
