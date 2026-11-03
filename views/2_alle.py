@@ -160,10 +160,11 @@ else:
 
 # ══════════════════════════════════════════════════════════════════════════════
 
-tab_gtm, tab_notes, tab_deals = st.tabs([
+tab_gtm, tab_notes, tab_deals, tab_stage = st.tabs([
     "🎯 GTM Tracker",
     "📝 Meeting Notes",
     "📋 Active Deals",
+    "💼 Deals by Stage 🔒",
 ])
 
 
@@ -949,3 +950,104 @@ with tab_deals:
                 st.markdown(str(deal['comments'])[:2000])
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 4: DEALS BY STAGE — from Ankit's monthly Sales Update deck (🔒 password)
+# ══════════════════════════════════════════════════════════════════════════════
+# The page is open to the whole viewer list, but this tab shows deal values,
+# weighted pipeline by person and deal risks, so it is locked on its own. The deck
+# is only fetched once the session is unlocked.
+
+with tab_stage:
+    from services.inline_gate import gate_inline
+
+    if gate_inline("Deals by stage", key="alle_stage"):
+        _deals, _dmeta = None, None
+        try:
+            from services.sales_deck import load_deals, GP_SHARE, STAGES
+            with st.spinner("Reading the sales update deck…"):
+                _deals, _dmeta = load_deals()
+        except Exception as _e:
+            st.error(f"Couldn't read the sales update deck: {_e}")
+
+        if _deals is not None and _deals.empty:
+            st.info("The sales update deck has no filled-in Active Deals rows yet.")
+        elif _deals is not None:
+            def _usd(x):
+                if x is None or pd.isna(x):
+                    return "—"
+                return f"${x / 1_000_000:,.2f}M" if abs(x) >= 1_000_000 else f"${x / 1_000:,.0f}K"
+
+            st.caption(
+                f"From **{_dmeta['name']}** (edited {_dmeta['modified']:%d %b %Y}). "
+                f"The deck's values are contract value; GP here is {int(GP_SHARE * 100)}% of that. "
+                "Weighted GP = GP × stage probability, calculated here, not taken from the deck."
+            )
+
+            _n_flag = int((_deals["Flags"] != "").sum())
+            m1, m2, m3, m4 = st.columns(4)
+            m1.metric("Active deals", len(_deals))
+            m2.metric("GP", _usd(_deals["GP"].sum()))
+            m3.metric("Weighted GP", _usd(_deals["Weighted GP"].sum()))
+            m4.metric("Rows to check", _n_flag)
+
+            # By stage
+            st.markdown("#### By stage")
+            _st = (_deals.groupby("Stage").agg(Deals=("Account", "size"), GP=("GP", "sum"),
+                                              Weighted=("Weighted GP", "sum")).reset_index())
+            _prob = {s: p for s, p in STAGES}
+            _order = [s for s, _ in STAGES]
+            _st["Prob"] = _st["Stage"].map(_prob)
+            _st["_o"] = _st["Stage"].map({s: i for i, s in enumerate(_order)})
+            _st = _st.sort_values("_o").drop(columns="_o")
+            sc1, sc2 = st.columns([1, 1])
+            with sc1:
+                _fig = go.Figure()
+                _fig.add_bar(name="GP", x=_st["Stage"], y=_st["GP"], marker_color="#C7D2FE")
+                _fig.add_bar(name="Weighted GP", x=_st["Stage"], y=_st["Weighted"], marker_color="#4F46E5")
+                _fig.update_layout(barmode="group", height=300, margin=dict(l=0, r=0, t=10, b=0),
+                                   yaxis_tickprefix="$", legend=dict(orientation="h", y=1.12))
+                st.plotly_chart(_fig, use_container_width=True)
+            with sc2:
+                _show = _st.copy()
+                _show["Prob"] = _show["Prob"].map(lambda v: "" if pd.isna(v) else f"{int(v * 100)}%")
+                _show["GP"] = _show["GP"].map(_usd)
+                _show["Weighted"] = _show["Weighted"].map(_usd)
+                st.dataframe(_show[["Stage", "Prob", "Deals", "GP", "Weighted"]], hide_index=True,
+                             use_container_width=True)
+
+            # By person
+            st.markdown("#### By person")
+            _pp = (_deals.groupby("Person").agg(Deals=("Account", "size"), GP=("GP", "sum"),
+                                               Weighted=("Weighted GP", "sum"))
+                   .sort_values("Weighted", ascending=False).reset_index())
+            _pp["GP"] = _pp["GP"].map(_usd)
+            _pp["Weighted"] = _pp["Weighted"].map(_usd)
+            st.dataframe(_pp, hide_index=True, use_container_width=True)
+
+            # Deal table
+            st.markdown("#### Deals")
+            f1, f2 = st.columns(2)
+            _pf = f1.multiselect("Person", sorted(_deals["Person"].unique()), key="stage_person")
+            _sf = f2.multiselect("Stage", [s for s in reversed(_order) if s in set(_deals["Stage"])], key="stage_stage")
+            _v = _deals.copy()
+            if _pf:
+                _v = _v[_v["Person"].isin(_pf)]
+            if _sf:
+                _v = _v[_v["Stage"].isin(_sf)]
+            _v["Needs checking"] = _v["Flags"].map(lambda t: "⚠️" if t else "")
+            st.dataframe(
+                _v[["Person", "Account", "Product", "Stage", "GP", "Weighted GP", "Est. close", "Next step", "Needs checking"]],
+                hide_index=True, use_container_width=True,
+                column_config={
+                    "GP": st.column_config.NumberColumn("GP", format="$%.0f"),
+                    "Weighted GP": st.column_config.NumberColumn("Weighted GP", format="$%.0f"),
+                    "Next step": st.column_config.TextColumn("Next step", width="large"),
+                    "Needs checking": st.column_config.TextColumn("", width="small"),
+                },
+            )
+
+            _bad = _deals[_deals["Flags"] != ""]
+            if len(_bad):
+                with st.expander(f"⚠️ {len(_bad)} rows to check with the deal owner"):
+                    for _, _r in _bad.iterrows():
+                        st.markdown(f"- **{_r['Account']}** ({_r['Person']}): {_r['Flags']}")
