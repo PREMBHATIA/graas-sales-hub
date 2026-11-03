@@ -357,17 +357,33 @@ def get_dedup_days() -> int:
         return 14
 
 
-def recent_sent_emails(days: int = None) -> set:
+def recent_sent_emails(days: int = None, bucket: str = None,
+                       strict: bool = False) -> set:
     """Return a set of lowercased emails sent successfully within the last N days.
 
     Used by bulk send to filter recipients in one pass instead of N sheet reads.
+
+    bucket — when given, only sends logged under that bucket count towards the
+    window. The follow-up round needs this. Every one of its recipients was
+    emailed by the original campaign days earlier — that is WHY they are in the
+    cohort — so an unfiltered window answers "emailed recently?" with yes for
+    all 209 and the round reaches nobody. Narrowed to the round's own bucket it
+    answers the question that actually matters, "have we already followed up
+    with this person", and the send log becomes the progress record instead of
+    a column somebody has to tick by hand after every batch.
+
+    strict — raise SheetReadError rather than return an empty set when the log
+    cannot be read. An empty set means "nobody was emailed recently", so a
+    transient Sheets failure silently clears the dedup guard for an entire
+    batch: the same shape of lie suppressed_emails() was fixed for. Callers
+    that are about to send must pass strict=True and block on the exception.
     """
     if days is None:
         days = get_dedup_days()
     sheet_id = os.getenv("EMAIL_LOG_SHEET_ID", "")
     if not sheet_id:
         return set()
-    df = fetch_log_rows(sheet_id, LOG_TAB_NAME)
+    df = fetch_log_rows(sheet_id, LOG_TAB_NAME, strict=strict)
     if df.empty or "to_email" not in df.columns or "timestamp_utc" not in df.columns:
         return set()
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
@@ -379,6 +395,19 @@ def recent_sent_emails(days: int = None) -> set:
             return None
 
     sent = df[df["status"] == "sent"].copy()
+    if bucket:
+        # No bucket column means the log predates per-send bucketing, so we
+        # cannot tell a follow-up send from the original campaign. Returning
+        # an empty set here would report "nobody has been followed up" and let
+        # a whole round go out twice, so a caller that is about to send is
+        # told instead.
+        if "bucket" not in sent.columns:
+            if strict:
+                raise SheetReadError(
+                    "the send log has no 'bucket' column, so prior follow-up "
+                    "sends cannot be told apart from the original campaign")
+            return set()
+        sent = sent[sent["bucket"].astype(str).str.strip() == str(bucket).strip()]
     sent["_ts"] = sent["timestamp_utc"].apply(_parse)
     sent = sent[(sent["_ts"].notna()) & (sent["_ts"] >= cutoff)]
     return set(sent["to_email"].str.lower().str.strip().tolist())

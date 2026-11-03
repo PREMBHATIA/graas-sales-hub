@@ -3050,7 +3050,25 @@ with tab_compose, _tab_guard("Email Composer"):
                     except Exception as _se:
                         supp_set = set()
                         _supp_read_failed = str(_se)
-                    recent_set = recent_sent_emails(get_dedup_days())
+                    # The follow-up round asks a different question of the log.
+                    # "Emailed in the last 14 days?" is yes for every one of
+                    # its 209 recipients, because the campaign that put them in
+                    # the cohort went out 11 days ago — so the unfiltered
+                    # window drops the entire round and sends to nobody. Ask
+                    # instead whether this person has ever had the follow-up,
+                    # which is what we actually never want to do twice, and the
+                    # log itself becomes the record of how far the round got.
+                    _is_follow_up = str(comp_ai_seg) == "Follow-up cohort"
+                    _dedup_read_failed = ""
+                    try:
+                        recent_set = recent_sent_emails(
+                            3650 if _is_follow_up else get_dedup_days(),
+                            bucket="Follow-up cohort" if _is_follow_up else None,
+                            strict=True,
+                        )
+                    except Exception as _de:
+                        recent_set = set()
+                        _dedup_read_failed = str(_de)
                     watcher_list = _fetch_watchers_page()
                 sup_mask = after_no_touch["_email_norm"].isin(supp_set)
                 bulk_supp = after_no_touch[sup_mask]
@@ -3093,8 +3111,10 @@ with tab_compose, _tab_guard("Email Composer"):
                         f"{stage_total - stage_after_nt} no-touch · "
                         f"{_vh_bit}"
                         f"{stage_after_vh - stage_after_supp} suppressed · "
-                        f"{stage_after_supp - stage_after_dedup} emailed in last {get_dedup_days()}d"
-                        f"{_miss_bit} · details below."
+                        f"{stage_after_supp - stage_after_dedup}"
+                        + (" already followed up" if _is_follow_up
+                           else f" emailed in last {get_dedup_days()}d")
+                        + f"{_miss_bit} · details below."
                     )
 
                 # Test-marker check. Testing is done by typing "[TEST] " into the
@@ -3117,6 +3137,17 @@ with tab_compose, _tab_guard("Email Composer"):
                         "people who opted out. Wait a moment and hit "
                         "**🔄 Refresh CRM Data**.  \n"
                         f"`{_supp_read_failed[:160]}`"
+                    )
+                if _dedup_read_failed and not bulk_blocked_reason:
+                    # Failing open here would re-send a whole batch to people
+                    # who already had it. Blocked for the same reason the
+                    # suppression read is.
+                    bulk_blocked_reason = (
+                        "Could not read the **send log**, so there is no way to "
+                        "tell who has already been emailed. Sending now could "
+                        "mail the same people twice. Wait a moment and hit "
+                        "**🔄 Refresh CRM Data**.  \n"
+                        f"`{_dedup_read_failed[:160]}`"
                     )
                 _subj_check = str(subject or "")
                 _test_marker = _TEST_MARKER_RE.search(_subj_check)
@@ -3160,7 +3191,10 @@ with tab_compose, _tab_guard("Email Composer"):
                                     columns={"company": "Company", "person_name": "Name", "email": "Email"}),
                                 use_container_width=True, hide_index=True, height=140)
                         if not bulk_dedup.empty:
-                            st.markdown(f"**⏱️ Recently emailed ({len(bulk_dedup)}, within {get_dedup_days()}d):**")
+                            st.markdown(
+                                f"**⏱️ Already followed up ({len(bulk_dedup)}):**"
+                                if _is_follow_up else
+                                f"**⏱️ Recently emailed ({len(bulk_dedup)}, within {get_dedup_days()}d):**")
                             st.dataframe(
                                 bulk_dedup[["company", "person_name", "email"]].rename(
                                     columns={"company": "Company", "person_name": "Name", "email": "Email"}),
