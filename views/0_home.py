@@ -175,13 +175,21 @@ st.markdown("""
     .kb-head { font-weight: 800; font-size: 0.92rem; line-height: 1.2;
                padding: 4px 0 6px; border-bottom: 2px solid; margin-bottom: 8px; }
     .kb-tot  { font-size: 0.8rem; font-weight: 700; margin-top: 3px; }
-    .kb-card { background: #1E1E2E; border-radius: 6px; padding: 7px 9px;
-               margin-bottom: 5px; border-left: 3px solid; }
-    .kb-name { font-weight: 700; font-size: 0.84rem; color: #E2E8F0;
-               white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .kb-meta { font-size: 0.7rem; color: #9CA3AF; margin-top: 1px;
-               white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .kb-amt  { font-size: 0.78rem; font-weight: 800; margin-top: 2px; }
+    /* Two lines per card: name on the left with the amount top-right, and the
+       owner · region · month line beneath. A grid, so the amount can sit on the
+       first row even though it comes last in the markup. */
+    .kb-card { background: #1E1E2E; border-radius: 5px; padding: 4px 8px 5px;
+               margin-bottom: 3px; border-left: 3px solid;
+               display: grid; grid-template-columns: minmax(0, 1fr) auto;
+               column-gap: 8px; align-items: baseline; }
+    .kb-name { grid-column: 1; font-weight: 700; font-size: 0.8rem; color: #E2E8F0;
+               line-height: 1.25; white-space: nowrap; overflow: hidden;
+               text-overflow: ellipsis; }
+    .kb-amt  { grid-column: 2; grid-row: 1; font-size: 0.8rem; font-weight: 800;
+               line-height: 1.25; text-align: right; }
+    .kb-meta { grid-column: 1 / -1; font-size: 0.66rem; color: #9CA3AF;
+               line-height: 1.2; white-space: nowrap; overflow: hidden;
+               text-overflow: ellipsis; }
     .kb-more { font-size: 0.74rem; color: #6B7280; padding: 2px 2px 0; }
     .kb-empty { font-size: 0.78rem; color: #9CA3AF; padding: 10px 2px; }
     .kb-note { font-size: 0.7rem; color: #9CA3AF; margin-top: 8px; }
@@ -227,7 +235,7 @@ def _pipeline_panel():
         st.caption("Pipeline numbers are unavailable right now.")
         return
 
-    CAP = 6   # keeps the board above the fold; the rest collapse to "+N more"
+    CAP = 10  # cards are compact enough to show every deal; extras collapse to "+N more"
     cols = [(">60", "Proposals > 60 days", "#F59E0B", "🟡", "None"),
             ("<60", "Proposals < 60 days", "#3B82F6", "🔵", "None sent in the last 60 days"),
             ("Won", "Won", "#10B981", "✅", "None"),
