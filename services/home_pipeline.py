@@ -9,6 +9,10 @@ Numbers come from two sheets that are both live:
 All-e ONLY: the revenue sheet also carries MP Enablement, Extract, Hoppr and others,
 which are filtered out on Product.
 
+The sheet's "First Year GP" column actually holds REVENUE (Prem, 4 Nov: "all these
+deals are revenue, not GP"; e.g. Propan's $78K equals its quoted ACV). The board
+shows GP, so every value is taken at GP_SHARE (80%) of what the sheet says.
+
 Two hard-coded overrides (Prem), because the sheets lag the deals:
   • LK is WON (signed by email; the sheet still says "In Discussion").
   • PI is WON but is on neither sheet, so it is added here: Jan 2026, ACV $35K,
@@ -32,6 +36,11 @@ GP_SHARE = 0.80   # an ACV is revenue; GP is taken as 80% of it (Prem's rule)
 # PI: WhatsApp distributor ordering, won Jan 2026, ACV $35K (Prem, 4 Nov).
 EXTRA_WON = [{"name": "PI", "acv": 35_000, "region": "India", "owner": "Prem", "month": 1}]
 DISPLAY_NAME = {"castrol voice agent pilot": "Castrol Voice", "lk all-e": "LK"}
+# Region / owner the tracker lacks or gets wrong, by lower-case display name (Prem, 4 Nov).
+DEAL_FIXES = {
+    "sinarmas sdn id": {"region": "Indonesia", "owner": "Ashwin"},
+    "hindware": {"region": "India", "owner": "Amruta"},
+}
 
 _MONTHS = {m: i for i, m in enumerate(
     ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"], 1)}
@@ -130,7 +139,9 @@ def load_headline() -> dict:
         for prefix, forced in STATUS_OVERRIDES.items():
             if low.startswith(prefix):
                 status = forced
-        rows.append({"name": DISPLAY_NAME.get(low, raw), "status": status, "gp": _gp(r.get("First Year GP")),
+        rev_amt = _gp(r.get("First Year GP"))   # labelled GP on the sheet, but it is revenue
+        rows.append({"name": DISPLAY_NAME.get(low, raw), "status": status,
+                     "gp": None if rev_amt is None else rev_amt * GP_SHARE,
                      "pic": str(r.get("PIC", "")).strip(), "month": _month(r.get("Date sent"))})
     for x in EXTRA_WON:
         rows.append({"name": x["name"], "status": "Won", "gp": x["acv"] * GP_SHARE, "pic": "",
@@ -143,6 +154,8 @@ def load_headline() -> dict:
         else:
             region, owner = _lookup(r["name"])
             owner = owner or r["pic"]          # tracker owner, else the sheet's PIC
+        fix = DEAL_FIXES.get(_norm(r["name"]), {})
+        region, owner = fix.get("region", region), fix.get("owner", owner)
         gp = None if pd.isna(r["gp"]) else float(r["gp"])
         mon = [k for k, v in _MONTHS.items() if v == r["month"]]
         return {"name": r["name"], "gp": gp, "region": region or "", "owner": owner or "",

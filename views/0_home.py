@@ -260,9 +260,10 @@ def _pipeline_panel():
     p1 = f"{d['proposals'] / d['leads']:.0%}" if d["leads"] else "—"
     p2 = f"{d['won'] / d['proposals']:.0%}" if d["proposals"] else "—"
     note = ""
-    if unlocked and d["gp_missing"]:
-        note = ('<div class="kb-note">' + ", ".join(d["gp_missing"])
-                + ': value not on the sheet yet.</div>')
+    if unlocked:
+        note = ('<div class="kb-note">$ = GP, taken as 80% of the revenue on the sheet.'
+                + (" " + ", ".join(d["gp_missing"]) + ": value not on the sheet yet."
+                   if d["gp_missing"] else "") + '</div>')
     st.markdown(
         f'<div class="kb-sum"><b>{d["leads"]}</b> net-new leads → <b>{d["proposals"]}</b> proposals '
         f'({p1}) → <b>{d["won"]}</b> won ({p2})</div>'
