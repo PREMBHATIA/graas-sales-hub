@@ -9,14 +9,15 @@ Numbers come from two sheets that are both live:
 All-e ONLY: the revenue sheet also carries MP Enablement, Extract, Hoppr and others,
 which are filtered out on Product.
 
-The sheet's "First Year GP" column actually holds REVENUE (Prem, 4 Nov: "all these
-deals are revenue, not GP"; e.g. Propan's $78K equals its quoted ACV). The board
-shows GP, so every value is taken at GP_SHARE (80%) of what the sheet says.
+Amounts are REVENUE: the sheet's "First Year GP" column holds proposal revenue
+(Prem, 4 Nov: "the pre-sales and revenue trackers are the proposal amounts, which is
+revenue"; e.g. Propan's $78K is its quoted ACV). They are shown as they are, with no
+GP conversion.
 
 Two hard-coded overrides (Prem), because the sheets lag the deals:
   • LK is WON (signed by email; the sheet still says "In Discussion").
   • PI is WON but is on neither sheet, so it is added here: Jan 2026, ACV $35K,
-    owner Prem. The page shows GP, so it counts at 80% of the ACV ($28K).
+    owner Prem, at its $35K ACV.
 Delete these the day the sheets are updated.
 
 Kept in its own module, imported lazily by the homepage, so a failure here can
@@ -32,9 +33,8 @@ import streamlit as st
 
 # ── Overrides ────────────────────────────────────────────────────────────────
 STATUS_OVERRIDES = {"lk": "Won"}   # client-name prefix (lower case) → status
-GP_SHARE = 0.80   # an ACV is revenue; GP is taken as 80% of it (Prem's rule)
 # PI: WhatsApp distributor ordering, won Jan 2026, ACV $35K (Prem, 4 Nov).
-EXTRA_WON = [{"name": "PI", "acv": 35_000, "region": "India", "owner": "Prem", "month": 1}]
+EXTRA_WON = [{"name": "PI", "rev": 35_000, "region": "India", "owner": "Prem", "month": 1}]
 DISPLAY_NAME = {"castrol voice agent pilot": "Castrol Voice", "lk all-e": "LK"}
 # Region / owner the tracker lacks or gets wrong, by lower-case display name (Prem, 4 Nov).
 DEAL_FIXES = {
@@ -82,7 +82,7 @@ def _bucket(month) -> str:
     return "<60" if datetime(2026, int(month), 15) >= datetime.now() - timedelta(days=60) else ">60"
 
 
-def _gp(v):
+def _amount(v):
     s = re.sub(r"[^0-9.]", "", str(v or ""))
     return float(s) if s else None
 
@@ -139,12 +139,11 @@ def load_headline() -> dict:
         for prefix, forced in STATUS_OVERRIDES.items():
             if low.startswith(prefix):
                 status = forced
-        rev_amt = _gp(r.get("First Year GP"))   # labelled GP on the sheet, but it is revenue
         rows.append({"name": DISPLAY_NAME.get(low, raw), "status": status,
-                     "gp": None if rev_amt is None else rev_amt * GP_SHARE,
+                     "rev": _amount(r.get("First Year GP")),   # labelled GP on the sheet; it is revenue
                      "pic": str(r.get("PIC", "")).strip(), "month": _month(r.get("Date sent"))})
     for x in EXTRA_WON:
-        rows.append({"name": x["name"], "status": "Won", "gp": x["acv"] * GP_SHARE, "pic": "",
+        rows.append({"name": x["name"], "status": "Won", "rev": x["rev"], "pic": "",
                      "month": x["month"], "_region": x["region"], "_owner": x["owner"]})
     df = pd.DataFrame(rows)
 
@@ -156,9 +155,9 @@ def load_headline() -> dict:
             owner = owner or r["pic"]          # tracker owner, else the sheet's PIC
         fix = DEAL_FIXES.get(_norm(r["name"]), {})
         region, owner = fix.get("region", region), fix.get("owner", owner)
-        gp = None if pd.isna(r["gp"]) else float(r["gp"])
+        rev = None if pd.isna(r["rev"]) else float(r["rev"])
         mon = [k for k, v in _MONTHS.items() if v == r["month"]]
-        return {"name": r["name"], "gp": gp, "region": region or "", "owner": owner or "",
+        return {"name": r["name"], "rev": rev, "region": region or "", "owner": owner or "",
                 "month": mon[0].title() if mon else ""}
 
     stages = {"<60": [], ">60": [], "Won": [], "Lost": []}
@@ -166,7 +165,7 @@ def load_headline() -> dict:
         key = r["status"] if r["status"] in ("Won", "Lost") else _bucket(r["month"])
         stages[key].append(_card(r))
     for k in stages:   # biggest first, deals with no value last
-        stages[k].sort(key=lambda c: -(c["gp"] or 0))
+        stages[k].sort(key=lambda c: -(c["rev"] or 0))
 
     # Net-new leads this year
     first = tracker["First conv date"].map(_date)
@@ -180,5 +179,5 @@ def load_headline() -> dict:
         "lost": int(count.get("Lost", 0)),
         "discussion": int(count.get("In discussion", 0)),
         "stages": stages,
-        "gp_missing": [c["name"] for c in stages["Won"] if c["gp"] is None],
+        "rev_missing": [c["name"] for c in stages["Won"] if c["rev"] is None],
     }

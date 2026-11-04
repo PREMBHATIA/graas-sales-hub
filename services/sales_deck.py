@@ -7,10 +7,11 @@ page can show live deals by stage and by person from the deck's negotiated
 numbers, which move as deals are negotiated.
 
 Rules, all set by Prem:
-  • The deck's "Value" is contract value (revenue). The page shows GP, taken as
-    GP_SHARE (80%) of that value.
-  • Weighted GP = GP × the stage probability. The deck's own "Weighted" column is
-    not used: it is sometimes blank, "TBC" or a percentage. Where it IS a dollar
+  • The deck's "Value" is contract value, i.e. revenue. It is shown as it is, with no
+    GP conversion (the trackers' proposal amounts are revenue too, so every page
+    speaks the same unit).
+  • Weighted value = value × the stage probability. The deck's own "Weighted" column
+    is not used: it is sometimes blank, "TBC" or a percentage. Where it IS a dollar
     figure that disagrees with value × stage probability, the row is flagged.
   • Stage probabilities are Ankit's: Opportunity 10%, Value validation 30%,
     Commercials aligned 50%, Approvals & contracting 75%.
@@ -29,9 +30,6 @@ from datetime import datetime
 import pandas as pd
 import requests
 import streamlit as st
-
-# The deck's Value is contract value; the page shows GP at this share of it.
-GP_SHARE = 0.80
 
 STAGES = [  # (name, probability), lowest stage first
     ("Opportunity", 0.10),
@@ -250,23 +248,22 @@ def parse_deck(data: bytes, ref_date: datetime):
             flags.append(f"close date unclear ('{r['Est. close']}')")
         elif period < (ref_date.year, ref_date.month):
             flags.append(f"close date {r['Est. close']} has passed")
-        gp = None if val is None else val * GP_SHARE
         out.append({
             "Person": r["Person"], "Account": r["Account"], "Product": r["Product"],
             "All-e": is_alle(r["Product"]),
             "Stage": stage or r["_stage_raw"] or "?", "Prob": prob,
-            "Contract value": val, "GP": gp,
-            "Weighted GP": None if gp is None or prob is None else gp * prob,
+            "Contract value": val,
+            "Weighted value": None if val is None or prob is None else val * prob,
             "Est. close": r["Est. close"], "Next step": r["Next step"],
             "Flags": "; ".join(flags),
         })
 
-    df = pd.DataFrame(out, columns=["Person", "Account", "Product", "All-e", "Stage", "Prob", "Contract value", "GP",
-                                    "Weighted GP", "Est. close", "Next step", "Flags"])
+    df = pd.DataFrame(out, columns=["Person", "Account", "Product", "All-e", "Stage", "Prob", "Contract value",
+                                    "Weighted value", "Est. close", "Next step", "Flags"])
     if not df.empty:
         df = df.drop_duplicates(subset=["Person", "Account", "Product"], keep="first")
         df["_rank"] = df["Stage"].map({s: i for i, s in enumerate(STAGE_ORDER)}).fillna(-1)
-        df = df.sort_values(["_rank", "GP"], ascending=[False, False]).drop(columns="_rank").reset_index(drop=True)
+        df = df.sort_values(["_rank", "Contract value"], ascending=[False, False]).drop(columns="_rank").reset_index(drop=True)
     return df, people_seen
 
 

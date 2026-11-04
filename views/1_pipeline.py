@@ -592,7 +592,7 @@ prod_group = df.groupby("Product Group").agg(
     Won=("Status", lambda x: (x == "Won").sum()),
     Lost=("Status", lambda x: (x == "Lost").sum()),
     Open=("Status", lambda x: (x == "Open").sum()),
-    # Open_GP is what "Pipeline GP" should mean — future revenue from deals
+    # Open_GP is what "Pipeline Revenue" should mean — future revenue from deals
     # still in play. Summing all rows would conflate it with Won + Lost value.
     Open_GP=("GP", lambda x: x[df.loc[x.index, "Status"] == "Open"].sum()),
     Won_GP=("GP", lambda x: x[df.loc[x.index, "Status"] == "Won"].sum()),
@@ -605,11 +605,11 @@ for _, r in prod_group.iterrows():
         "Product": r["Product Group"],
         "Prop Sent": int(r["Sent"]),
         "Prop Won": int(r["Won"]),
-        "Won GP": fmt(r["Won_GP"]),
+        "Won Revenue": fmt(r["Won_GP"]),
         "Prop Lost": int(r["Lost"]),
         "Prop Open": int(r["Open"]),
         "Win Rate": f"{wr_p:.0f}%",
-        "Pipeline GP": fmt(r["Open_GP"]),
+        "Pipeline Revenue": fmt(r["Open_GP"]),
         "Pipeline >60": _names_gt60.get(r["Product Group"], ""),
         "Pipeline <60": _names_lt60.get(r["Product Group"], ""),
     })
@@ -623,11 +623,11 @@ def _summary_row(label, sub):
         "Product": label,
         "Prop Sent": len(sub),
         "Prop Won": won,
-        "Won GP": fmt(sub.loc[sub["Status"] == "Won", "GP"].sum()),
+        "Won Revenue": fmt(sub.loc[sub["Status"] == "Won", "GP"].sum()),
         "Prop Lost": lost,
         "Prop Open": int((sub["Status"] == "Open").sum()),
         "Win Rate": f"{wr:.0f}%",
-        "Pipeline GP": fmt(sub.loc[sub["Status"] == "Open", "GP"].sum()),
+        "Pipeline Revenue": fmt(sub.loc[sub["Status"] == "Open", "GP"].sum()),
         "Pipeline >60": "",
         "Pipeline <60": "",
     }
@@ -653,7 +653,7 @@ def red_cell(val):
     return ""
 
 # The three pipeline columns get a distinct tint so they read as one block.
-_PIPE_COLS = ["Pipeline GP", "Pipeline >60", "Pipeline <60"]
+_PIPE_COLS = ["Pipeline Revenue", "Pipeline >60", "Pipeline <60"]
 
 def _bold_total(row):
     # Total = bold summary line (top rule); New/Existing = muted sub-totals.
@@ -664,7 +664,7 @@ def _bold_total(row):
     return [""] * len(row)
 
 styled_prod = (prod_df.style
-    .map(green_cell, subset=["Prop Won", "Won GP"])
+    .map(green_cell, subset=["Prop Won", "Won Revenue"])
     .map(red_cell, subset=["Prop Lost"])
     .set_properties(subset=_PIPE_COLS, **{"background-color": "#EEF1FF",
                                           "color": "#3730A3"})
@@ -691,11 +691,11 @@ styled_prod = (prod_df.style
         {"selector": "th:nth-child(1)", "props": [("width", "118px")]},   # Product
         {"selector": "th:nth-child(2)", "props": [("width", "82px")]},    # Proposals Sent
         {"selector": "th:nth-child(3)", "props": [("width", "82px")]},    # Proposals Won
-        {"selector": "th:nth-child(4)", "props": [("width", "72px")]},    # Won GP
+        {"selector": "th:nth-child(4)", "props": [("width", "72px")]},    # Won Revenue
         {"selector": "th:nth-child(5)", "props": [("width", "82px")]},    # Lost Proposals
         {"selector": "th:nth-child(6)", "props": [("width", "82px")]},    # Open Proposals
         {"selector": "th:nth-child(7)", "props": [("width", "66px")]},    # Win Rate
-        {"selector": "th:nth-child(8)", "props": [("width", "78px")]},    # Pipeline GP
+        {"selector": "th:nth-child(8)", "props": [("width", "78px")]},    # Pipeline Revenue
         {"selector": "th:nth-child(9)", "props": [("width", "205px")]},   # Pipeline >60
         {"selector": "th:nth-child(10)", "props": [("width", "205px")]},  # Pipeline <60
         {"selector": "td:nth-child(9), td:nth-child(10)",
@@ -833,18 +833,18 @@ st.markdown("### Pipeline Value by Product")
 fig_pg = go.Figure()
 fig_pg.add_trace(go.Bar(
     y=prod_group["Product Group"], x=prod_group["Open_GP"], orientation="h",
-    name="Pipeline GP",
+    name="Pipeline Revenue",
     text=[fmt(v) for v in prod_group["Open_GP"]], textposition="outside",
     marker_color="#7C3AED",
 ))
 fig_pg.add_trace(go.Bar(
     y=prod_group["Product Group"], x=prod_group["Won_GP"], orientation="h",
-    name="Won GP",
+    name="Won Revenue",
     text=[fmt(v) for v in prod_group["Won_GP"]], textposition="outside",
     marker_color="#10B981",
 ))
 fig_pg.update_layout(barmode="group", height=350, template="plotly_dark",
-                      xaxis_title="GP ($)", margin=dict(l=20, r=100, t=10, b=20),
+                      xaxis_title="Revenue ($)", margin=dict(l=20, r=100, t=10, b=20),
                       legend=dict(orientation="h", yanchor="bottom", y=1.02))
 st.plotly_chart(fig_pg, use_container_width=True)
 

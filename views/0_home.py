@@ -238,7 +238,7 @@ def _pipeline_panel():
         amt = ""
         if unlocked:
             amt = ('<div class="kb-amt" style="color:' + color + '">'
-                   + (_k(c["gp"]) if c["gp"] else "—") + '</div>')
+                   + (_k(c["rev"]) if c["rev"] else "—") + '</div>')
         return (f'<div class="kb-card" style="border-color:{color}">'
                 f'<div class="kb-name">{_h.escape(c["name"])}</div>'
                 f'<div class="kb-meta">{_h.escape(meta) or "&nbsp;"}</div>{amt}</div>')
@@ -246,7 +246,7 @@ def _pipeline_panel():
     out = []
     for key, label, color, icon, empty in cols:
         items = d["stages"][key]
-        total = sum(c["gp"] or 0 for c in items)
+        total = sum(c["rev"] or 0 for c in items)
         tot = _k(total) if unlocked else "🔒"
         body = "".join(card(c, color) for c in items[:CAP])
         if len(items) > CAP:
@@ -260,10 +260,9 @@ def _pipeline_panel():
     p1 = f"{d['proposals'] / d['leads']:.0%}" if d["leads"] else "—"
     p2 = f"{d['won'] / d['proposals']:.0%}" if d["proposals"] else "—"
     note = ""
-    if unlocked:
-        note = ('<div class="kb-note">$ = GP, taken as 80% of the revenue on the sheet.'
-                + (" " + ", ".join(d["gp_missing"]) + ": value not on the sheet yet."
-                   if d["gp_missing"] else "") + '</div>')
+    if unlocked and d["rev_missing"]:
+        note = ('<div class="kb-note">' + ", ".join(d["rev_missing"])
+                + ': value not on the sheet yet.</div>')
     st.markdown(
         f'<div class="kb-sum"><b>{d["leads"]}</b> net-new leads → <b>{d["proposals"]}</b> proposals '
         f'({p1}) → <b>{d["won"]}</b> won ({p2})</div>'
