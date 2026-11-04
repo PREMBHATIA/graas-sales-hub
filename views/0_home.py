@@ -228,8 +228,8 @@ def _pipeline_panel():
 
     unlocked = is_unlocked()
     CAP = 6   # keeps the board above the fold; the rest collapse to "+N more"
-    cols = [("<60", "Proposals < 60 days", "#3B82F6", "🔵", "None sent in the last 60 days"),
-            (">60", "Proposals > 60 days", "#F59E0B", "🟡", "None"),
+    cols = [(">60", "Proposals > 60 days", "#F59E0B", "🟡", "None"),
+            ("<60", "Proposals < 60 days", "#3B82F6", "🔵", "None sent in the last 60 days"),
             ("Won", "Won", "#10B981", "✅", "None"),
             ("Lost", "Lost", "#EF4444", "❌", "None")]
 
