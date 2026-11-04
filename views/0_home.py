@@ -196,6 +196,14 @@ st.markdown("""
     .kb-line { display: flex; justify-content: space-between; gap: 8px;
                font-size: 0.8rem; line-height: 1.5; color: #E2E8F0; font-weight: 700; }
     .kb-line span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    /* Recent conversations: a row of the same compact cards, with a third line for
+       the next step / last note. */
+    .rc-sub  { font-size: 0.78rem; color: #6B7280; margin: -4px 0 8px; }
+    .rc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+               gap: 4px 10px; }
+    .rc-step { grid-column: 1 / -1; font-size: 0.68rem; color: #CBD5E1; line-height: 1.25;
+               margin-top: 1px; white-space: nowrap; overflow: hidden;
+               text-overflow: ellipsis; }
     .kb-more { font-size: 0.74rem; color: #6B7280; padding: 2px 2px 0; }
     .kb-empty { font-size: 0.78rem; color: #9CA3AF; padding: 10px 2px; }
     .kb-note { font-size: 0.7rem; color: #9CA3AF; margin-top: 8px; }
@@ -294,6 +302,36 @@ def _pipeline_panel():
 
 
 
+def _recent_panel():
+    """Good conversations from the last 30 days that have not reached a proposal yet.
+    Rendered below the board so the board paints first (the deck read can take a few
+    seconds). Silent on any failure: the board above is the point of this page."""
+    import html as _h
+    try:
+        from services.home_recent import load_recent
+        items = load_recent()
+    except Exception:
+        return
+    if not items:
+        return
+    CAP, color = 8, "#14B8A6"
+    cards = ""
+    for x in items[:CAP]:
+        meta = " · ".join(p for p in (x["owner"], x["where"], f'{x["date"]:%d %b}') if p)
+        step = _h.escape(x["step"] or "")
+        cards += (
+            f'<div class="kb-card" style="border-color:{color}" title="{step}">'
+            f'<div class="kb-name">{_h.escape(x["name"])}</div>'
+            + (f'<div class="kb-amt" style="color:{color}">{_k(x["value"])}</div>' if x["value"] else "")
+            + f'<div class="kb-meta">{_h.escape(meta)}</div>'
+            + (f'<div class="rc-step">{step}</div>' if step else "") + '</div>')
+    more = (f'<div class="kb-more">+{len(items) - CAP} more</div>' if len(items) > CAP else "")
+    _label(f"Recent conversations ({len(items)})")
+    st.markdown('<div class="rc-sub">Active leads spoken to in the last 30 days that have not '
+                'reached a proposal yet.</div><div class="rc-grid">' + cards + '</div>' + more,
+                unsafe_allow_html=True)
+
+
 st.markdown('<p class="main-header">SalesHub</p>', unsafe_allow_html=True)
 st.markdown('<p class="sub-header">Everything a salesperson needs — briefs, '
             'collateral, pipeline and outreach.</p>', unsafe_allow_html=True)
@@ -312,6 +350,7 @@ with _left:
 with _right:
     _label("All-e pipeline")
     _pipeline_panel()
+    _recent_panel()
 
 with c1:
     _tile("📋", "Prospect Brief", "Pre-call two-pager research",
