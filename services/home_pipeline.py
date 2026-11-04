@@ -9,10 +9,10 @@ Numbers come from two sheets that are both live:
 All-e ONLY: the revenue sheet also carries MP Enablement, Extract, Hoppr and others,
 which are filtered out on Product.
 
-Two hard-coded overrides (Prem, 3 Nov), because the sheets lag the deals:
+Two hard-coded overrides (Prem), because the sheets lag the deals:
   • LK is WON (signed by email; the sheet still says "In Discussion").
-  • PI is WON but is on neither sheet, so it is added here. Its value is not known
-    yet, so it counts as a proposal and a win but adds nothing to the dollar totals.
+  • PI is WON but is on neither sheet, so it is added here: Jan 2026, ACV $35K,
+    owner Prem. The page shows GP, so it counts at 80% of the ACV ($28K).
 Delete these the day the sheets are updated.
 
 Kept in its own module, imported lazily by the homepage, so a failure here can
@@ -21,14 +21,16 @@ never break the landing page.
 
 import os
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pandas as pd
 import streamlit as st
 
 # ── Overrides ────────────────────────────────────────────────────────────────
 STATUS_OVERRIDES = {"lk": "Won"}   # client-name prefix (lower case) → status
-EXTRA_WON = [{"name": "PI", "gp": None, "region": "India", "owner": ""}]
+GP_SHARE = 0.80   # an ACV is revenue; GP is taken as 80% of it (Prem's rule)
+# PI: WhatsApp distributor ordering, won Jan 2026, ACV $35K (Prem, 4 Nov).
+EXTRA_WON = [{"name": "PI", "acv": 35_000, "region": "India", "owner": "Prem", "month": 1}]
 DISPLAY_NAME = {"castrol voice agent pilot": "Castrol Voice", "lk all-e": "LK"}
 
 _MONTHS = {m: i for i, m in enumerate(
@@ -56,6 +58,19 @@ def _date(s):
         return datetime(min(int(m.group(3)), 2026), _MONTHS[m.group(2)[:3].lower()], int(m.group(1)))
     except ValueError:
         return None
+
+
+def _month(s):
+    """'May'26' / 'March '26' -> 5. None if unreadable."""
+    return _MONTHS.get(re.sub(r"[^a-z]", "", str(s or "").lower())[:3])
+
+
+def _bucket(month) -> str:
+    """Same cut as the Cross-Product Pipeline page: a proposal is '<60' if its
+    sent month's 15th is within 60 days of today, else '>60'."""
+    if month is None or pd.isna(month):
+        return ">60"
+    return "<60" if datetime(2026, int(month), 15) >= datetime.now() - timedelta(days=60) else ">60"
 
 
 def _gp(v):
@@ -103,9 +118,8 @@ def load_headline() -> dict:
         m = m[~m["Lead name"].astype(str).str.lower().str.contains("large")]
         if m.empty:
             return "", ""
-        region = str(m["Region"].iloc[0]).strip()
-        owner = str(m["Owner"].iloc[0]).strip() if has_owner else ""
-        return region, owner
+        clean = lambda v: "" if str(v).strip().lower() in ("nan", "none") else str(v).strip()
+        return clean(m["Region"].iloc[0]), clean(m["Owner"].iloc[0]) if has_owner else ""
 
     rows = []
     for _, r in rev.iterrows():
@@ -117,21 +131,29 @@ def load_headline() -> dict:
             if low.startswith(prefix):
                 status = forced
         rows.append({"name": DISPLAY_NAME.get(low, raw), "status": status, "gp": _gp(r.get("First Year GP")),
-                     "pic": str(r.get("PIC", "")).strip()})
+                     "pic": str(r.get("PIC", "")).strip(), "month": _month(r.get("Date sent"))})
     for x in EXTRA_WON:
-        rows.append({"name": x["name"], "status": "Won", "gp": x["gp"], "pic": "", "_region": x["region"],
-                     "_owner": x["owner"]})
+        rows.append({"name": x["name"], "status": "Won", "gp": x["acv"] * GP_SHARE, "pic": "",
+                     "month": x["month"], "_region": x["region"], "_owner": x["owner"]})
     df = pd.DataFrame(rows)
 
-    won = []
-    for _, r in df[df["status"] == "Won"].iterrows():
+    def _card(r):
         if "_region" in r and isinstance(r.get("_region"), str):
             region, owner = r["_region"], r.get("_owner", "")
         else:
             region, owner = _lookup(r["name"])
             owner = owner or r["pic"]          # tracker owner, else the sheet's PIC
         gp = None if pd.isna(r["gp"]) else float(r["gp"])
-        won.append({"name": r["name"], "gp": gp, "region": region or "—", "owner": owner or "—"})
+        mon = [k for k, v in _MONTHS.items() if v == r["month"]]
+        return {"name": r["name"], "gp": gp, "region": region or "", "owner": owner or "",
+                "month": mon[0].title() if mon else ""}
+
+    stages = {"<60": [], ">60": [], "Won": [], "Lost": []}
+    for _, r in df.iterrows():
+        key = r["status"] if r["status"] in ("Won", "Lost") else _bucket(r["month"])
+        stages[key].append(_card(r))
+    for k in stages:   # biggest first, deals with no value last
+        stages[k].sort(key=lambda c: -(c["gp"] or 0))
 
     # Net-new leads this year
     first = tracker["First conv date"].map(_date)
@@ -141,11 +163,9 @@ def load_headline() -> dict:
     return {
         "leads": leads,
         "proposals": len(df),
-        "proposals_gp": float(df["gp"].sum()),
         "won": int(count.get("Won", 0)),
         "lost": int(count.get("Lost", 0)),
         "discussion": int(count.get("In discussion", 0)),
-        "won_gp": float(df.loc[df["status"] == "Won", "gp"].sum()),
-        "won_list": sorted(won, key=lambda w: -(w["gp"] or 0)),
-        "gp_missing": [w["name"] for w in won if w["gp"] is None],
+        "stages": stages,
+        "gp_missing": [c["name"] for c in stages["Won"] if c["gp"] is None],
     }

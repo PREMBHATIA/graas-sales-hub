@@ -93,10 +93,13 @@ st.markdown("""
         box-shadow: 0 10px 22px rgba(79,70,229,.13);
         border-color: #C7D2FE;
     }
-    .tile-icon  { font-size: 1.7rem; line-height: 1; }
-    .tile-title { font-size: 1.02rem; font-weight: 800; margin: 6px 0 2px;
-                  letter-spacing: -0.01em; }
-    .tile-desc  { font-size: 0.82rem; color: #6B7280; min-height: 2.4em;
+    /* Icon sits beside the title, not above it: the cards live in a narrow rail
+       next to the pipeline board, and stacking the icon cost ~30px a card. */
+    .tile-icon  { font-size: 1.3rem; line-height: 1; display: inline-block;
+                  vertical-align: middle; margin-right: 7px; }
+    .tile-title { font-size: 1.02rem; font-weight: 800; display: inline;
+                  vertical-align: middle; letter-spacing: -0.01em; }
+    .tile-desc  { font-size: 0.8rem; color: #6B7280; margin-top: 3px;
                   line-height: 1.35; }
 
     /* Streamlit's page_link, made to read as the card's action */
@@ -162,35 +165,26 @@ st.markdown("""
                   margin-left: 4px; }
     .rumi-subj  { min-width: 270px; font-weight: 600; }
 
-    /* All-e pipeline panel. Plain HTML, NOT a bordered container, so the card
-       hover-lift above doesn't apply to it. The funnel is centred bars of
-       fixed widths (the counts are too far apart to draw to scale). */
-    .pipe-panel { border: 1px solid #E5E7EB; border-radius: 14px;
-                  padding: 14px 16px 10px; background: #FFFFFF; }
-    .pf-step { margin: 0 auto; border-radius: 10px; padding: 8px 14px;
-               display: flex; align-items: baseline; gap: 10px; }
-    .pf-n   { font-size: 1.45rem; font-weight: 800; letter-spacing: -0.02em;
-              line-height: 1; }
-    .pf-l   { font-size: 0.78rem; font-weight: 600; flex: 1; }
-    .pf-usd { font-size: 0.8rem; font-weight: 800; white-space: nowrap; }
-    .pf-lock { font-size: 0.72rem; opacity: .75; }
-    .pf-conv { text-align: center; font-size: 0.72rem; font-weight: 800;
-               color: #6B7280; margin: 3px 0; }
-    .pf-chips { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;
-                margin: 10px 0 4px; }
-    .pf-chip { font-size: 0.74rem; font-weight: 700; padding: 3px 11px;
-               border-radius: 999px; border: 1px solid #E5E7EB; color: #374151;
-               background: #F9FAFB; }
-    .pf-sub { font-size: 0.68rem; font-weight: 800; letter-spacing: .1em;
-              text-transform: uppercase; color: #6B7280; margin: 12px 0 4px;
-              padding-top: 10px; border-top: 1px solid #F3F4F6; }
-    .pf-deal { display: flex; align-items: baseline; gap: 8px; padding: 5px 0;
-               border-bottom: 1px solid #F3F4F6; font-size: 0.84rem; }
-    .pf-deal:last-of-type { border-bottom: none; }
-    .pf-d-name { font-weight: 700; flex: 1; }
-    .pf-d-meta { color: #6B7280; font-size: 0.74rem; white-space: nowrap; }
-    .pf-d-usd  { font-weight: 800; min-width: 52px; text-align: right; }
-    .pf-note { font-size: 0.7rem; color: #9CA3AF; margin-top: 6px; }
+    /* All-e pipeline board: four columns (proposals <60 days, >60 days, won,
+       lost), the same funnel as the Cross-Product Proposal Board. Plain HTML,
+       NOT a bordered container, so the card hover-lift above doesn't apply. */
+    .kb-sum  { font-size: 0.8rem; color: #6B7280; margin: 0 0 10px; }
+    .kb-sum b { color: #111827; }
+    .kb-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+               gap: 14px; }
+    .kb-head { font-weight: 800; font-size: 0.92rem; line-height: 1.2;
+               padding: 4px 0 6px; border-bottom: 2px solid; margin-bottom: 8px; }
+    .kb-tot  { font-size: 0.8rem; font-weight: 700; margin-top: 3px; }
+    .kb-card { background: #1E1E2E; border-radius: 6px; padding: 7px 9px;
+               margin-bottom: 5px; border-left: 3px solid; }
+    .kb-name { font-weight: 700; font-size: 0.84rem; color: #E2E8F0;
+               white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .kb-meta { font-size: 0.7rem; color: #9CA3AF; margin-top: 1px;
+               white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .kb-amt  { font-size: 0.78rem; font-weight: 800; margin-top: 2px; }
+    .kb-more { font-size: 0.74rem; color: #6B7280; padding: 2px 2px 0; }
+    .kb-empty { font-size: 0.78rem; color: #9CA3AF; padding: 10px 2px; }
+    .kb-note { font-size: 0.7rem; color: #9CA3AF; margin-top: 8px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -220,9 +214,10 @@ def _k(x):
 
 
 def _pipeline_panel():
-    """All-e headline funnel. Counts are open to everyone; dollar amounts show
+    """All-e proposal board. Counts are open to everyone; dollar amounts show
     only once the session is unlocked (the shared section password). Never lets
     a sheet problem break the landing page."""
+    import html as _h
     from services.auth_gate import is_unlocked
     try:
         from services.home_pipeline import load_headline
@@ -232,38 +227,46 @@ def _pipeline_panel():
         return
 
     unlocked = is_unlocked()
-    lock = '<span class="pf-lock">🔒</span>'
-    usd = lambda x: _k(x) if unlocked else lock
+    CAP = 6   # keeps the board above the fold; the rest collapse to "+N more"
+    cols = [("<60", "Proposals < 60 days", "#3B82F6", "🔵", "None sent in the last 60 days"),
+            (">60", "Proposals > 60 days", "#F59E0B", "🟡", "None"),
+            ("Won", "Won", "#10B981", "✅", "None"),
+            ("Lost", "Lost", "#EF4444", "❌", "None")]
+
+    def card(c, color):
+        meta = " · ".join(x for x in (c["owner"], c["region"], c["month"]) if x)
+        amt = ""
+        if unlocked:
+            amt = ('<div class="kb-amt" style="color:' + color + '">'
+                   + (_k(c["gp"]) if c["gp"] else "—") + '</div>')
+        return (f'<div class="kb-card" style="border-color:{color}">'
+                f'<div class="kb-name">{_h.escape(c["name"])}</div>'
+                f'<div class="kb-meta">{_h.escape(meta) or "&nbsp;"}</div>{amt}</div>')
+
+    out = []
+    for key, label, color, icon, empty in cols:
+        items = d["stages"][key]
+        total = sum(c["gp"] or 0 for c in items)
+        tot = _k(total) if unlocked else "🔒"
+        body = "".join(card(c, color) for c in items[:CAP])
+        if len(items) > CAP:
+            body += f'<div class="kb-more">+{len(items) - CAP} more</div>'
+        if not items:
+            body = f'<div class="kb-empty">{empty}</div>'
+        out.append(
+            '<div><div class="kb-head" style="border-color:' + color + ';color:' + color + '">'
+            f'{icon} {label} ({len(items)})<div class="kb-tot">{tot}</div></div>{body}</div>')
+
     p1 = f"{d['proposals'] / d['leads']:.0%}" if d["leads"] else "—"
     p2 = f"{d['won'] / d['proposals']:.0%}" if d["proposals"] else "—"
-
-    deals = "".join(
-        f'<div class="pf-deal"><span class="pf-d-name">{w["name"]}</span>'
-        f'<span class="pf-d-meta">{w["owner"]} · {w["region"]}</span>'
-        f'<span class="pf-d-usd">'
-        + ("" if not unlocked else "—" if w["gp"] is None else _k(w["gp"])) + '</span></div>'
-        for w in d["won_list"])
     note = ""
     if unlocked and d["gp_missing"]:
-        note = ('<div class="pf-note">' + ", ".join(d["gp_missing"])
+        note = ('<div class="kb-note">' + ", ".join(d["gp_missing"])
                 + ': value not on the sheet yet.</div>')
-
     st.markdown(
-        '<div class="pipe-panel">'
-        f'<div class="pf-step" style="width:100%;background:#EEF2FF;color:#3730A3">'
-        f'<span class="pf-n">{d["leads"]}</span><span class="pf-l">Net-new leads, 2026</span></div>'
-        f'<div class="pf-conv">▼ {p1}</div>'
-        f'<div class="pf-step" style="width:82%;background:#C7D2FE;color:#312E81">'
-        f'<span class="pf-n">{d["proposals"]}</span><span class="pf-l">Proposals out</span>'
-        f'<span class="pf-usd">{usd(d["proposals_gp"])}</span></div>'
-        f'<div class="pf-conv">▼ {p2}</div>'
-        f'<div class="pf-step" style="width:64%;background:#059669;color:#FFFFFF">'
-        f'<span class="pf-n">{d["won"]}</span><span class="pf-l">Won</span>'
-        f'<span class="pf-usd">{usd(d["won_gp"])}</span></div>'
-        '<div class="pf-chips">'
-        f'<span class="pf-chip">{d["discussion"]} in discussion</span>'
-        f'<span class="pf-chip">{d["lost"]} lost</span></div>'
-        '<div class="pf-sub">Won deals</div>' + deals + note + '</div>',
+        f'<div class="kb-sum"><b>{d["leads"]}</b> net-new leads → <b>{d["proposals"]}</b> proposals '
+        f'({p1}) → <b>{d["won"]}</b> won ({p2})</div>'
+        '<div class="kb-grid">' + "".join(out) + '</div>' + note,
         unsafe_allow_html=True)
 
     if not unlocked:
@@ -280,12 +283,13 @@ st.markdown('<p class="sub-header">Everything a salesperson needs — briefs, '
 # Promoted above Cross-Product: it is where the team actually works and holds
 # the only tiles most people need. The restricted sections sit below.
 
-_left, _right = st.columns([5, 4], gap="large")
+_left, _right = st.columns([2, 7], gap="large")
 with _left:
-    _label("All-e — where the work happens")
-    _r1a, _r1b = st.columns(2)
-    _r2a, _r2b = st.columns(2)
-c1, c2, c3, c4 = _r1a, _r1b, _r2a, _r2b
+    _label("All-e")
+    c1 = st.container()
+    c2 = st.container()
+    c3 = st.container()
+    c4 = st.container()
 with _right:
     _label("All-e pipeline")
     _pipeline_panel()
