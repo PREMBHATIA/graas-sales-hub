@@ -173,11 +173,21 @@ def load_headline() -> dict:
     revisit_words = {_norm(n).split(" ")[0] for n, s in zip(tracker["Lead name"], status_col)
                      if str(s).strip().lower() == "revisit"}
 
+    # A proposal the tracker marks Dropped is a lost deal, whatever the revenue sheet still
+    # says (Microtek: "3-Proposal sent" + Dropped, sheet "In discussion"). Skipped when
+    # another lead with the same first word is still Active (Schneider vs Schneider OCR).
+    word = lambda n: _norm(n).split(" ")[0]
+    live_words = {word(n) for n, s in zip(tracker["Lead name"], status_col) if str(s).strip() in ("Active", "Revisit")}
+    dropped_words = {word(n) for n, s in zip(tracker["Lead name"], status_col)
+                     if str(s).strip() == "Dropped"} - live_words
+
     stages = {"<60": [], ">60": [], "Revisit": [], "Won": [], "Lost": []}
     for _, r in df.iterrows():
         key = r["status"] if r["status"] in ("Won", "Lost") else _bucket(r["month"])
         if key in ("<60", ">60") and _norm(r["name"]).split(" ")[0] in revisit_words:
             key = "Revisit"
+        elif key in ("<60", ">60") and _norm(r["name"]).split(" ")[0] in dropped_words:
+            key = "Lost"
         stages[key].append(_card(r))
     for k in stages:   # biggest first, deals with no value last
         stages[k].sort(key=lambda c: -(c["rev"] or 0))
