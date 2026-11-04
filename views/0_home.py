@@ -161,6 +161,36 @@ st.markdown("""
                   border-left: 2px solid #E5E7EB; padding-left: 12px;
                   margin-left: 4px; }
     .rumi-subj  { min-width: 270px; font-weight: 600; }
+
+    /* All-e pipeline panel. Plain HTML, NOT a bordered container, so the card
+       hover-lift above doesn't apply to it. The funnel is centred bars of
+       fixed widths (the counts are too far apart to draw to scale). */
+    .pipe-panel { border: 1px solid #E5E7EB; border-radius: 14px;
+                  padding: 14px 16px 10px; background: #FFFFFF; }
+    .pf-step { margin: 0 auto; border-radius: 10px; padding: 8px 14px;
+               display: flex; align-items: baseline; gap: 10px; }
+    .pf-n   { font-size: 1.45rem; font-weight: 800; letter-spacing: -0.02em;
+              line-height: 1; }
+    .pf-l   { font-size: 0.78rem; font-weight: 600; flex: 1; }
+    .pf-usd { font-size: 0.8rem; font-weight: 800; white-space: nowrap; }
+    .pf-lock { font-size: 0.72rem; opacity: .75; }
+    .pf-conv { text-align: center; font-size: 0.72rem; font-weight: 800;
+               color: #6B7280; margin: 3px 0; }
+    .pf-chips { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;
+                margin: 10px 0 4px; }
+    .pf-chip { font-size: 0.74rem; font-weight: 700; padding: 3px 11px;
+               border-radius: 999px; border: 1px solid #E5E7EB; color: #374151;
+               background: #F9FAFB; }
+    .pf-sub { font-size: 0.68rem; font-weight: 800; letter-spacing: .1em;
+              text-transform: uppercase; color: #6B7280; margin: 12px 0 4px;
+              padding-top: 10px; border-top: 1px solid #F3F4F6; }
+    .pf-deal { display: flex; align-items: baseline; gap: 8px; padding: 5px 0;
+               border-bottom: 1px solid #F3F4F6; font-size: 0.84rem; }
+    .pf-deal:last-of-type { border-bottom: none; }
+    .pf-d-name { font-weight: 700; flex: 1; }
+    .pf-d-meta { color: #6B7280; font-size: 0.74rem; white-space: nowrap; }
+    .pf-d-usd  { font-weight: 800; min-width: 52px; text-align: right; }
+    .pf-note { font-size: 0.7rem; color: #9CA3AF; margin-top: 6px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -184,6 +214,64 @@ def _label(text, locked=False):
         + '</p>', unsafe_allow_html=True)
 
 
+def _k(x):
+    """$1.14M / $229K."""
+    return f"${x / 1_000_000:,.2f}M" if x >= 1_000_000 else f"${x / 1_000:,.0f}K"
+
+
+def _pipeline_panel():
+    """All-e headline funnel. Counts are open to everyone; dollar amounts show
+    only once the session is unlocked (the shared section password). Never lets
+    a sheet problem break the landing page."""
+    from services.auth_gate import is_unlocked
+    try:
+        from services.home_pipeline import load_headline
+        d = load_headline()
+    except Exception:
+        st.caption("Pipeline numbers are unavailable right now.")
+        return
+
+    unlocked = is_unlocked()
+    lock = '<span class="pf-lock">🔒</span>'
+    usd = lambda x: _k(x) if unlocked else lock
+    p1 = f"{d['proposals'] / d['leads']:.0%}" if d["leads"] else "—"
+    p2 = f"{d['won'] / d['proposals']:.0%}" if d["proposals"] else "—"
+
+    deals = "".join(
+        f'<div class="pf-deal"><span class="pf-d-name">{w["name"]}</span>'
+        f'<span class="pf-d-meta">{w["owner"]} · {w["region"]}</span>'
+        f'<span class="pf-d-usd">'
+        + ("" if not unlocked else "—" if w["gp"] is None else _k(w["gp"])) + '</span></div>'
+        for w in d["won_list"])
+    note = ""
+    if unlocked and d["gp_missing"]:
+        note = ('<div class="pf-note">' + ", ".join(d["gp_missing"])
+                + ': value not on the sheet yet.</div>')
+
+    st.markdown(
+        '<div class="pipe-panel">'
+        f'<div class="pf-step" style="width:100%;background:#EEF2FF;color:#3730A3">'
+        f'<span class="pf-n">{d["leads"]}</span><span class="pf-l">Net-new leads, 2026</span></div>'
+        f'<div class="pf-conv">▼ {p1}</div>'
+        f'<div class="pf-step" style="width:82%;background:#C7D2FE;color:#312E81">'
+        f'<span class="pf-n">{d["proposals"]}</span><span class="pf-l">Proposals out</span>'
+        f'<span class="pf-usd">{usd(d["proposals_gp"])}</span></div>'
+        f'<div class="pf-conv">▼ {p2}</div>'
+        f'<div class="pf-step" style="width:64%;background:#059669;color:#FFFFFF">'
+        f'<span class="pf-n">{d["won"]}</span><span class="pf-l">Won</span>'
+        f'<span class="pf-usd">{usd(d["won_gp"])}</span></div>'
+        '<div class="pf-chips">'
+        f'<span class="pf-chip">{d["discussion"]} in discussion</span>'
+        f'<span class="pf-chip">{d["lost"]} lost</span></div>'
+        '<div class="pf-sub">Won deals</div>' + deals + note + '</div>',
+        unsafe_allow_html=True)
+
+    if not unlocked:
+        with st.expander("🔒 Show $ values"):
+            from services.inline_gate import gate_inline
+            gate_inline("Pipeline $ values", key="home_pipeline")
+
+
 st.markdown('<p class="main-header">SalesHub</p>', unsafe_allow_html=True)
 st.markdown('<p class="sub-header">Everything a salesperson needs — briefs, '
             'collateral, pipeline and outreach.</p>', unsafe_allow_html=True)
@@ -192,9 +280,16 @@ st.markdown('<p class="sub-header">Everything a salesperson needs — briefs, '
 # Promoted above Cross-Product: it is where the team actually works and holds
 # the only tiles most people need. The restricted sections sit below.
 
-_label("All-e — where the work happens")
+_left, _right = st.columns([5, 4], gap="large")
+with _left:
+    _label("All-e — where the work happens")
+    _r1a, _r1b = st.columns(2)
+    _r2a, _r2b = st.columns(2)
+c1, c2, c3, c4 = _r1a, _r1b, _r2a, _r2b
+with _right:
+    _label("All-e pipeline")
+    _pipeline_panel()
 
-c1, c2, c3, c4 = st.columns(4)
 with c1:
     _tile("📋", "Prospect Brief", "Pre-call two-pager research",
           "views/9_prospect_brief.py", "Create a brief →")

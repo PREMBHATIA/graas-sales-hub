@@ -29,7 +29,7 @@ def gate_inline(section_label: str, key: str = "inline") -> bool:
 
     st.markdown(f"#### 🔒 {section_label} is restricted")
     st.caption(
-        "Enter the team access password to view this tab. It is the same password "
+        "Enter the team access password to view this. It is the same password "
         "as Pipeline (Cross-Product), Hoppr, Emails & Segments and Resources, and "
         "unlocks all of them for this browser session."
     )
