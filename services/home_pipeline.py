@@ -96,10 +96,13 @@ def _norm(n) -> str:
 
 
 def _tracker():
+    # force_refresh: fetch_sheet_tab otherwise trusts its saved copy for 4 hours, so a
+    # lead flagged Revisit (or a new proposal) took hours to reach the homepage. This is
+    # called inside load_headline, itself cached for 15 minutes, so reads stay few.
     from services.sheets_client import fetch_sheet_tab
     sid = _cfg("ALLE_SHEET_ID")
-    a = fetch_sheet_tab(sid, "Overall Pipeline for IN and SEA")
-    b = fetch_sheet_tab(sid, "Dropped leads")
+    a = fetch_sheet_tab(sid, "Overall Pipeline for IN and SEA", force_refresh=True)
+    b = fetch_sheet_tab(sid, "Dropped leads", force_refresh=True)
     for df in (a, b):
         df.columns = [str(c).strip() for c in df.columns]
     a = a[a["Lead name"].astype(str).str.strip().ne("")].copy()
@@ -115,7 +118,7 @@ def load_headline() -> dict:
     from services.sheets_client import fetch_sheet_tab
 
     # Proposals — All-e rows only
-    rev = fetch_sheet_tab(_cfg("REVENUE_SHEET_ID"), "Proposals")
+    rev = fetch_sheet_tab(_cfg("REVENUE_SHEET_ID"), "Proposals", force_refresh=True)
     rev.columns = [str(c).strip() for c in rev.columns]
     rev = rev[rev["Client Name"].astype(str).str.strip().ne("")].copy()
     rev = rev[rev["Product"].astype(str).str.contains(r"\ball[\s\-]?e\b", case=False, regex=True, na=False)]

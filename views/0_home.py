@@ -174,6 +174,7 @@ st.markdown("""
                gap: 14px; }
     .kb-head { font-weight: 800; font-size: 0.92rem; line-height: 1.2;
                padding: 4px 0 6px; border-bottom: 2px solid; margin-bottom: 8px; }
+    .kb-sub  { font-size: 0.66rem; font-weight: 600; color: #6B7280; margin-top: 1px; }
     .kb-tot  { font-size: 0.8rem; font-weight: 700; margin-top: 3px; }
     /* Two lines per card: name on the left with the amount top-right, and the
        owner · region · month line beneath. A grid, so the amount can sit on the
@@ -241,11 +242,11 @@ def _pipeline_panel():
         return
 
     CAP = 10  # cards are compact enough to show every deal; extras collapse to "+N more"
-    cols = [(">60", "> 60 days", "#F59E0B", "🟡", "None"),
-            ("<60", "< 60 days", "#3B82F6", "🔵", "None sent in the last 60 days"),
-            ("Revisit", "Revisit", "#8B5CF6", "🔁", "None"),
-            ("Won", "Won", "#10B981", "✅", "None"),
-            ("Lost", "Lost", "#EF4444", "❌", "None")]
+    cols = [("Revisit", "Revisit", "#8B5CF6", "🔁", "None", "proposal sent, no response"),
+            (">60", "> 60 days", "#F59E0B", "🟡", "None", ""),
+            ("<60", "< 60 days", "#3B82F6", "🔵", "None sent in the last 60 days", ""),
+            ("Won", "Won", "#10B981", "✅", "None", ""),
+            ("Lost", "Lost", "#EF4444", "❌", "None", "")]
 
     def card(c, color):
         meta = " · ".join(x for x in (c["owner"], c["region"], c["month"]) if x)
@@ -256,7 +257,7 @@ def _pipeline_panel():
                 f'<div class="kb-meta">{_h.escape(meta) or "&nbsp;"}</div>{amt}</div>')
 
     out = []
-    for key, label, color, icon, empty in cols:
+    for key, label, color, icon, empty, sub in cols:
         items = d["stages"][key]
         total = sum(c["rev"] or 0 for c in items)
         tot = _k(total)
@@ -275,7 +276,9 @@ def _pipeline_panel():
             body = f'<div class="kb-empty">{empty}</div>'
         out.append(
             '<div><div class="kb-head" style="border-color:' + color + ';color:' + color + '">'
-            f'{icon} {label} ({len(items)})<div class="kb-tot">{tot}</div></div>{body}</div>')
+            f'{icon} {label} ({len(items)})'
+            + (f'<div class="kb-sub">{sub}</div>' if sub else '')
+            + f'<div class="kb-tot">{tot}</div></div>{body}</div>')
 
     p1 = f"{d['proposals'] / d['leads']:.0%}" if d["leads"] else "—"
     p2 = f"{d['won'] / d['proposals']:.0%}" if d["proposals"] else "—"
