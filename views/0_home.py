@@ -209,16 +209,17 @@ def _label(text, locked=False):
 
 
 def _k(x):
-    """$1.14M / $229K."""
+    """$1.14M / $229K / $0."""
+    if not x:
+        return "$0"
     return f"${x / 1_000_000:,.2f}M" if x >= 1_000_000 else f"${x / 1_000:,.0f}K"
 
 
 def _pipeline_panel():
-    """All-e proposal board. Counts are open to everyone; dollar amounts show
-    only once the session is unlocked (the shared section password). Never lets
-    a sheet problem break the landing page."""
+    """All-e proposal board: counts, per-deal revenue and column totals, open to
+    everyone on the viewer list (Prem, 4 Nov: option 1 — no password on the
+    board). Never lets a sheet problem break the landing page."""
     import html as _h
-    from services.auth_gate import is_unlocked
     try:
         from services.home_pipeline import load_headline
         d = load_headline()
@@ -226,7 +227,6 @@ def _pipeline_panel():
         st.caption("Pipeline numbers are unavailable right now.")
         return
 
-    unlocked = is_unlocked()
     CAP = 6   # keeps the board above the fold; the rest collapse to "+N more"
     cols = [(">60", "Proposals > 60 days", "#F59E0B", "🟡", "None"),
             ("<60", "Proposals < 60 days", "#3B82F6", "🔵", "None sent in the last 60 days"),
@@ -235,10 +235,8 @@ def _pipeline_panel():
 
     def card(c, color):
         meta = " · ".join(x for x in (c["owner"], c["region"], c["month"]) if x)
-        amt = ""
-        if unlocked:
-            amt = ('<div class="kb-amt" style="color:' + color + '">'
-                   + (_k(c["rev"]) if c["rev"] else "—") + '</div>')
+        amt = ('<div class="kb-amt" style="color:' + color + '">'
+               + (_k(c["rev"]) if c["rev"] else "—") + '</div>')
         return (f'<div class="kb-card" style="border-color:{color}">'
                 f'<div class="kb-name">{_h.escape(c["name"])}</div>'
                 f'<div class="kb-meta">{_h.escape(meta) or "&nbsp;"}</div>{amt}</div>')
@@ -247,7 +245,7 @@ def _pipeline_panel():
     for key, label, color, icon, empty in cols:
         items = d["stages"][key]
         total = sum(c["rev"] or 0 for c in items)
-        tot = _k(total) if unlocked else "🔒"
+        tot = _k(total)
         body = "".join(card(c, color) for c in items[:CAP])
         if len(items) > CAP:
             body += f'<div class="kb-more">+{len(items) - CAP} more</div>'
@@ -260,7 +258,7 @@ def _pipeline_panel():
     p1 = f"{d['proposals'] / d['leads']:.0%}" if d["leads"] else "—"
     p2 = f"{d['won'] / d['proposals']:.0%}" if d["proposals"] else "—"
     note = ""
-    if unlocked and d["rev_missing"]:
+    if d["rev_missing"]:
         note = ('<div class="kb-note">' + ", ".join(d["rev_missing"])
                 + ': value not on the sheet yet.</div>')
     st.markdown(
@@ -269,10 +267,6 @@ def _pipeline_panel():
         '<div class="kb-grid">' + "".join(out) + '</div>' + note,
         unsafe_allow_html=True)
 
-    if not unlocked:
-        with st.expander("🔒 Show $ values"):
-            from services.inline_gate import gate_inline
-            gate_inline("Pipeline $ values", key="home_pipeline")
 
 
 st.markdown('<p class="main-header">SalesHub</p>', unsafe_allow_html=True)
