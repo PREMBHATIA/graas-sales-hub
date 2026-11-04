@@ -195,4 +195,8 @@ def load_headline() -> dict:
         "discussion": int(count.get("In discussion", 0)),
         "stages": stages,
         "rev_missing": [c["name"] for c in stages["Won"] if c["rev"] is None],
+        # shown only at ?diag=1, to see what a deployed copy actually read
+        "diag": {"tracker_rows": len(tracker_a), "sheet": _cfg("ALLE_SHEET_ID")[-6:],
+                 "status": status_col.astype(str).str.strip().value_counts().to_dict(),
+                 "revisit_words": sorted(revisit_words), "read_at": datetime.now().strftime("%H:%M:%S")},
     }

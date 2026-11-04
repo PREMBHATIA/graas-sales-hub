@@ -248,6 +248,8 @@ def _pipeline_panel():
     except Exception:
         st.caption("Pipeline numbers are unavailable right now.")
         return
+    if st.query_params.get("diag"):
+        st.caption(f"diag: {d.get('diag', 'no diag in this build')}")
 
     CAP = 10  # cards are compact enough to show every deal; extras collapse to "+N more"
     cols = [("Revisit", "Revisit", "#8B5CF6", "🔁", "None", "proposal sent, no response"),
