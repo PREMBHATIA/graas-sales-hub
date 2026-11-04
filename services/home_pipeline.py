@@ -35,10 +35,14 @@ import streamlit as st
 STATUS_OVERRIDES = {"lk": "Won"}   # client-name prefix (lower case) → status
 # PI: WhatsApp distributor ordering, won Jan 2026, ACV $35K (Prem, 4 Nov).
 EXTRA_WON = [{"name": "PI", "rev": 35_000, "region": "India", "owner": "Prem", "month": 1}]
-DISPLAY_NAME = {"castrol voice agent pilot": "Castrol Voice", "lk all-e": "LK"}
+# Short names, as the team says them. Also keeps the tracker lookup (by first word of
+# the name) off "PT", which matches half the leads.
+DISPLAY_NAME = {"castrol voice agent pilot": "Castrol Voice", "lk all-e": "LK",
+                "sinarmas sdn id": "Sinarmas", "pt propan raya": "Propan",
+                "pt wings group": "Wings", "sunway my": "Sunway"}
 # Region / owner the tracker lacks or gets wrong, by lower-case display name (Prem, 4 Nov).
 DEAL_FIXES = {
-    "sinarmas sdn id": {"region": "Indonesia", "owner": "Ashwin"},
+    "sinarmas": {"region": "Indonesia", "owner": "Ashwin"},
     "hindware": {"region": "India", "owner": "Amruta"},
 }
 
@@ -160,9 +164,17 @@ def load_headline() -> dict:
         return {"name": r["name"], "rev": rev, "region": region or "", "owner": owner or "",
                 "month": mon[0].title() if mon else ""}
 
-    stages = {"<60": [], ">60": [], "Won": [], "Lost": []}
+    # Proposals the customer has parked ("we'll revisit"): the tracker marks the lead
+    # Active / Dropped = "Revisit". Matched to a proposal by the first word of its name.
+    status_col = tracker["Active / Dropped"] if "Active / Dropped" in tracker.columns else pd.Series(dtype=str)
+    revisit_words = {_norm(n).split(" ")[0] for n, s in zip(tracker["Lead name"], status_col)
+                     if str(s).strip().lower() == "revisit"}
+
+    stages = {"<60": [], ">60": [], "Revisit": [], "Won": [], "Lost": []}
     for _, r in df.iterrows():
         key = r["status"] if r["status"] in ("Won", "Lost") else _bucket(r["month"])
+        if key in ("<60", ">60") and _norm(r["name"]).split(" ")[0] in revisit_words:
+            key = "Revisit"
         stages[key].append(_card(r))
     for k in stages:   # biggest first, deals with no value last
         stages[k].sort(key=lambda c: -(c["rev"] or 0))

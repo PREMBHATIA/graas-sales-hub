@@ -170,7 +170,7 @@ st.markdown("""
        NOT a bordered container, so the card hover-lift above doesn't apply. */
     .kb-sum  { font-size: 0.8rem; color: #6B7280; margin: 0 0 10px; }
     .kb-sum b { color: #111827; }
-    .kb-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+    .kb-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
                gap: 14px; }
     .kb-head { font-weight: 800; font-size: 0.92rem; line-height: 1.2;
                padding: 4px 0 6px; border-bottom: 2px solid; margin-bottom: 8px; }
@@ -190,6 +190,11 @@ st.markdown("""
     .kb-meta { grid-column: 1 / -1; font-size: 0.66rem; color: #9CA3AF;
                line-height: 1.2; white-space: nowrap; overflow: hidden;
                text-overflow: ellipsis; }
+    /* Revisit: ONE card for every parked proposal, a line per deal. */
+    .kb-revisit { display: block; padding: 5px 9px 6px; }
+    .kb-line { display: flex; justify-content: space-between; gap: 8px;
+               font-size: 0.8rem; line-height: 1.5; color: #E2E8F0; font-weight: 700; }
+    .kb-line span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .kb-more { font-size: 0.74rem; color: #6B7280; padding: 2px 2px 0; }
     .kb-empty { font-size: 0.78rem; color: #9CA3AF; padding: 10px 2px; }
     .kb-note { font-size: 0.7rem; color: #9CA3AF; margin-top: 8px; }
@@ -236,8 +241,9 @@ def _pipeline_panel():
         return
 
     CAP = 10  # cards are compact enough to show every deal; extras collapse to "+N more"
-    cols = [(">60", "Proposals > 60 days", "#F59E0B", "🟡", "None"),
-            ("<60", "Proposals < 60 days", "#3B82F6", "🔵", "None sent in the last 60 days"),
+    cols = [(">60", "> 60 days", "#F59E0B", "🟡", "None"),
+            ("<60", "< 60 days", "#3B82F6", "🔵", "None sent in the last 60 days"),
+            ("Revisit", "Revisit", "#8B5CF6", "🔁", "None"),
             ("Won", "Won", "#10B981", "✅", "None"),
             ("Lost", "Lost", "#EF4444", "❌", "None")]
 
@@ -254,7 +260,15 @@ def _pipeline_panel():
         items = d["stages"][key]
         total = sum(c["rev"] or 0 for c in items)
         tot = _k(total)
-        body = "".join(card(c, color) for c in items[:CAP])
+        if key == "Revisit" and items:
+            lines = "".join(
+                f'<div class="kb-line" title="{_h.escape(" · ".join(x for x in (c["owner"], c["region"], c["month"]) if x))}">'
+                f'<span>{_h.escape(c["name"])}</span>'
+                f'<b style="color:{color}">{_k(c["rev"]) if c["rev"] else "—"}</b></div>'
+                for c in items)
+            body = f'<div class="kb-card kb-revisit" style="border-color:{color}">{lines}</div>'
+        else:
+            body = "".join(card(c, color) for c in items[:CAP])
         if len(items) > CAP:
             body += f'<div class="kb-more">+{len(items) - CAP} more</div>'
         if not items:
