@@ -392,7 +392,7 @@ with _left:
     c3 = st.container()
     c4 = st.container()
 with _right:
-    _label("All-e pipeline")
+    _label("All-e pipeline &nbsp;<span style='text-transform:none;letter-spacing:0;font-weight:600'>(Proposal and after stage only)</span>")
     _pipeline_panel()
     _recent_panel()
 
