@@ -53,21 +53,29 @@ st.markdown("""
 
     /* Section label with a fading rule, so the eye can find the groups */
     .section-label {
-        font-size: 0.7rem;
+        font-size: 1rem;
         font-weight: 800;
-        letter-spacing: 0.12em;
+        letter-spacing: 0.1em;
         text-transform: uppercase;
-        color: #6B7280;
-        margin: 6px 0 12px;
+        color: #111827;
+        margin: 8px 0 14px;
         display: flex;
         align-items: center;
         gap: 10px;
     }
+    /* accent bar in the title's indigo-to-pink, so each section start is findable */
+    .section-label::before {
+        content: "";
+        width: 5px;
+        height: 1.15em;
+        border-radius: 3px;
+        background: linear-gradient(180deg, #4F46E5, #DB2777);
+    }
     .section-label::after {
         content: "";
         flex: 1;
-        height: 1px;
-        background: linear-gradient(90deg, #E5E7EB, transparent);
+        height: 2px;
+        background: linear-gradient(90deg, #C7D2FE, transparent);
     }
     .lock-pill {
         background: #FEF3C7;
@@ -147,6 +155,15 @@ st.markdown("""
     div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .tm) a[data-testid="stPageLink-NavLink"] * { color: #FFFFFF !important; }
     div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > div[data-testid="stElementContainer"] .tm) .lock-pill,
     div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .tm) .lock-pill { background: #FFFFFF; }
+
+    /* Compact: the rail sits beside a board that is already tall. */
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > div[data-testid="stElementContainer"] .tm),
+    div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .tm) { padding: 0.55rem 0.85rem; gap: 0.3rem; }
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > div[data-testid="stElementContainer"] .tm) .tile-desc,
+    div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .tm) .tile-desc { margin-top: 1px; }
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > div[data-testid="stElementContainer"] .tm) a[data-testid="stPageLink-NavLink"],
+    div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .tm) a[data-testid="stPageLink-NavLink"] { padding: 0.1rem 0.6rem; min-height: 0; }
+    div[data-testid="stVerticalBlock"]:has(> div[data-testid="stLayoutWrapper"] .tm) { gap: 0.55rem; }
 
     /* News — every card carries its own accent colour, set inline from the
        story's tag, so the band reads as a set rather than one highlight and
@@ -392,7 +409,7 @@ with _left:
     c3 = st.container()
     c4 = st.container()
 with _right:
-    _label("All-e pipeline &nbsp;<span style='text-transform:none;letter-spacing:0;font-weight:600'>(Proposal and after stage only)</span>")
+    _label("All-e pipeline &nbsp;<span style='text-transform:none;letter-spacing:0;font-weight:600;font-size:0.8rem;color:#6B7280'>(Proposal and after stage only)</span>")
     _pipeline_panel()
     _recent_panel()
 
