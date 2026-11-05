@@ -1,46 +1,46 @@
 {
-  "generated_utc": "2026-11-04T21:44:18Z",
+  "generated_utc": "2026-11-05T21:46:38Z",
   "window_days": 30,
   "stories": [
     {
-      "tag": "US - agent vendor / M&A",
-      "title": "Salesforce Acquires Cresta for $2.7B — Its Third CX AI Deal in Two Weeks",
-      "body": "On November 2, 2026, Salesforce signed a definitive agreement to acquire Cresta, a Stanford AI Lab spinout whose voice agents run complex customer calls end-to-end and also coach human reps in real time, for a reported $2.7 billion. The deal — Salesforce's third CX acquisition in two weeks after its $3.6B Fin (formerly Intercom) pickup — will fold Cresta into Service Cloud while Cresta keeps supporting existing contact-center and telephony platforms. Named enterprise customers running Cresta voice agents include Marriott, Comcast, and Alaska Airlines.",
-      "why": "Cresta is a named competitor and Salesforce is rapidly assembling an end-to-end AI CX stack (Fin for chat/email, Cresta for voice, Informatica for data). A seller must be ready to answer 'why not just buy the Salesforce bundle?' — the answer is integration risk, Salesforce's own acknowledgment that agents still need a governed context layer underneath, and the lack of retail-specific domain ontologies in any of these acquisitions.",
-      "source_label": "AI Weekly / The Information (via Aragon Research)",
-      "source_url": "https://aragonresearch.com/salesforce-buys-cresta-the-2-7b-voice-agent-bet/"
+      "tag": "US - Analyst / Governance",
+      "title": "Gartner (May 2026): 40% of Enterprises Will Decommission Production AI Agents by 2027 Due to Governance Gaps",
+      "body": "On May 26, 2026, Gartner published a forecast that by 2027, 40% of enterprises will demote or decommission autonomous AI agents — not because the technology failed, but because governance gaps are discovered only after a production incident occurs. Gartner's diagnosis is specific: applying a single, uniform governance standard across every agent regardless of its autonomy level and access scope is itself a primary cause of failure. This follows Gartner's separate projection that 40% of enterprise applications will embed task-specific AI agents by end of 2026, up from under 5% in 2025, meaning a large wave of under-governed agents is already entering production.",
+      "why": "This is the most powerful objection-handling stat in the market right now: pilots are graduating to production, then getting killed by governance failures, not AI capability gaps — exactly the 'pilot purgatory' problem Graas solves. Use it to shift the conversation from 'does the AI work?' to 'do you have the context layer, policy enforcement, and observability to keep it in production?'",
+      "source_label": "CMSWire / Gartner (May 26, 2026)",
+      "source_url": "https://www.cmswire.com/contact-center/approval-fatigue-is-turning-contact-center-oversight-into-theater/"
     },
     {
-      "tag": "US - analyst research / CPG",
-      "title": "BCG 'Are CPG Companies Ready for Agentic Commerce?' — 59% Report No Meaningful Capabilities (Oct 30, 2026)",
-      "body": "BCG's GenAI CPG Survey 2026 finds that 59% of US CPG companies report no meaningful agentic AI capabilities today, even as 80% of US consumers use AI and nearly half already shop with it. BCG's parallel retail survey of 150 retailers and brands (Oct 21) found that 68% of retailers expect agentic commerce to have a significant or transformational effect within two years, yet 24% have not moved beyond the assessment stage. BCG's analysis also shows that scaling the full set of AI initiatives across the demand value chain can deliver 220–350 basis points of cumulative EBIT for CPGs and 180–360 bps for retailers.",
-      "why": "This is the sharpest recent proof point that the gap between AI ambition and production deployment is structural, not just budgetary — and BCG ties it directly to data and agent-readiness gaps in CPG and retail. Sellers can use these figures to frame why a context/knowledge layer must precede any agentic rollout, and to put urgency on the 59% who are exposed.",
-      "source_label": "Boston Consulting Group",
-      "source_url": "https://www.bcg.com/publications/2026/how-cpg-companies-win-agentic-commerce"
+      "tag": "US - Analyst Research",
+      "title": "McKinsey State of AI 2026: 32% of Enterprises Have Stopped Buying Software to Build It With AI Coding Agents — but EBIT Impact Stays Flat at 37%",
+      "body": "McKinsey's State of AI 2026 survey of 1,719 organizations across 97 countries, published August 25, 2026, found that 32% of respondents decided against buying at least one software product or feature because agentic coding tools let them build it in-house instead — a figure that rises to nearly 50% among AI high performers. Despite this build momentum, the share of organizations attributing any EBIT impact to AI remained flat at 37%, unchanged from 2025, and only 6% qualify as high performers attributing 5%+ of EBIT to AI. Roughly one in five organizations also reported that AI operating costs are already constraining the scale of their AI use.",
+      "why": "The 'we'll build it ourselves' objection now has an analyst-grade counter: building is easy, but profit impact has stalled for two years because enterprises lack the data foundation to make agents reliable at scale. Graas can position its context and semantic layer as the missing ingredient between individual productivity gains (80% report these) and actual EBIT return.",
+      "source_label": "McKinsey & Company / Yahoo Finance",
+      "source_url": "https://finance.yahoo.com/technology/ai/articles/build-vs-buy-shift-32-113806700.html"
     },
     {
-      "tag": "US - enterprise AI architecture",
-      "title": "Sierra and Meta Launch 'Personal Agent Protocol' — An Open Standard for Agent-to-Business Communication (Oct 6, 2026)",
-      "body": "At Sierra Summit in San Francisco on October 6, 2026, Sierra and Meta announced the Personal Agent Protocol (PAP), an open standard governing how personal AI agents communicate with businesses; Stripe, Shopify, Walmart, and Genesys are listed as launch partners. Sierra said it will publish the v0.1 specification and hold design workshops later in October. The 2026 Summit also introduced Tandem Voice, new models, and updates separate from the eight products launched at Sierra Summit 2025 — which included Agent Studio 2.0 and the Agent Data Platform.",
-      "why": "PAP is an infrastructure commitment, not a feature: it sets the protocol layer through which consumer AI agents (Alexa, Gemini, ChatGPT) will talk to enterprise commerce and service systems. If this standard takes hold, every enterprise retailer will need a machine-readable, governed data layer behind it — exactly the context and ontology problem Graas solves. Sellers should ask prospects whether their product catalog, pricing, and policy data are structured well enough to respond to an external agent query today.",
-      "source_label": "Dutch Startup AI / Sierra",
-      "source_url": "https://www.dutchstartup.ai/en/news/sierra-and-meta-announce-open-standard-for-ai-customer-service-agents-in"
+      "tag": "US - Analyst Research",
+      "title": "Gartner (September 2026): 'Context Graphs Ground AI Agents With Enterprise Knowledge' — Names Context Graph as the Foundational Layer for Agentic AI",
+      "body": "In a September 15, 2026 research note, Gartner identifies context graphs as the foundational layer that grounds AI agents in the declarative, procedural, and causal knowledge required to reason about enterprise tasks and decisions, with policies enforced through runtime constraints. Gartner distinguishes context graphs from simple graph databases, arguing that an enterprise-scale context graph must span operational data across all systems rather than serve a single use case. The note frames building a domain-specific, continuously updated context graph — encoding what the organization knows, how it works, and what it permits — as the prerequisite for moving agentic AI from experiment to enterprise scale.",
+      "why": "Gartner has now named and defined exactly what Graas sells. A seller can walk into any retail or CPG account and cite this Gartner research to validate that the context layer is not an optional add-on — it is what determines whether agents work or get decommissioned. It reframes Graas's architecture as analyst-endorsed infrastructure, not a niche vendor claim.",
+      "source_label": "Gartner (via Skan.ai research summary)",
+      "source_url": "https://www.skan.ai/analyst-reports/gartner-playbook-for-establishing-an-enterprise-context-layer"
     },
     {
-      "tag": "US - enterprise AI architecture critique",
-      "title": "Onix Whitepaper: 'The Semantic Layer Is Not Enough' — Agents Need a Four-Layer Context Stack (Oct 2026)",
-      "body": "Research across 522 enterprise queries cited by Onix found that agents with unified, multi-dimensional context achieved 38% higher accuracy than agents relying on semantic definitions alone. Onix argues that every successful production AI deployment in 2026 requires four components working together: a knowledge graph for entity and relationship mapping with lineage, a governed semantic layer for metric definitions, a retrieval layer for unstructured content, and a governance infrastructure that makes every AI output traceable to its source data. Onix's Wingspan 2.0 platform is built around what it calls a 'Semantic Twin' as shared infrastructure, so each successive agent starts with a richer foundation rather than rebuilding context from scratch.",
-      "why": "This is a direct, citable rebuttal to prospects who believe standing up a BI semantic layer is sufficient before deploying agents. The 38% accuracy delta is a sales-ready proof point showing why incomplete context stalls pilots, and the four-layer stack mirrors the architecture conversation Graas has with enterprise retail and CPG accounts.",
-      "source_label": "Onix (VentureBeat/Onixnet)",
-      "source_url": "https://www.onixnet.com/blog/the-semantic-layer-is-not-enough/"
+      "tag": "US - Agent Vendor: Sierra",
+      "title": "Sierra Raises $950M at $15.8B Valuation, Launches 'Horizon' for Long-Running Agents, and Now Claims 40%+ of Fortune 50 Customers",
+      "body": "In May 2026, Sierra raised $950 million led by Tiger Global and GV at a valuation described as over $15 billion, bringing total funding to approximately $1.6 billion; the company reported over $150 million in ARR as of February 2026. In July 2026, Sierra launched 'Horizon' via its acquisition of Takeoff, extending agent capability to goals that unfold over days or weeks, and in August launched Voice Personas. Sierra now claims to serve more than 40% of the Fortune 50, with named enterprise customers including CarMax, ADT, WeightWatchers, and SiriusXM — all charged on outcome-based pricing estimated at roughly $1.50 per resolved interaction.",
+      "why": "Sierra is the most-cited competitor in enterprise customer-service AI and is now entering long-horizon, multi-day agentic workflows that overlap with Graas's territory in ordering, service escalation, and supply chain coordination. Sellers need to know Sierra's pricing model, customer list, and capability roadmap to position Graas's context-layer differentiation — specifically that Sierra agents still depend on external knowledge infrastructure that Graas provides.",
+      "source_label": "Aissist.io / CNBC / Sierra.ai",
+      "source_url": "https://aissist.io/insights/sierra-ai-review"
     },
     {
-      "tag": "US/Global - named enterprise deployment / CPG",
-      "title": "Parloa CPG Case: Decathlon's AI Agent Handles 500K+ Interactions/Year, Identifies 74% of Customers by Order Number",
-      "body": "Parloa's published CPG use-case data shows that Decathlon's deployed AI agent handles more than 500,000 customer interactions per year, identifies 74% of customers automatically by order number, and has eliminated 20% of repetitive tasks previously handled by human agents. A separate ATU deployment on the same platform booked one in three appointments autonomously, cut staff phone time by 60%, and went live in six weeks. Parloa positions CPG and retail AI agents as deployable alongside existing OMS, CRM, and ERP systems without requiring a full platform migration.",
-      "why": "These are named enterprise outcomes — resolution rate, identification rate, and time-to-live — from a retail/CPG context, making them directly usable on a sales call as proof that agents in real workflows produce measurable cost-to-serve reductions. The 'deploy alongside existing systems' framing is also a direct counter to the objection that an enterprise must replace its stack before getting value.",
-      "source_label": "Parloa",
-      "source_url": "https://www.parloa.com/knowledge-hub/ai-for-cpg-sales/"
+      "tag": "US/Global - Named Enterprise Deployment",
+      "title": "BCG: Agentic AI Boosts In-Stocks by 2–4% and Planning Productivity Over 60% in CPG–Retail Collaboration Deployments",
+      "body": "A BCG analysis published in its 'Breaking Friction Silos' report found that agentic AI deployed across CPG and retailer supply chain workflows can boost in-stock rates by 2–4% and planning productivity by over 60%. BCG describes a multi-agent architecture where one sub-agent monitors store- and DC-level inventory signals against sell-through velocity and proactively generates replenishment recommendations before the retailer's own cycle catches a pending stockout, while a separate evaluation sub-agent scores recommendation quality before action and an observability layer provides an auditable record of every agent decision. A separate Tredence case study cited an agentic deduction-management solution integrated across 30+ systems that recovered $6.5M from roughly $40M in addressable trade deduction spend for one enterprise CPG client.",
+      "why": "These are concrete outcome numbers — the kind that move enterprise buying committees. The BCG architecture (inventory-monitoring agent + evaluation sub-agent + observability layer) maps directly to what Graas builds: a governed context layer is what allows the evaluation sub-agent to score recommendations against 'historical accuracy, current data completeness, and known edge cases.' Use this to show that the outcome numbers require the data foundation, not just the agent.",
+      "source_label": "BCG / Tredence",
+      "source_url": "https://www.bcg.com/x/the-multiplier/how-agentic-ai-improves-cpg-retailer-collaboration"
     }
   ]
 }
