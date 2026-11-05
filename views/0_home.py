@@ -108,6 +108,46 @@ st.markdown("""
         font-size: 0.84rem;
     }
 
+    /* The All-e rail: solid coloured tiles so it holds its own beside the dark
+       pipeline board. Streamlit gives a container no class of its own, so each tile
+       carries a marker span (.tm-<tone>) and the CSS finds the card whose own
+       children hold it. Two selector forms cover older and newer Streamlit markup. */
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > div[data-testid="stElementContainer"] .tm),
+    div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .tm) {
+        border: none; color: #FFFFFF; box-shadow: 0 6px 16px rgba(30,27,75,.16);
+        transition: transform .15s ease, box-shadow .15s ease;
+    }
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > div[data-testid="stElementContainer"] .tm-indigo),
+    div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .tm-indigo) {
+        background: linear-gradient(135deg, #4F46E5, #7C3AED);
+    }
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > div[data-testid="stElementContainer"] .tm-amber),
+    div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .tm-amber) {
+        background: linear-gradient(135deg, #F59E0B, #EA580C);
+    }
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > div[data-testid="stElementContainer"] .tm-teal),
+    div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .tm-teal) {
+        background: linear-gradient(135deg, #0D9488, #0891B2);
+    }
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > div[data-testid="stElementContainer"] .tm-rose),
+    div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .tm-rose) {
+        background: linear-gradient(135deg, #DB2777, #9D174D);
+    }
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > div[data-testid="stElementContainer"] .tm),
+    div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .tm):hover {
+        box-shadow: 0 12px 26px rgba(30,27,75,.28); transform: translateY(-3px);
+    }
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > div[data-testid="stElementContainer"] .tm) .tile-title,
+    div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .tm) .tile-title { color: #FFFFFF; }
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > div[data-testid="stElementContainer"] .tm) .tile-desc,
+    div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .tm) .tile-desc { color: rgba(255,255,255,.88); }
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > div[data-testid="stElementContainer"] .tm) a[data-testid="stPageLink-NavLink"],
+    div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .tm) a[data-testid="stPageLink-NavLink"] { background: rgba(255,255,255,.2); border-radius: 8px; }
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > div[data-testid="stElementContainer"] .tm) a[data-testid="stPageLink-NavLink"] *,
+    div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .tm) a[data-testid="stPageLink-NavLink"] * { color: #FFFFFF !important; }
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > div[data-testid="stElementContainer"] .tm) .lock-pill,
+    div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .tm) .lock-pill { background: #FFFFFF; }
+
     /* News — every card carries its own accent colour, set inline from the
        story's tag, so the band reads as a set rather than one highlight and
        a grey list. */
@@ -211,11 +251,13 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-def _tile(icon, title, desc, page, label, locked=False):
-    """One card. Same shape everywhere so the row lines up."""
+def _tile(icon, title, desc, page, label, locked=False, tone=None):
+    """One card. Same shape everywhere so the row lines up. `tone` paints it as a
+    solid coloured tile (the All-e rail); the marker span is what the CSS finds."""
     with st.container(border=True):
         st.markdown(
-            f'<div class="tile-icon">{icon}</div>'
+            (f'<span class="tm tm-{tone}"></span>' if tone else '')
+            + f'<div class="tile-icon">{icon}</div>'
             f'<div class="tile-title">{title}'
             + (' <span class="lock-pill">locked</span>' if locked else '')
             + f'</div><div class="tile-desc">{desc}</div>',
@@ -356,19 +398,19 @@ with _right:
 
 with c1:
     _tile("📋", "Prospect Brief", "Pre-call two-pager research",
-          "views/9_prospect_brief.py", "Create a brief →")
+          "views/9_prospect_brief.py", "Create a brief →", tone="indigo")
 with c2:
     # Open, unlike the Knowledge Base below — onboarding material the sales
     # team needs cannot sit behind the team password (Prem, 25 Oct).
     _tile("🎒", "Key Collateral", "GTM Immersion · videos · creds",
-          "views/6_collateral.py", "Open collateral →")
+          "views/6_collateral.py", "Open collateral →", tone="amber")
 with c3:
     _tile("🤖", "All-e", "Presales pipeline &amp; deals",
-          "views/2_alle.py", "Open All-e →")
+          "views/2_alle.py", "Open All-e →", tone="teal")
 with c4:
     # Gated page inside an open section — the pill warns before the click.
     _tile("📧", "CRM", "Contacts, campaigns &amp; intent",
-          "views/3_crm.py", "Open CRM →", locked=True)
+          "views/3_crm.py", "Open CRM →", locked=True, tone="rose")
     # The intent list is the sheet salespeople actually work from — who
     # engaged, at what level, and who not to contact. The raw outreach log
     # (every send, every beacon) is plumbing and was the only thing linked
@@ -400,26 +442,6 @@ with c4:
         '1Vcu7ZkAjGbzpKH2CUGoSuLUGIfwYBT-GlpNN0zMKJMY/edit" target="_blank" '
         'style="color:#9CA3AF">Raw outreach log ↗</a></div>',
         unsafe_allow_html=True)
-
-st.markdown("")
-
-# ── Security & compliance ────────────────────────────────────────────────────
-# A strip, not a tile: the certs are a thing you point a procurement team at
-# a few times a year, so it earns one line and a link — the documents
-# themselves live in Key Collateral (Prem, 25 Oct).
-st.markdown(
-    '<div class="sec-strip">'
-    '<span class="s-ttl">🔐 Security &amp; compliance</span>'
-    '<span class="sec-badge">SOC 2 Type 2</span>'
-    '<span class="sec-badge">ISO 27001</span>'
-    '<span class="sec-badge">GDPR</span>'
-    '<span class="sec-badge">PDPA</span>'
-    '<span class="sec-note">Reports live in Key Collateral — '
-    'send the link, not the file.</span>'
-    '</div>', unsafe_allow_html=True)
-_s1, _ = st.columns([1, 3])
-with _s1:
-    st.page_link("views/6_collateral.py", label="Get the certificates →")
 
 st.markdown("")
 
@@ -544,3 +566,26 @@ with r2:
 with r3:
     _tile("🧠", "Knowledge Base", "Source docs, decks &amp; KB health",
           "views/5_resources.py", "Open the KB →", locked=True)
+
+st.markdown("")
+
+# ── Security & compliance ────────────────────────────────────────────────────
+# Sits at the foot of the page (Prem, 5 Nov: it was crowding the fold).
+# A strip, not a tile: the certs are a thing you point a procurement team at
+# a few times a year, so it earns one line and a link — the documents
+# themselves live in Key Collateral (Prem, 25 Oct).
+st.markdown(
+    '<div class="sec-strip">'
+    '<span class="s-ttl">🔐 Security &amp; compliance</span>'
+    '<span class="sec-badge">SOC 2 Type 2</span>'
+    '<span class="sec-badge">ISO 27001</span>'
+    '<span class="sec-badge">GDPR</span>'
+    '<span class="sec-badge">PDPA</span>'
+    '<span class="sec-note">Reports live in Key Collateral — '
+    'send the link, not the file.</span>'
+    '</div>', unsafe_allow_html=True)
+_s1, _ = st.columns([1, 3])
+with _s1:
+    st.page_link("views/6_collateral.py", label="Get the certificates →")
+
+st.markdown("")
