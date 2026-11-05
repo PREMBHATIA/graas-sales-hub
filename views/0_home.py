@@ -158,7 +158,15 @@ st.markdown("""
 
     /* Compact: the rail sits beside a board that is already tall. */
     div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > div[data-testid="stElementContainer"] .tm),
-    div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .tm) { padding: 0.55rem 0.85rem; gap: 0.3rem; }
+    div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .tm) { position: relative; padding: 0.8rem 0.95rem 0.85rem; gap: 0.2rem; }
+    /* the action button rides the title row at the right instead of taking its own row */
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > div[data-testid="stElementContainer"] .tm) > div > div[data-testid="stElementContainer"]:last-child,
+    div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .tm) > div[data-testid="stElementContainer"]:last-child { position: absolute; top: 0.55rem; right: 0.6rem; width: auto; }
+    /* narrow window: not enough room beside the title, so the button gets its own row */
+    @media (max-width: 1300px) {
+      div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > div[data-testid="stElementContainer"] .tm) > div > div[data-testid="stElementContainer"]:last-child,
+      div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .tm) > div[data-testid="stElementContainer"]:last-child { position: static; }
+    }
     div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > div[data-testid="stElementContainer"] .tm) .tile-desc,
     div[data-testid="stVerticalBlock"]:has(> div[data-testid="stElementContainer"] .tm) .tile-desc { margin-top: 1px; }
     div[data-testid="stVerticalBlockBorderWrapper"]:has(> div > div[data-testid="stElementContainer"] .tm) a[data-testid="stPageLink-NavLink"],
@@ -415,19 +423,19 @@ with _right:
 
 with c1:
     _tile("📋", "Prospect Brief", "Pre-call two-pager research",
-          "views/9_prospect_brief.py", "Create a brief →", tone="indigo")
+          "views/9_prospect_brief.py", "Create →", tone="indigo")
 with c2:
     # Open, unlike the Knowledge Base below — onboarding material the sales
     # team needs cannot sit behind the team password (Prem, 25 Oct).
     _tile("🎒", "Key Collateral", "GTM Immersion · videos · creds",
-          "views/6_collateral.py", "Open collateral →", tone="amber")
+          "views/6_collateral.py", "Open →", tone="amber")
 with c3:
     _tile("🤖", "All-e", "Presales pipeline &amp; deals",
-          "views/2_alle.py", "Open All-e →", tone="teal")
+          "views/2_alle.py", "Open →", tone="teal")
 with c4:
     # Gated page inside an open section — the pill warns before the click.
     _tile("📧", "CRM", "Contacts, campaigns &amp; intent",
-          "views/3_crm.py", "Open CRM →", locked=True, tone="rose")
+          "views/3_crm.py", "Open →", locked=True, tone="rose")
     # The intent list is the sheet salespeople actually work from — who
     # engaged, at what level, and who not to contact. The raw outreach log
     # (every send, every beacon) is plumbing and was the only thing linked
