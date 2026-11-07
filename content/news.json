@@ -1,45 +1,45 @@
 {
-  "generated_utc": "2026-11-06T21:16:58Z",
+  "generated_utc": "2026-11-07T19:52:51Z",
   "window_days": 30,
   "stories": [
     {
-      "tag": "US - context layer / enterprise AI architecture",
-      "title": "Gartner Names Context Graphs the Foundational Infrastructure Layer for Enterprise AI Agents (September 2026)",
-      "body": "In its September 2026 report 'Context Graphs Ground AI Agents With Enterprise Knowledge,' Gartner identifies context graphs as the foundational layer that grounds AI agents in the declarative, procedural, and causal knowledge required to reason about enterprise tasks—with policies enforced through runtime constraints. A related Gartner finding published in its 2026 Hype Cycle for AI Governance states that 'AI failures often stem from inadequate context, poor grounding and unmanaged knowledge assets,' and predicts that by 2029, 80% of AI agent platforms will have aligned context layers in place, up from under 10% today. Gartner also notes that organizations implementing semantic modeling are more than twice as likely to achieve high effectiveness in AI data engineering, yet only 44% have done so.",
-      "why": "This is Gartner putting a formal name and architecture blueprint on the exact problem Graas solves—retail agents fail without a governed context layer, not because of the model. Use this report to reframe every pilot-stall conversation: the question is not which LLM to pick, it is whether the enterprise has built the context graph underneath it.",
-      "source_label": "Gartner (via Skan AI analyst report page)",
-      "source_url": "https://www.skan.ai/analyst-reports/gartner-playbook-for-establishing-an-enterprise-context-layer"
+      "tag": "US - context layer / agent infrastructure",
+      "title": "Neo4j Context Engine Launches to Create AI Knowledge Layer and Enhance Agent Performance",
+      "body": "On October 20, 2026, Neo4j announced the Neo4j Context Engine, a new product that lets enterprises rapidly build a shared knowledge layer — a reusable substrate that AI agents use to reason consistently over enterprise data. The engine includes a predefined six-layer business ontology, a graph-native memory layer for agent decision tracking, and simplified MCP server configuration for agent setup. It connects physical data sources directly to business logic so agents can make context-aware decisions without bespoke integration work per agent.",
+      "why": "This is exactly the architecture argument Graas makes: agents fail without a governed context layer underneath them. Neo4j shipping a named product with an ontology, memory, and MCP wiring gives sellers a credible anchor point when explaining why a knowledge graph is prerequisite infrastructure — and raises the competitive bar for any agent vendor that does not ship with one.",
+      "source_label": "Neo4j Press Release / VentureBeat",
+      "source_url": "https://neo4j.com/press-releases/neo4j-context-engine/"
     },
     {
-      "tag": "US - McKinsey research / agentic commerce",
-      "title": "McKinsey: 53% of Consumers Now Use AI for Shopping, But Retailers' Own Infrastructure Wins at Checkout (October 28, 2026)",
-      "body": "McKinsey's Agentic Commerce Consumer Survey of ~21,000 consumers across 11 geographies, published October 28, 2026, finds that 53% of consumers used AI for shopping in the past three months, yet only 27% used a retailer's own AI assistant versus 56% who used a stand-alone AI tool. The key structural finding is that retailer AI assistants outperform stand-alone platforms at checkout precisely because retail AI platforms already have live inventory, payments, and delivery infrastructure in place. McKinsey concludes that companies are not yet equipped to meet rising agentic commerce demand, identifying the gap between consumer readiness and enterprise commerce infrastructure as the defining strategic challenge.",
-      "why": "McKinsey's data gives Graas sellers a named, dated proof point that the enterprise data foundation—live inventory, governed SKU, unified identity—is what determines whether a retailer wins or loses in the agentic era. It directly answers a CIO's question of why their standalone chatbot underperforms: it lacks the operational context layer.",
-      "source_label": "McKinsey & Company",
-      "source_url": "https://www.mckinsey.com/capabilities/growth-marketing-and-sales/our-insights/who-wins-when-ai-does-the-shopping-new-evidence-on-agentic-commerce"
+      "tag": "US - analyst research / build vs buy economics",
+      "title": "McKinsey State of AI 2026: 32% of Enterprises Skipped a Software Purchase to Build With Agentic Coding Tools",
+      "body": "McKinsey's August 25, 2026 State of AI survey (1,719 respondents across 97 countries) found that 32% of organizations decided against buying at least one software product or feature because they could build it in-house with agentic coding tools — rising to nearly half among AI high performers who attribute 5%+ of EBIT to AI. Large enterprises (over $1B revenue) scaling AI agents jumped from 27% to 40% year-over-year, while about one in five organizations report AI operating costs are already constraining AI use even as 60% plan to increase investment.",
+      "why": "This is the exact objection Graas sales teams face — 'we'll just build it.' McKinsey's data shows the build impulse is real but concentrated in a small high-performer cohort, while operating costs bite hardest among the builders themselves. Sellers can use the 20% cost-constraint finding and the flat EBIT impact figure (only 37% report any bottom-line effect) to reframe buy-vs-build conversations toward total cost of ownership.",
+      "source_label": "McKinsey QuantumBlack / Yahoo Finance",
+      "source_url": "https://www.mckinsey.com/capabilities/quantumblack/our-insights/the-state-of-ai"
     },
     {
-      "tag": "US - agent vendor / Sierra",
-      "title": "Sierra Acquires Anon to Put Horizon Agents Behind Logins—and Signs Guardian Life for 1 Million Dental Calls a Year (November 5, 2026)",
-      "body": "On November 5, 2026, Sierra announced two major moves in a single day: it acquired browser-agent startup Anon—which raised more than $13M—to bring authentication, credential handling, and MFA support into its Horizon agents, enabling them to sign into portals and complete tasks in services without APIs; and it signed a multi-year deal with US insurer Guardian Life to handle approximately 1 million dental benefit verification calls per year, plus payments and claim status checks. Sierra's Horizon agents are designed to orchestrate outbound and inbound interactions over days or weeks, not just single conversations. The Anon acquisition targets a persistent deployment bottleneck: most enterprise workflows happen behind a login, in interfaces built for humans with no API.",
-      "why": "Sierra is now extending its agent surface from API-connected systems to the entire authenticated web, widening the workflows it can automate—directly competitive with what Graas agents handle in retail operations and service. The Guardian Life deal is a live outcome reference ($1M+ calls automated) that buyers will cite on calls; Graas sellers need a comparable retail-specific counter-narrative.",
-      "source_label": "AI Weekly / Unite.AI / The Next Web",
-      "source_url": "https://aiweekly.co/alerts/sierra-acquires-anon-to-put-horizon-agents-behind-logins"
+      "tag": "US - analyst research / retail-CPG AI adoption",
+      "title": "Deloitte 2026 Retail & CPG Executive Survey: Enterprise-Wide AI Deployment Still in Single Digits Despite Broad Piloting",
+      "body": "Deloitte's 2026 State of AI in Retail and CPG survey of 200 executives found that enterprise-wide AI deployment sits at just 7–10% across both sectors — meaning the vast majority of investment remains in pilots. While 82% plan to increase AI budgets in the next 12 months, most incremental spend is going into IT and data infrastructure rather than value-generating use cases. On agentic commerce specifically, 40% of CPGs and 29% of retailers have no defined strategy yet, even as 50–60% are already piloting capabilities and prioritising API readiness.",
+      "why": "This is the pilot-stall story in hard numbers: single-digit enterprise deployment despite near-universal piloting is the exact problem Graas exists to solve. The finding that spend is pooling in infrastructure rather than outcomes gives sellers a credible framing for why customers need a proven deployment partner, not more internal experimentation budget.",
+      "source_label": "Deloitte",
+      "source_url": "https://www.deloitte.com/us/en/industries/consumer/articles/state-of-ai-adoption-in-retail-cpg-executive-survey.html"
     },
     {
-      "tag": "US - agent vendor / Cresta + Intercom Fin",
-      "title": "Salesforce Acquires Cresta for Voice AI, as Intercom Rebrands Entirely to 'Fin' — Consolidation Reshapes the Agent Vendor Map (November 2026)",
-      "body": "On November 2, 2026, Salesforce announced a definitive agreement to acquire Cresta, which develops voice-based AI agents and conversation intelligence for customer service; the combined offering is intended to connect Cresta's real-time conversation intelligence with Salesforce Service Cloud, linking customer interactions to outcomes such as issue resolution and retention. Simultaneously, Intercom—which Salesforce had already acquired as 'Fin' on September 10, 2026—completed a full rebrand: the company is now called Fin, retains the Intercom helpdesk product name, launched its own proprietary Apex 1.0 AI model, and operates with 40% fewer staff while serving 30,000+ businesses at $0.99 per resolved outcome. These two moves together give Salesforce a full-stack voice-and-chat agent suite embedded inside its CRM and service platform.",
-      "why": "Salesforce is rapidly consolidating the agent vendor landscape into its Service Cloud stack—Cresta for voice, Fin for chat—which will accelerate enterprise buying decisions toward the CRM incumbent and squeeze standalone agent vendors. Graas sellers should use this to sharpen the build-on-Salesforce-vs-specialist conversation and highlight what Salesforce's stack still lacks: a retail-specific context and data layer.",
-      "source_label": "StreetInsider / blog.mean.ceo",
-      "source_url": "https://www.streetinsider.com/Corporate+News/Salesforce+to+acquire+Cresta+in+AI+voice+agent+deal/27273501.html"
+      "tag": "US - agent vendor / Decagon product launch",
+      "title": "Decagon Launches Personal Agent Gateway and Four New Products at Dialogues 2026 to Handle AI-to-AI Support Calls",
+      "body": "At its October 1, 2026 Dialogues conference, Decagon shipped four products: Voice 3 (with a new duplex speech model called Chord), Personal Agent Gateway, Agent Modules, and Duet Apprentice. The Personal Agent Gateway detects when a customer's personal AI agent (such as Meta Muse, OpenAI Dots, or Instinct) contacts support, routes it to a dedicated channel, and enforces scoped permissions the customer grants — accompanied by a new authorization protocol called PACT. Decagon also announced a Databricks partnership so its agents read real-time customer context directly from the lakehouse with no ETL, and joined the Databricks Marketplace.",
+      "why": "Decagon is a named competitor and the PACT protocol signals where the agent-to-agent commerce infrastructure race is heading: the retailer's AI concierge must be able to authenticate and serve a shopper's personal agent, not just a human. Graas sellers should understand this as a data-readiness story — the Databricks tie-in shows Decagon knows agents are only as good as the real-time context underneath them.",
+      "source_label": "Decagon / Unite.AI",
+      "source_url": "https://decagon.ai/blog/dialogues-2026"
     },
     {
-      "tag": "US/Global - CPG enterprise deployment / data foundation",
-      "title": "Tredence Agentic AI Recovers $6.5M in Trade Deductions for CPG Enterprise Client Across 30+ Systems (2026)",
-      "body": "Tredence's agentic AI deduction-management solution, integrated across 30+ systems including SAP, EDI, retailer portals, and email, automatically evaluates each trade deduction, assigns reason codes, and recommends next-best actions—recovering $6.5M from roughly $40M in addressable deduction spend for one large CPG enterprise client. The NVIDIA 2026 State of AI in Retail and CPG survey corroborates the deployment context: 90% of retail and CPG companies will increase AI budgets in 2026, 51% cite supply chain efficiency as the top agentic AI priority, and the most-cited barrier to scaling is data quality and integration, not the technology itself. CPG companies still managing retailer data in silos find their AI initiatives limited to single-channel applications that cannot scale.",
-      "why": "This is a named, outcome-quantified CPG deployment ($6.5M recovered) that shows agents working in a real back-office workflow—exactly the proof point Graas sellers need when prospects ask 'has anyone actually deployed this in retail operations?' It also validates that the data foundation (30+ system integrations) is the prerequisite, not an afterthought.",
-      "source_label": "Tredence / NVIDIA State of AI in Retail and CPG 2026",
+      "tag": "US - named CPG deployment / agent outcomes",
+      "title": "Tredence Agentic AI Recovers $6.5M in Trade Deductions for Enterprise CPG Client Across 30+ Systems",
+      "body": "Tredence published a documented deployment in which its agentic AI deduction-management solution, integrated across 30+ systems including SAP, EDI feeds, retailer portals, and email, automatically evaluated trade deductions, assigned reason codes, and recommended next-best actions for one enterprise CPG client. The result was $6.5M recovered from roughly $40M in addressable deduction spend. The case is part of a broader set of retail agent use cases published in October 2026 covering supply chain alert agents, dynamic pricing, and backend workflow automation.",
+      "why": "This is the proof-not-opinion story sellers need: a named CPG workflow (trade deduction resolution), a named multi-system integration challenge, and a hard dollar outcome ($6.5M on $40M addressable). It illustrates that agent value in retail/CPG is unlocked only when the agent has governed access to the right context across SAP, EDI, and retailer portals — precisely the data-foundation argument Graas makes.",
+      "source_label": "Tredence",
       "source_url": "https://www.tredence.com/eu/blog/ai-agents-in-retail-realworld-use-cases-for-2026"
     }
   ]
