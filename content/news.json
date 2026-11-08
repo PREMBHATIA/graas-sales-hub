@@ -1,46 +1,46 @@
 {
-  "generated_utc": "2026-11-07T19:52:51Z",
+  "generated_utc": "2026-11-08T20:11:16Z",
   "window_days": 30,
   "stories": [
     {
-      "tag": "US - context layer / agent infrastructure",
-      "title": "Neo4j Context Engine Launches to Create AI Knowledge Layer and Enhance Agent Performance",
-      "body": "On October 20, 2026, Neo4j announced the Neo4j Context Engine, a new product that lets enterprises rapidly build a shared knowledge layer — a reusable substrate that AI agents use to reason consistently over enterprise data. The engine includes a predefined six-layer business ontology, a graph-native memory layer for agent decision tracking, and simplified MCP server configuration for agent setup. It connects physical data sources directly to business logic so agents can make context-aware decisions without bespoke integration work per agent.",
-      "why": "This is exactly the architecture argument Graas makes: agents fail without a governed context layer underneath them. Neo4j shipping a named product with an ontology, memory, and MCP wiring gives sellers a credible anchor point when explaining why a knowledge graph is prerequisite infrastructure — and raises the competitive bar for any agent vendor that does not ship with one.",
-      "source_label": "Neo4j Press Release / VentureBeat",
-      "source_url": "https://neo4j.com/press-releases/neo4j-context-engine/"
+      "tag": "US - enterprise AI architecture",
+      "title": "Gartner: Context Graphs Are the Foundational Infrastructure Layer for Enterprise AI Agents (September 2026)",
+      "body": "In its September 2026 report 'Context Graphs Ground AI Agents With Enterprise Knowledge,' Gartner identifies context graphs — combining declarative, procedural, and causal knowledge with runtime policy constraints — as the essential infrastructure layer that grounds AI agents in operational reality. Gartner predicts that by 2029, 80% of AI agent platforms using reasoning models will have aligned context layers in place, compared to less than 10% today, and that by 2028, context engineering improvements will enhance agentic AI accuracy by at least 30%. A separate October 2026 Gartner finding notes that only 6% of enterprises currently report meaningful ROI from AI, citing missing context as the primary blocker.",
+      "why": "This is the single most authoritative external validation for the context-layer argument a Graas seller will ever need on a call — Gartner's named report frames the knowledge graph / semantic layer as a prerequisite, not a differentiator. Use it to explain why a retailer's existing agents are hallucinating or stalling: they lack the declarative, procedural, and causal context Gartner says is non-negotiable.",
+      "source_label": "Gartner / Skan.ai analyst report summary",
+      "source_url": "https://www.skan.ai/analyst-reports/gartner-playbook-for-establishing-an-enterprise-context-layer"
     },
     {
-      "tag": "US - analyst research / build vs buy economics",
-      "title": "McKinsey State of AI 2026: 32% of Enterprises Skipped a Software Purchase to Build With Agentic Coding Tools",
-      "body": "McKinsey's August 25, 2026 State of AI survey (1,719 respondents across 97 countries) found that 32% of organizations decided against buying at least one software product or feature because they could build it in-house with agentic coding tools — rising to nearly half among AI high performers who attribute 5%+ of EBIT to AI. Large enterprises (over $1B revenue) scaling AI agents jumped from 27% to 40% year-over-year, while about one in five organizations report AI operating costs are already constraining AI use even as 60% plan to increase investment.",
-      "why": "This is the exact objection Graas sales teams face — 'we'll just build it.' McKinsey's data shows the build impulse is real but concentrated in a small high-performer cohort, while operating costs bite hardest among the builders themselves. Sellers can use the 20% cost-constraint finding and the flat EBIT impact figure (only 37% report any bottom-line effect) to reframe buy-vs-build conversations toward total cost of ownership.",
-      "source_label": "McKinsey QuantumBlack / Yahoo Finance",
-      "source_url": "https://www.mckinsey.com/capabilities/quantumblack/our-insights/the-state-of-ai"
+      "tag": "US - analyst research / agent vendor risk",
+      "title": "Gartner Predicts 70% of Enterprises Will Abandon Agentic AI Built by Vendor Forward-Deployed Engineering by 2028",
+      "body": "In a September 29, 2026 press release, Gartner warned that 70% of enterprises will abandon agentic AI built by vendor forward-deployed engineering (FDE) by 2028, trapped by soaring costs and an inability to evolve the system independently. Gartner found that less than 20% of FDE engagements will convert recurring customer needs into vendor core-product capabilities, exposing a risk the firm labels 'FDE washing.' Success, Gartner argues, is measured not by implementation completion but by the enterprise's ability to manage, optimize, and scale the technology on its own.",
+      "why": "Sierra's model is explicitly FDE — the vendor's team builds and owns the agent. This Gartner prediction is a direct, citable risk flag for any retail prospect considering Sierra or a similar vendor-led build: they may win fast but lose control and face escalating costs within two years. A Graas seller can use this to position owned, context-layer-grounded architecture as the lower-risk long-term path.",
+      "source_label": "Gartner Newsroom",
+      "source_url": "https://www.gartner.com/en/newsroom/press-releases/2026-09-29-gartner-predicts-70-percent-of-enterprises-will-abandon-agentic-ai-built-by-vendor-forward-deployed-engineering-by-2028"
     },
     {
-      "tag": "US - analyst research / retail-CPG AI adoption",
-      "title": "Deloitte 2026 Retail & CPG Executive Survey: Enterprise-Wide AI Deployment Still in Single Digits Despite Broad Piloting",
-      "body": "Deloitte's 2026 State of AI in Retail and CPG survey of 200 executives found that enterprise-wide AI deployment sits at just 7–10% across both sectors — meaning the vast majority of investment remains in pilots. While 82% plan to increase AI budgets in the next 12 months, most incremental spend is going into IT and data infrastructure rather than value-generating use cases. On agentic commerce specifically, 40% of CPGs and 29% of retailers have no defined strategy yet, even as 50–60% are already piloting capabilities and prioritising API readiness.",
-      "why": "This is the pilot-stall story in hard numbers: single-digit enterprise deployment despite near-universal piloting is the exact problem Graas exists to solve. The finding that spend is pooling in infrastructure rather than outcomes gives sellers a credible framing for why customers need a proven deployment partner, not more internal experimentation budget.",
-      "source_label": "Deloitte",
-      "source_url": "https://www.deloitte.com/us/en/industries/consumer/articles/state-of-ai-adoption-in-retail-cpg-executive-survey.html"
+      "tag": "US - McKinsey survey / economics",
+      "title": "McKinsey State of AI 2026: 80% Productivity Gain, Only 37% See EBIT Impact — and 32% Are Cancelling Software Purchases to Build In-House",
+      "body": "McKinsey's 'State of AI in 2026: On the Road to ROI,' fielded May–June 2026 across 1,719 executives in 97 countries, found that 80% of respondents see personal productivity gains from AI but only 37% report enterprise-level EBIT impact — a figure flat year-over-year. Nearly a third (32%) have already decided against buying at least one software product or feature, choosing to build it in-house using agentic coding tools instead, rising to 48% among AI high performers. AI operating costs are now actively constraining usage for one in five organizations, even as most plan to increase AI investment.",
+      "why": "This data reframes every sales conversation about build-vs-buy: the 'we'll build it ourselves' objection now has hard data behind it, but so does the counter — 94% of enterprises aren't yet delivering EBIT impact, which is exactly the gap a data-foundation and context-layer play addresses. Use the EBIT flatness to challenge the assumption that agentic coding alone gets retailers to outcomes.",
+      "source_label": "McKinsey & Company / Yahoo Finance",
+      "source_url": "https://finance.yahoo.com/technology/ai/articles/build-vs-buy-shift-32-113806700.html"
     },
     {
-      "tag": "US - agent vendor / Decagon product launch",
-      "title": "Decagon Launches Personal Agent Gateway and Four New Products at Dialogues 2026 to Handle AI-to-AI Support Calls",
-      "body": "At its October 1, 2026 Dialogues conference, Decagon shipped four products: Voice 3 (with a new duplex speech model called Chord), Personal Agent Gateway, Agent Modules, and Duet Apprentice. The Personal Agent Gateway detects when a customer's personal AI agent (such as Meta Muse, OpenAI Dots, or Instinct) contacts support, routes it to a dedicated channel, and enforces scoped permissions the customer grants — accompanied by a new authorization protocol called PACT. Decagon also announced a Databricks partnership so its agents read real-time customer context directly from the lakehouse with no ETL, and joined the Databricks Marketplace.",
-      "why": "Decagon is a named competitor and the PACT protocol signals where the agent-to-agent commerce infrastructure race is heading: the retailer's AI concierge must be able to authenticate and serve a shopper's personal agent, not just a human. Graas sellers should understand this as a data-readiness story — the Databricks tie-in shows Decagon knows agents are only as good as the real-time context underneath them.",
-      "source_label": "Decagon / Unite.AI",
-      "source_url": "https://decagon.ai/blog/dialogues-2026"
+      "tag": "US - agent vendor landscape",
+      "title": "Salesforce Completes Acquisition of Intercom Fin; Sierra Crosses $150M ARR at $15.8B Valuation — Agent Pricing War Intensifies",
+      "body": "Salesforce completed its acquisition of Fin (formerly Intercom) on September 10, 2026, folding it into the Agentforce portfolio while continuing to charge $0.99 per resolved outcome. Sierra, meanwhile, raised $950M in May 2026 at a $15.8B valuation and crossed $150M ARR, charging an estimated ~$1.50 per resolution — with no published pricing and a sales-led enterprise model. Decagon, which raised $250M at a $4.5B valuation in January 2026, charges per conversation regardless of resolution, creating a meaningfully different economic model that benefits volume-heavy retail contact centers.",
+      "why": "Three of the most prominent agent vendors a Graas seller encounters are now on diverging economic trajectories: Fin is a Salesforce product locked to the Agentforce ecosystem, Sierra is a premium FDE play (see Gartner risk story above), and Decagon's per-conversation model erodes margin on low-resolution retail SKUs. Sellers need to know these pricing structures to position Graas's outcome economics and data-foundation differentiation on the same call.",
+      "source_label": "Getmacha / TechCrunch / SiliconANGLE",
+      "source_url": "https://www.getmacha.com/blog/sierra-vs-decagon-vs-fin-vs-ada"
     },
     {
-      "tag": "US - named CPG deployment / agent outcomes",
-      "title": "Tredence Agentic AI Recovers $6.5M in Trade Deductions for Enterprise CPG Client Across 30+ Systems",
-      "body": "Tredence published a documented deployment in which its agentic AI deduction-management solution, integrated across 30+ systems including SAP, EDI feeds, retailer portals, and email, automatically evaluated trade deductions, assigned reason codes, and recommended next-best actions for one enterprise CPG client. The result was $6.5M recovered from roughly $40M in addressable deduction spend. The case is part of a broader set of retail agent use cases published in October 2026 covering supply chain alert agents, dynamic pricing, and backend workflow automation.",
-      "why": "This is the proof-not-opinion story sellers need: a named CPG workflow (trade deduction resolution), a named multi-system integration challenge, and a hard dollar outcome ($6.5M on $40M addressable). It illustrates that agent value in retail/CPG is unlocked only when the agent has governed access to the right context across SAP, EDI, and retailer portals — precisely the data-foundation argument Graas makes.",
-      "source_label": "Tredence",
-      "source_url": "https://www.tredence.com/eu/blog/ai-agents-in-retail-realworld-use-cases-for-2026"
+      "tag": "US/Global - BCG research / CPG-retail deployment",
+      "title": "BCG: Agentic AI Can Lift In-Stock Rates 2–4% and Planning Productivity Over 60% in CPG–Retailer Supply Chains",
+      "body": "A BCG Executive Perspectives report (May 2026) on agentic supply chains finds that AI agents can boost in-stocks by 2–4 percentage points and planning productivity by more than 60% for CPGs and their retail partners. BCG's model shows agents doing continuous retailer inventory monitoring against sell-through velocity and proactively generating replenishment recommendations before a retailer's own replenishment cycle would catch the gap. Despite this potential, 69% of executives in the same report said agentic AI requires entirely new operating models — signalling that data readiness, not model capability, is the bottleneck.",
+      "why": "This is a named analyst firm attaching specific outcome numbers (2–4% in-stocks, 60%+ productivity) to exactly the supply-chain and ordering workflows Graas sells into — use it on calls with CPG and distributor prospects as proof that agentic replenishment agents have demonstrated ROI. The 69% 'new operating model' finding is the opening to introduce the context-layer / data-foundation conversation as the prerequisite.",
+      "source_label": "Boston Consulting Group",
+      "source_url": "https://www.bcg.com/x/the-multiplier/how-agentic-ai-improves-cpg-retailer-collaboration"
     }
   ]
 }
