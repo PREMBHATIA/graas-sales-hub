@@ -1,46 +1,46 @@
 {
-  "generated_utc": "2026-11-09T23:59:09Z",
+  "generated_utc": "2026-11-10T21:39:22Z",
   "window_days": 30,
   "stories": [
     {
-      "tag": "US - agent vendor consolidation",
-      "title": "Salesforce Completes $3.6B Acquisition of Fin (formerly Intercom), Folding It Into Agentforce",
-      "body": "Salesforce closed its $3.6 billion acquisition of Fin — the AI customer-service company formerly known as Intercom — on September 10, 2026, bringing more than 30,000 enterprise customers and Fin's autonomous agent platform into Agentforce. Fin's AI Agent claims to resolve 76% of support volume without human involvement across live chat, email, WhatsApp, SMS, phone, and Slack, priced at $0.99 per resolved outcome. The deal folds Fin's proprietary Apex model and its engineering team into Salesforce AI Labs, with Fin continuing to operate as a standalone product inside the Salesforce stack.",
-      "why": "Any enterprise evaluating Fin or Intercom is now buying into the Salesforce platform lock-in story — a critical objection point and an opening to contrast Graas's independence and retail-data specialization. The $0.99/outcome pricing benchmark is now the market anchor; sellers need to be ready to defend or reframe outcome-based pricing conversations with retail and CPG procurement teams.",
-      "source_label": "Salesforce / Dealroom / Silicon Republic",
-      "source_url": "https://www.hpcwire.com/bigdatawire/this-just-in/salesforce-completes-acquisition-of-fin/"
+      "tag": "US - Agent Vendor M&A",
+      "title": "Salesforce Acquires Cresta for ~$2.7B to Bring Voice AI Agents Into Service Cloud",
+      "body": "Salesforce signed a definitive agreement on November 2, 2026 to acquire Cresta, a voice AI company whose agents handle customer phone calls end-to-end and coach human reps during live conversations. The deal, reported at approximately $2.7 billion, follows Salesforce's earlier $3.6B purchase of Fin (formerly Intercom) in September 2026, giving Salesforce both a text-first and a voice-first service agent to fold into Service Cloud. Salesforce named Marriott, Comcast, and Alaska Airlines as existing Cresta enterprise customers at scale.",
+      "why": "Cresta is a named competitor in the voice/CX agent space. Its absorption into Salesforce Agentforce means enterprise retail CX buyers will now hear a consolidated Salesforce pitch — sellers must be ready to articulate why a purpose-built, context-layer-grounded agent beats a bundled suite with no semantic understanding of the retailer's data. The consolidation also signals the market is thinning: independent agent vendors that lack a data foundation story are acquisition targets or at risk.",
+      "source_label": "ALM Corp / Salesforce Announcement",
+      "source_url": "https://almcorp.com/news/salesforce-acquires-cresta-voice-ai-service-cloud"
     },
     {
-      "tag": "US - architecture launch",
-      "title": "Neo4j Launches Context Engine: A Shared Knowledge Layer With Business Ontology for Enterprise AI Agents",
-      "body": "Neo4j announced the Context Engine on October 20, 2026, positioning it as a reusable, shared knowledge substrate that lets AI agents consistently reason over enterprise data across systems. The product includes a predefined six-layer business ontology that maps organization, processes, data, and AI assets into a graph, plus a graph-native memory layer that logs agent reasoning and past decisions so agents learn over time. It also provides MCP-server integration for agent setup, connecting physical data sources directly to business logic at runtime.",
-      "why": "This is the clearest recent proof that the market has named 'context layer' as the missing piece before agents work reliably — directly validating the architecture Graas leads with on calls. Sellers can cite Neo4j's October launch as third-party confirmation that raw CRM or ERP data alone is insufficient and that a governed, ontology-grounded knowledge graph is the prerequisite infrastructure.",
-      "source_label": "Neo4j Press Release",
-      "source_url": "https://neo4j.com/press-releases/neo4j-context-engine/"
+      "tag": "US - Enterprise AI Economics",
+      "title": "Menlo Ventures: Enterprise AI Spend Hits $177B, Up 5.4x — Agents Drive Budgets 2.5x Over Plan",
+      "body": "Menlo Ventures' fourth annual State of Enterprise AI report, published November 3, 2026 and based on a survey of nearly 400 U.S. enterprise decision-makers, puts enterprise AI deployment spend at $176.8 billion by September 2026, up from $33 billion in 2025. Enterprises ended up spending approximately 2.5 times their planned AI budgets, with the heaviest overage among companies running autonomous agents. Fifty-five percent of the incremental spend came from new budget lines, while only 9% shifted from traditional SaaS — meaning AI is expanding the software market rather than cannibalizing it.",
+      "why": "When a CIO says 'we didn't budget for this,' this report is the proof point that everyone is over-budget — and that agents are the primary cause. Sellers can use the 2.5x overage figure to reframe the conversation: the question is not whether the enterprise will spend more, but whether that spend lands on a foundation (context layer, knowledge graph) that makes agents reliable enough to justify the bill.",
+      "source_label": "Menlo Ventures / Yahoo Finance",
+      "source_url": "https://finance.yahoo.com/technology/ai/articles/menlo-ventures-2026-state-enterprise-140000395.html"
     },
     {
-      "tag": "US/Global - analyst research",
-      "title": "Gartner & Forrester: 40%+ of Agentic AI Projects Will Be Canceled by 2027; 88% of Pilots Never Reach Production",
-      "body": "Gartner, polling more than 3,400 organizations, predicts over 40% of agentic AI projects will be canceled by end of 2027, attributing failures to escalating costs, unclear business value, and inadequate governance — not model capability. A separate September 2026 Gartner forecast adds that 70% of enterprises will abandon agentic AI built by vendor forward-deployed engineering by 2028, citing rising maintenance costs and outside-engineer dependence. Forrester's 2026 report, titled 'Companies Are Chasing, Few Are Catching,' found roughly three-quarters of enterprise leaders claiming to adopt agentic AI but only a fraction running it in real production, with 88% of pilots (per a Forrester/Anaconda study) never reaching production due to missing evaluation criteria and governance friction.",
-      "why": "This analyst consensus is the sharpest objection-handler available: when a prospect says 'we're already running pilots,' sellers can cite these numbers to shift the conversation to what it takes to get from pilot to production — which is exactly the data-foundation and governance layer Graas provides. The Gartner September 2026 'vendor forward-deployed engineering' forecast also directly challenges build-with-a-consultancy approaches.",
-      "source_label": "Gartner / Forrester / Forbes",
-      "source_url": "https://www.forbes.com/sites/robertszczerba/2026/07/07/why-40-of-agentic-ai-projects-may-be-canceled-by-2027/"
+      "tag": "US - Analyst Research",
+      "title": "BCG Survey: 59% of CPG Companies Have No Meaningful Agentic AI Capabilities Despite 80% Consumer AI Use",
+      "body": "A BCG GenAI CPG Survey 2026 published October 30 finds that 80% of U.S. consumers use AI and nearly half shop with it, yet 59% of CPG companies report no meaningful agentic commerce capabilities today. Only 41% have begun developing any agentic AI capabilities, leaving the majority at risk of becoming unfindable as AI-driven referrals — currently under 1% of retail site visits — are projected to reach 5% by end of 2026 and to overtake organic search in the U.S. as early as 2028. BCG prescribes three plays: generative engine optimization, building owned agents, and integrating into the broader agentic commerce ecosystem.",
+      "why": "The 59% gap is a cold-open statistic for any CPG or distributor call: the majority of your prospect's competitors have not yet built the agent capability layer, which means the window to establish a context-layer foundation before the market shifts is narrow. The data-readiness prerequisite BCG implies — structured product data, owned agent infrastructure — maps directly to what a semantic/context layer enables.",
+      "source_label": "BCG",
+      "source_url": "https://www.bcg.com/publications/2026/how-cpg-companies-win-agentic-commerce"
     },
     {
-      "tag": "US/Global - McKinsey named report",
-      "title": "McKinsey Agentic Commerce Consumer Survey (Oct 2026): AI Search Now 3x More Influential Than Traditional Search for Retail Decisions",
-      "body": "McKinsey's Agentic Commerce Consumer Survey, fielded in June 2026 across approximately 21,000 consumers in 11 markets, finds that for AI users, AI search is three times more influential than traditional search in purchase decisions. The report notes that agentic commerce is helping e-commerce laggards close competitive gaps rapidly, and flags that implementation complications led OpenAI to scale back its instant-checkout ambitions — a signal that the agent execution layer remains harder than it looks. Forrester's mid-2026 assessment, cited in the same research ecosystem, states bluntly that most 'agentic' commerce experiences today are still conversational, with humans still driving checkout in the vast majority of cases.",
-      "why": "A McKinsey survey with 21,000 respondents published October 28, 2026 is the strongest external proof point that enterprise retailers must act now on agentic commerce infrastructure — not in 2027. The finding that even well-resourced players like OpenAI have stumbled on execution reinforces why a pre-built, retail-specific context layer matters more than a DIY agent build.",
-      "source_label": "McKinsey & Company",
-      "source_url": "https://www.mckinsey.com/capabilities/growth-marketing-and-sales/our-insights/who-wins-when-ai-does-the-shopping-new-evidence-on-agentic-commerce"
+      "tag": "US - Agent Vendor Product Move",
+      "title": "Sierra Acquires Anon to Give Enterprise Agents Access Behind Website Logins — No API Required",
+      "body": "On November 5, 2026, Sierra acquired Anon, bringing in its authenticated browser technology, credential handling, and SDK to let Sierra's AI agents sign into websites, navigate portals, and complete tasks in systems that have no APIs. The deal follows Sierra's earlier acquisitions of voice, international, and workflow capabilities as it pushes agents from answering questions to acting across systems. Dealroom noted that roughly 70% of enterprise software lacks a robust API, making authenticated browser execution a persistent deployment bottleneck.",
+      "why": "Sierra is a primary named competitor. This acquisition signals that the next phase of the agent market is won by whoever can execute inside the messy, login-protected enterprise stack — not just chat. For Graas sellers, it sharpens the conversation: agents without a governed context layer will produce plausible-but-wrong outputs inside those portals at scale; the architecture story (knowledge graph + semantic layer) is what makes browser-action agents safe to deploy.",
+      "source_label": "Dealroom / RuntimeWire",
+      "source_url": "https://dealroom.co/news/170115-sierra-buys-anon-to-let-its-ai-agents-work-behind-website-logins"
     },
     {
-      "tag": "US - named CPG deployment with outcomes",
-      "title": "BCG: Agentic AI Boosts In-Stocks by 2–4% and Planning Productivity by 60%+ in CPG–Retailer Supply Chain Pilots",
-      "body": "BCG's published analysis of large CPG and retailer deployments finds that agentic AI unlocks 2–4 percentage points of in-stock improvement and more than 60% planning productivity gains by enabling synchronized replenishment — agents monitor store- and DC-level inventory signals against sell-through velocity and proactively push replenishment recommendations before a retailer's own cycle catches a pending stockout. A separate named case from analytics firm Tredence shows an enterprise CPG client's deduction-management agent, integrated across 30-plus systems including SAP and EDI portals, recovered $6.5 million from roughly $40 million in addressable trade deduction spend. Both deployments cite the same prerequisite: a unified, real-time data layer spanning retailer feeds, ERP, and demand signals.",
-      "why": "These are named outcome numbers — in-stock rates and recovered revenue — that a Graas seller can put on a slide for a supply-chain or category-management conversation with a CPG or distributor prospect. Both cases explicitly name data harmonization as the prerequisite, making them direct proof that the context/data foundation layer is not optional overhead but the source of the measurable return.",
-      "source_label": "BCG / Tredence",
-      "source_url": "https://www.bcg.com/x/the-multiplier/how-agentic-ai-improves-cpg-retailer-collaboration"
+      "tag": "US - Enterprise AI Architecture",
+      "title": "Dell Launches Unified Semantic Layer and Enterprise Knowledge Graph to Ground Agentic AI On-Premises",
+      "body": "Dell announced three new features for its enterprise AI stack: a Unified Semantic Layer that establishes a common business vocabulary across structured and unstructured data, an Enterprise Knowledge Graph that maps relationships including metadata, lineage, and query history, and Knowledge Agents built on top of both. Dell plans to incorporate Nvidia's open-source Auto-Ontology technology to help construct the knowledge graphs from enterprise data, and all components will operate within the customer's environment to meet data sovereignty requirements. The Unified Semantic Layer and Knowledge Graph are scheduled for release in the first half of 2027.",
+      "why": "A major infrastructure vendor making an on-premises architecture commitment to the semantic layer + knowledge graph stack validates the entire category and the sales narrative that agents fail without a governed data foundation. When a prospect's IT team says 'we'll build this ourselves,' Dell entering the space shows the complexity of doing so — and why a purpose-built context layer for retail commerce is a faster, lower-risk path.",
+      "source_label": "Network World",
+      "source_url": "https://www.networkworld.com/article/4232072/dell-gives-ai-agents-a-broader-view-of-enterprise-data.html"
     }
   ]
 }
