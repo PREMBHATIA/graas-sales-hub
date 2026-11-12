@@ -178,17 +178,19 @@ st.markdown("""
        a grey list. */
     .news-lead, .news-card {
         border: 1px solid #E5E7EB; border-radius: 12px;
-        padding: 14px 16px; height: 100%;
+        padding: 10px 14px; height: 100%;
     }
-    .news-lead { padding: 17px 19px; margin: 4px 0 12px; }
-    .news-lead .n-ttl { font-size: 1.06rem; font-weight: 800; margin: 6px 0 7px;
+    .news-lead { padding: 11px 15px; margin: 2px 0 8px; }
+    .news-lead .n-ttl { font-size: 0.97rem; font-weight: 800; margin: 3px 0 4px;
                         line-height: 1.3; letter-spacing: -0.01em; }
-    .news-lead .n-why { font-size: 0.86rem; color: #374151; line-height: 1.45; }
-    .news-card .n-ttl { font-size: 0.87rem; font-weight: 700; margin: 5px 0 0;
+    .news-lead .n-why { font-size: 0.8rem; color: #374151; line-height: 1.4;
+                        display: -webkit-box; -webkit-line-clamp: 2;
+                        -webkit-box-orient: vertical; overflow: hidden; }
+    .news-card .n-ttl { font-size: 0.82rem; font-weight: 700; margin: 3px 0 0;
                         line-height: 1.36; }
     .n-tag  { font-size: 0.63rem; font-weight: 800; letter-spacing: .08em;
               text-transform: uppercase; display: block; }
-    .n-src  { font-size: 0.73rem; color: #6B7280; margin-top: 7px; }
+    .n-src  { font-size: 0.73rem; color: #6B7280; margin-top: 4px; }
     .news-lead a, .news-card a { text-decoration: none; }
     .news-lead a:hover, .news-card a:hover { text-decoration: underline; }
 
@@ -511,10 +513,11 @@ def _video_shelf():
             f'<div class="vs-th">{thumb}{badge}</div>'
             f'<div class="vs-ttl">{_h.escape(str(r.get("title", "Video")))}</div>'
             f'</a>')
+    st.markdown('<div style="height:10px"></div>', unsafe_allow_html=True)
     _label("Videos")
     st.markdown(
         '<style>'
-        '.vs-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;}'
+        '.vs-grid{display:grid;grid-template-columns:repeat(auto-fill,190px);gap:14px;margin:4px 0 14px;}'
         '.vs-card{text-decoration:none !important;color:#111827 !important;display:block;}'
         '.vs-th{position:relative;aspect-ratio:16/9;border-radius:8px;overflow:hidden;'
         'background:#111827;border:1px solid #E5E7EB;}'
@@ -525,7 +528,7 @@ def _video_shelf():
         'background:rgba(0,0,0,.65);color:#fff;font-size:.6rem;display:flex;'
         'align-items:center;justify-content:center;padding-left:2px;}'
         '.vs-card:hover .vs-th{border-color:#4F46E5;box-shadow:0 2px 8px rgba(79,70,229,.25);}'
-        '.vs-ttl{font-size:.82rem;font-weight:700;margin-top:6px;line-height:1.25;}'
+        '.vs-ttl{font-size:.8rem;font-weight:700;margin-top:5px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}'
         '</style><div class="vs-grid">' + cards + '</div>',
         unsafe_allow_html=True)
     _v1, _ = st.columns([1, 3])
@@ -575,6 +578,7 @@ def _accent(tag: str):
 
 
 if _stories:
+    import html as _h
     _when = str(_news.get("generated_utc", ""))[:10]
     _label(f"News you can Use &nbsp;·&nbsp; {_when}")
 
@@ -586,7 +590,7 @@ if _stories:
         f'<span class="n-tag" style="color:{_c}">{_ld.get("tag","")}</span>'
         f'<div class="n-ttl"><a href="{_ld.get("source_url","#")}" '
         f'target="_blank" style="color:#111827">{_ld.get("title","")}</a></div>'
-        f'<div class="n-why">{_ld.get("why","")}</div>'
+        f'<div class="n-why" title="{_h.escape(str(_ld.get("why","")), quote=True)}">{_ld.get("why","")}</div>'
         f'<div class="n-src">{_ld.get("source_label","")} ↗</div></div>',
         unsafe_allow_html=True)
 
