@@ -470,6 +470,72 @@ with c4:
 
 st.markdown("")
 
+# ── Videos ───────────────────────────────────────────────────────────────────
+# A shelf of small thumbnails, newest first, read from the same "Videos"
+# entries Key Collateral shows — one list, so a video added there appears here
+# with no second edit. Customer-safe ones only (sales_facing), same rule as
+# Key Collateral.
+#
+# Thumbnails: YouTube serves one per video id, no API. A Drive file has no
+# public thumbnail (Drive enforces the file's own sharing, so it would render
+# broken for anyone without access), so anything that is not YouTube gets a
+# gradient tile with a play mark instead.
+def _video_shelf():
+    import html as _h
+    import re as _re
+    try:
+        data = json.loads((Path(__file__).parent.parent / "content"
+                           / "resources.json").read_text("utf-8"))
+    except Exception:
+        return
+    vids = [r for r in (data.get("decks", []) + data.get("docs", []))
+            if isinstance(r, dict) and r.get("sales_facing") is True
+            and str(r.get("category", "")).strip() == "Videos" and r.get("url")]
+    if not vids:
+        return
+    # Stable sort: newest "added" first, file order within a day.
+    vids.sort(key=lambda r: str(r.get("added", "")), reverse=True)
+    cards = ""
+    for r in vids[:6]:
+        url = str(r["url"])
+        m = _re.search(r"(?:youtu\.be/|[?&]v=)([A-Za-z0-9_-]{11})", url)
+        if m:
+            thumb = (f'<img src="https://img.youtube.com/vi/{m.group(1)}'
+                     f'/mqdefault.jpg" alt="" loading="lazy">')
+        else:
+            thumb = '<div class="vs-ph">▶</div>'
+        badge = '<span class="vs-play">▶</span>' if m else ''
+        cards += (
+            f'<a class="vs-card" href="{_h.escape(url, quote=True)}" '
+            f'target="_blank" rel="noopener">'
+            f'<div class="vs-th">{thumb}{badge}</div>'
+            f'<div class="vs-ttl">{_h.escape(str(r.get("title", "Video")))}</div>'
+            f'</a>')
+    _label("Videos")
+    st.markdown(
+        '<style>'
+        '.vs-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;}'
+        '.vs-card{text-decoration:none !important;color:#111827 !important;display:block;}'
+        '.vs-th{position:relative;aspect-ratio:16/9;border-radius:8px;overflow:hidden;'
+        'background:#111827;border:1px solid #E5E7EB;}'
+        '.vs-th img{width:100%;height:100%;object-fit:cover;display:block;}'
+        '.vs-ph{width:100%;height:100%;display:flex;align-items:center;justify-content:center;'
+        'background:linear-gradient(135deg,#4F46E5,#7C3AED 55%,#DB2777);color:#fff;font-size:1.6rem;}'
+        '.vs-play{position:absolute;right:6px;bottom:6px;width:22px;height:22px;border-radius:50%;'
+        'background:rgba(0,0,0,.65);color:#fff;font-size:.6rem;display:flex;'
+        'align-items:center;justify-content:center;padding-left:2px;}'
+        '.vs-card:hover .vs-th{border-color:#4F46E5;box-shadow:0 2px 8px rgba(79,70,229,.25);}'
+        '.vs-ttl{font-size:.82rem;font-weight:700;margin-top:6px;line-height:1.25;}'
+        '</style><div class="vs-grid">' + cards + '</div>',
+        unsafe_allow_html=True)
+    _v1, _ = st.columns([1, 3])
+    with _v1:
+        st.page_link("views/6_collateral.py", label="All videos & collateral →")
+    st.markdown("")
+
+
+_video_shelf()
+
 # ── News you can Use ─────────────────────────────────────────────────────────
 # Reads content/news.json and NOTHING else — no API call, no Sheets read. The
 # file is rewritten by .github/workflows/refresh-news.yml at 16:00 UTC
