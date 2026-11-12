@@ -189,5 +189,13 @@
       "source": "McKinsey Growth, Marketing & Sales Practice, October 2026"
     }
   ],
-  "_security_folder": "https://drive.google.com/drive/folders/15uPqFL0AgU4nufXRNJqikCXK-g4FlR6N"
+  "_security_folder": "https://drive.google.com/drive/folders/15uPqFL0AgU4nufXRNJqikCXK-g4FlR6N",
+  "featured_video": {
+    "title": "Agent Foundry walkthrough",
+    "kicker": "New · Product walkthrough",
+    "description": "The Knowledge Graph, then Foundry end to end: Prompts, Evals and Analytics. Watch it before your next technical call.",
+    "drive_id": "1ZU2ikWJDUzx8-G-9OmxhszAfe4d9LfNW",
+    "added": "2026-11-12",
+    "audience": "Internal until confirmed"
+  }
 }
