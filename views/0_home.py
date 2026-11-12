@@ -470,47 +470,6 @@ with c4:
 
 st.markdown("")
 
-# ── Featured video ───────────────────────────────────────────────────────────
-# One config entry, content/resources.json -> "featured_video". Delete the key
-# and this section disappears; change drive_id to swap the video. It sits
-# below the pipeline on purpose: the landing page's job is navigation, so the
-# video must not push the board off the first screen.
-#
-# Drive's /preview player, not a file in the repo: the source is a ~60MB MP4
-# and committing that would bloat every clone and every redeploy. The catch is
-# that Drive enforces the file's own sharing, so a viewer without access sees
-# Drive's "request access" screen inside the frame. The link underneath is the
-# fallback for exactly that case.
-_fv = {}
-try:
-    _fv = json.loads((Path(__file__).parent.parent / "content"
-                      / "resources.json").read_text("utf-8")).get(
-                          "featured_video") or {}
-except Exception:
-    _fv = {}
-
-if _fv.get("drive_id"):
-    import re as _re
-    import streamlit.components.v1 as _components
-    _vid = _re.sub(r"[^A-Za-z0-9_-]", "", str(_fv["drive_id"]))
-    _label("New video")
-    _vl, _vr = st.columns([5, 4], gap="large")
-    with _vl:
-        _components.iframe(
-            f"https://drive.google.com/file/d/{_vid}/preview",
-            height=330)
-    with _vr:
-        st.markdown(f"**{_fv.get('title', 'Video')}**")
-        if _fv.get("description"):
-            st.write(_fv["description"])
-        _aud = str(_fv.get("audience", "")).strip()
-        if _aud:
-            st.caption(f"🔒 {_aud}")
-        st.markdown(
-            f"[Can't see the player? Open in Drive ↗]"
-            f"(https://drive.google.com/file/d/{_vid}/view)")
-    st.markdown("")
-
 # ── News you can Use ─────────────────────────────────────────────────────────
 # Reads content/news.json and NOTHING else — no API call, no Sheets read. The
 # file is rewritten by .github/workflows/refresh-news.yml at 16:00 UTC

@@ -187,15 +187,21 @@
       "sales_facing": true,
       "audience": "Share the link with customers — don't attach the PDF (McKinsey copyright)",
       "source": "McKinsey Growth, Marketing & Sales Practice, October 2026"
+    },
+    {
+      "title": "Agent Foundry walkthrough",
+      "description": "Knowledge Graph, then Foundry: Prompts, Evals and Analytics.",
+      "url": "https://drive.google.com/file/d/1ZU2ikWJDUzx8-G-9OmxhszAfe4d9LfNW/view",
+      "type": "Video",
+      "added": "2026-11-12",
+      "tags": [
+        "video",
+        "product"
+      ],
+      "category": "Videos",
+      "sales_facing": true,
+      "audience": "Share with customers"
     }
   ],
-  "_security_folder": "https://drive.google.com/drive/folders/15uPqFL0AgU4nufXRNJqikCXK-g4FlR6N",
-  "featured_video": {
-    "title": "Agent Foundry walkthrough",
-    "kicker": "New · Product walkthrough",
-    "description": "The Knowledge Graph, then Foundry end to end: Prompts, Evals and Analytics. Watch it before your next technical call.",
-    "drive_id": "1ZU2ikWJDUzx8-G-9OmxhszAfe4d9LfNW",
-    "added": "2026-11-12",
-    "audience": "Internal until confirmed"
-  }
+  "_security_folder": "https://drive.google.com/drive/folders/15uPqFL0AgU4nufXRNJqikCXK-g4FlR6N"
 }
