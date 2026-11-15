@@ -1,46 +1,46 @@
 {
-  "generated_utc": "2026-11-14T20:25:26Z",
+  "generated_utc": "2026-11-15T20:49:29Z",
   "window_days": 30,
   "stories": [
     {
-      "tag": "US - analyst / build-vs-buy",
-      "title": "Gartner: 70% of Enterprises Will Abandon Vendor-Built Agentic AI by 2028",
-      "body": "Published September 30, 2026, Gartner warned that 70% of enterprises will abandon agentic AI built through vendor forward-deployed engineering (FDE) by 2028, citing soaring costs and an inability to evolve the systems internally. Gartner also flagged a practice it calls 'FDE washing,' where vendors relabel implementation or consulting services as forward-deployed engineering while charging premium fees. A paired forecast adds that fewer than 20% of FDE engagements will convert recurring customer needs into permanent capabilities in the vendor's core product.",
-      "why": "This is the single most important buying objection a Graas seller will face in 2026: a prospect's CIO has now read Gartner's headline and will ask 'how do we avoid being in that 70%?' Sellers who can articulate how Graas builds internal capability and transfers ownership — rather than creating dependency — have a decisive response to the build-vs-buy stall.",
-      "source_label": "Gartner / The Register",
-      "source_url": "https://www.theregister.com/ai-and-ml/2026/09/30/7-in-10-enterprises-expected-to-abandon-vendor-built-agentic-ai-by-2028/5300021"
+      "tag": "US - context layer / agent infrastructure",
+      "title": "Neo4j Launches Context Engine: A Shared Knowledge Layer for Enterprise AI Agents",
+      "body": "On October 20, 2026, Neo4j announced the Neo4j Context Engine — a reusable, shared substrate that allows AI agents to consistently reason over enterprise knowledge. The product includes a six-layer Business Ontology that maps an organization's processes, data, and AI assets into a graph, plus a graph-native memory layer that gives agents memory and reinforced learning from past decisions. It also logs agent reasoning and operational paths to form a permanent record of enterprise experience.",
+      "why": "This is a direct proof point for the data foundation argument: without a governed knowledge layer, agents hallucinate or contradict each other across systems. A Graas seller can use this launch to show prospects that the market has converged on context-layer-first architecture — and that any agent deployment without it (including competitors') is building on sand.",
+      "source_label": "Neo4j Press Release",
+      "source_url": "https://neo4j.com/press-releases/neo4j-context-engine/"
     },
     {
-      "tag": "US - enterprise AI architecture",
-      "title": "Forrester: Build Meaning Before Machines — Why Ontologies and Knowledge Graphs Are Now Core Agentic AI Infrastructure",
-      "body": "Forrester's blog post argues that when agents lack a governed semantic foundation, they guess at joins, misinterpret metrics, and act on flawed assumptions — making ontologies, semantic layers, and knowledge graphs core architectural requirements, not nice-to-haves. Forrester proposes a layered model: ontologies define knowledge, semantic layers enforce clarity and consistency, and a knowledge graph becomes the long-term 'digital twin' that enables agentic AI to reason and act across the enterprise. Most organizations, Forrester notes, are not yet ready to build a knowledge graph and should start with the semantic layer as the right first step.",
-      "why": "This is a named Forrester position paper that directly validates the context-layer argument Graas makes on every discovery call — sellers can cite it to reframe the architecture conversation from 'chatbot vendor' to 'data foundation partner.' It also gives sellers language to explain precisely why pilots stall: agents without semantic grounding hallucinate business logic.",
-      "source_label": "Forrester",
-      "source_url": "https://www.forrester.com/blogs/build-meaning-before-machines-why-semantics-ontologies-and-knowledge-graphs-matter-for-agentic-ai/"
-    },
-    {
-      "tag": "US - McKinsey retail research",
-      "title": "McKinsey: 'Who Wins When AI Does the Shopping?' — 21,000-Consumer Survey Finds Retailers Are Not Yet Equipped",
-      "body": "McKinsey's October 28, 2026 Agentic Commerce Consumer Survey, fielded across approximately 21,000 consumers in 11 markets, finds that more than half of global consumers now use AI for shopping tasks, yet its headline conclusion is blunt: companies are not yet equipped to meet the rising demand. McKinsey argues that winning the AI consideration set requires retailers to have AI-ready product information — structured, machine-readable product attributes, real-time inventory feeds, and verified customer feedback that an algorithm can parse directly. The report projects up to $1 trillion in U.S. B2C retail revenue orchestrated through agentic commerce by 2030, with a global figure of $3–5 trillion.",
-      "why": "This is a named McKinsey report with a specific enterprise readiness finding — the data foundation gap is now a McKinsey-endorsed talking point, not just a vendor claim. Sellers can use it to open conversations with retail heads of e-commerce or digital: 'McKinsey just surveyed 21,000 shoppers and concluded your competitors aren't ready — here is what ready looks like architecturally.'",
+      "tag": "Global - analyst / consulting research",
+      "title": "McKinsey: 'Who Wins When AI Does the Shopping?' — Global Survey of 21,000 Consumers Finds Retailer AI Assistants Trail Stand-Alone Tools by 2x",
+      "body": "McKinsey's Agentic Commerce Consumer Survey (fielded June 2026, ~21,000 respondents across 11 markets) found that the rate at which US AI users completed a purchase with AI jumped 70% over the prior year. However, retailer-owned AI assistants trail stand-alone AI tools by as much as two times throughout the shopping journey, only catching up at checkout. Overall, 56% of consumers used an AI chat or search tool in the past three months versus 27% who used a retailer's own AI shopping assistant.",
+      "why": "The 2x gap between third-party AI tools and in-house retailer assistants is a compelling data point that directly explains why enterprise retailers need better-grounded agents — the ones losing ground are the ones without a solid context and data layer. Graas sellers can cite this October 2026 McKinsey study to explain why the architecture problem must be solved before an agent goes live.",
       "source_label": "McKinsey & Company",
       "source_url": "https://www.mckinsey.com/capabilities/growth-marketing-and-sales/our-insights/who-wins-when-ai-does-the-shopping-new-evidence-on-agentic-commerce"
     },
     {
-      "tag": "US - agent vendor landscape",
-      "title": "Sierra Reaches $15.8B Valuation on $950M Round; Salesforce Acquires Intercom Fin for ~$3.6B — Agent Vendor Map Redrawn",
-      "body": "Sierra raised $950 million in May 2026 at a $15.8 billion valuation led by Tiger Global and GV, bringing total funding to approximately $1.6 billion, and separately reported passing $150 million in annual recurring revenue. In a separate move that closed in September 2026, Salesforce acquired Intercom's Fin business for roughly $3.6 billion, folding the $0.99-per-outcome agent into the Salesforce stack. Decagon, the other named rival, reached a $4.5 billion valuation on $250 million raised in January 2026, with ARR growing from $44 million at end-2025 to an estimated $100 million by July 2026.",
-      "why": "Three of the five named agent vendors Graas competes with or sits beside have changed their capital structure, ownership, or pricing model in the last six months — sellers need to know that Fin is now a Salesforce product, Sierra's $150K floor makes it unsuitable for mid-market retail, and Decagon is growing fast at a lower price point. This reshapes every competitive bake-off conversation.",
-      "source_label": "The CODEW / getmacha.com",
-      "source_url": "https://www.thecodew.com/2026/11/the-term-sheet-sierra-funding-ai-agent-economy.html"
+      "tag": "Global - analyst / consulting research",
+      "title": "McKinsey & EuroCommerce Report: European Retail AI Has Stalled at the Pilot Stage — Scaling Is Now the Defining Challenge",
+      "body": "The June 2026 report 'Rewiring Retail in Europe: The AI Imperative' (McKinsey + EuroCommerce, survey of 36 retail executives) estimates that end-to-end AI transformation could unlock €240–320 billion in economic value for European retail over five years, equivalent to a four-to-ten percentage-point improvement in operating profit. Despite this, only around 30% of organizations report advanced capabilities in AI governance, risk, and control, while a further third lack formal frameworks entirely. The report identifies 'becoming agent-ready' — meaning connected data, commercial decision-making, and supply chain — as a top priority for retailers to escape the pilot trap.",
+      "why": "The governance and data-readiness gap is the exact reason AI pilots stall, and McKinsey names it explicitly. Graas sellers can point to this report when a prospect says their agents 'aren't working yet' — the root cause is almost always the missing context and governance layer, not the agent model itself.",
+      "source_label": "McKinsey & Company / EuroCommerce",
+      "source_url": "https://www.mckinsey.com/industries/retail/our-insights/rewiring-retail-in-europe-the-ai-imperative"
     },
     {
-      "tag": "US/Global - named CPG deployment",
-      "title": "BCG: Agentic AI Boosts CPG In-Stocks 2–4% and Planning Productivity Over 60% in Live Replenishment Deployments",
-      "body": "A BCG report documents a global CPG leader that redesigned replenishment using GenAI-enabled agents to deliver in-stock alerts and smart DC-to-store transfer recommendations, validated via human-in-the-loop feedback — achieving a 2–4% improvement in in-stock percentage and 40–60% improvement in planning productivity. BCG's supply chain report also cites General Mills, which partnered with Palantir to deploy an AI platform flagging supply chain risks and generating human-validated actions, contributing approximately $14 million in annualized savings. A separate October 26, 2026 press release from C.H. Robinson reports its agents produced more than 80,000 ocean and air freight quotes for over 3,600 customers, cutting quote time from up to three days to two to three minutes and reducing customs processing time by 23%.",
-      "why": "These are named enterprises with published outcome numbers across replenishment, supply chain risk, and freight — the three workflows where Graas agents are most often positioned. Sellers can walk into a CPG or distributor conversation with specific proof that peers have already moved from pilot to production with measurable P&L impact.",
-      "source_label": "BCG / Toptal / querynow.com",
-      "source_url": "https://www.bcg.com/x/the-multiplier/how-agentic-ai-improves-cpg-retailer-collaboration"
+      "tag": "US - agent vendor / M&A",
+      "title": "Salesforce Completes $3.6B Acquisition of Fin (Formerly Intercom Fin), Folding It Into Agentforce",
+      "body": "Salesforce completed its acquisition of Fin — the customer-service AI company formerly known as Intercom — on September 10, 2026, for approximately $3.6 billion, with Fin now operating inside Salesforce AI Labs. The deal brings more than 30,000 business customers to Salesforce and adds Fin's autonomous support technology — which Salesforce says resolves 76% of support volume without a human — into the Agentforce platform. Fin is priced at $0.99 per resolved outcome and is designed for rapid deployment on existing help desks, in contrast to Agentforce's deeply customizable enterprise offering.",
+      "why": "This consolidation fundamentally reshapes the competitive landscape: Intercom Fin is now a Salesforce product, bundled with CRM, which raises the switching cost for any retailer on Salesforce. Graas sellers competing in accounts that use Salesforce must now explain the difference between a bundled, lightly configured agent and a purpose-built, context-grounded retail agent — and what that difference means for resolution quality and outcome reliability.",
+      "source_label": "Salesforce Newsroom",
+      "source_url": "https://www.salesforce.com/news/press-releases/2026/09/10/salesforce-completes-acquisition-of-fin/"
+    },
+    {
+      "tag": "US - agent vendor / funding & product",
+      "title": "Sierra AI Raises $950M at $15.8B Valuation, Launches 'Horizon' for Long-Horizon Agent Goals; Decagon Hits $4.5B on $250M Round",
+      "body": "Sierra raised $950 million led by Tiger Global and GV in May 2026 at a $15.8 billion valuation, reporting over $150M in ARR and claiming it serves over 40% of the Fortune 50. In July 2026, Sierra launched Horizon — acquired via Takeoff — extending agents to goals that unfold over days or weeks (examples: loan origination, healthcare prior authorization). Rival Decagon raised $250 million in January 2026 at a $4.5 billion valuation, adding 100+ corporate clients including Avis Budget Group and Deutsche Telekom, and in March 2026 launched persistent memory of past conversations plus outbound voice.",
+      "why": "Sierra and Decagon are the two agents most likely to appear on a prospect's shortlist alongside or instead of Graas. Sierra's move into long-horizon, multi-day agent goals signals where the enterprise CX category is heading; Decagon's rapid client acquisition shows the mid-market is moving fast. Graas sellers need to be able to articulate what a retail-specific, catalog-and-inventory-grounded agent delivers that neither of these horizontal platforms can match out of the box.",
+      "source_label": "VentureBeat / Bloomberg / Sierra.ai",
+      "source_url": "https://www.getmacha.com/blog/decagon-vs-sierra-ai"
     }
   ]
 }
