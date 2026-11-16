@@ -201,6 +201,21 @@
       "category": "Videos",
       "sales_facing": true,
       "audience": "Share with customers"
+    },
+    {
+      "title": "Sales FAQ — GTM Immersion",
+      "description": "The questions prospects ask and the answers to give: positioning, features, channels, security, IP, implementation and commercials.",
+      "url": "https://docs.google.com/document/d/1trunWyKlzLxPEF-YlPs7qEnX2dbHlYZ7oSo2xU4aUl8/edit",
+      "type": "Google Doc",
+      "added": "2026-11-16",
+      "tags": [
+        "faq",
+        "gtm",
+        "objections"
+      ],
+      "category": "GTM Immersion",
+      "sales_facing": true,
+      "audience": "Internal only"
     }
   ],
   "_security_folder": "https://drive.google.com/drive/folders/15uPqFL0AgU4nufXRNJqikCXK-g4FlR6N"
