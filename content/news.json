@@ -1,46 +1,46 @@
 {
-  "generated_utc": "2026-11-16T23:59:12Z",
+  "generated_utc": "2026-11-17T23:20:47Z",
   "window_days": 30,
   "stories": [
     {
-      "tag": "US - agent vendor / open protocol",
-      "title": "Sierra Releases Personal Agent Protocol (Poppy) 1.0 — Live on Every Shopify Store and Meta Muse by Default",
-      "body": "Sierra released Personal Agent Protocol v1.0 (Poppy) on November 13, 2026, defining how a consumer's personal AI agent discovers a company and negotiates allowed actions through its website, APIs, or business agent. Every Shopify merchant in 175+ countries auto-publishes a Poppy file with no setup required, and Meta's Muse agent now calls Poppy on every site it visits by default. The design partner list passed 100 companies at launch, including Wayfair, Delta, Salesforce Agentforce, Cisco, and Synchrony.",
-      "why": "Any enterprise retailer now faces inbound traffic from personal AI agents operating on behalf of shoppers — Poppy sets the authentication and permission layer those agents use before they hit your commerce stack. A seller can use this to open a 'what's your Poppy strategy?' conversation with a CIO, directly linking the need for a governed context and identity layer to a live, shipping protocol.",
-      "source_label": "Sierra (official blog) / AI Weekly / Futurum Group",
-      "source_url": "https://sierra.ai/blog/theres-an-agent-for-that-and-it-runs-on-sierra"
+      "tag": "US - analyst research / pilot failure",
+      "title": "McKinsey 'State of Organizations 2026': 88% of Enterprises Deploy AI, 88% See No Bottom-Line Impact",
+      "body": "McKinsey's State of Organizations 2026 report (surveying 10,018 executives) finds that 88% of organizations now use AI in at least one business function, yet only 39% report measurable EBIT impact — and 86% of leaders say their organizations are not prepared to adopt AI in day-to-day operations. The top three barriers cited are concerns about AI itself (46%), regulatory or ethical concerns (44%), and organizational change management challenges (39%). In the US alone, only 1% of C-suite respondents describe their generative AI rollouts as mature.",
+      "why": "This is the definitive proof point for why retail AI pilots stall: it's a coordination and readiness gap, not a capability gap — exactly the conversation a Graas seller should be having with any CIO or CDO. The 86% unpreparedness figure reframes the sales conversation from 'do you need AI?' to 'do you have the data and organizational foundation to make it work?' — which is Graas's core value proposition.",
+      "source_label": "McKinsey & Company",
+      "source_url": "https://www.mckinsey.com/~/media/mckinsey/business%20functions/people%20and%20organizational%20performance/our%20insights/the%20state%20of%20organizations/2026/the-state-of-organizations-2026.pdf"
     },
     {
-      "tag": "US - analyst research / architecture",
-      "title": "Gartner Names Context Graphs a 'Peak' Technology in Its First Standalone Hype Cycle for Agentic AI (2026)",
-      "body": "Gartner's September 2026 report 'Context Graphs Ground AI Agents With Enterprise Knowledge' identifies context graphs as the foundational layer that grounds AI agents in declarative, procedural, and causal knowledge, with policies enforced through runtime constraints. The accompanying Hype Cycle for Agentic AI 2026 places context graphs at the Peak of Inflated Expectations, noting that unstructured RAG is insufficient for production agent deployments. Gartner predicts that by 2028 more than 50% of enterprise AI agent systems will leverage context graphs, driven by demand for greater agent autonomy.",
-      "why": "This is the highest-authority external validation a seller can cite for why a retailer must build a context/knowledge layer before agents deliver value — it reframes the conversation from 'AI tool' to 'missing infrastructure.' It also gives a rebuttal to any prospect that thinks RAG alone is enough to run enterprise retail agents at scale.",
-      "source_label": "Gartner (via Gartner.com abstract + Hype Cycle analysis)",
-      "source_url": "https://www.gartner.com/en/documents/8384981"
+      "tag": "US - analyst research / CPG-retail AI scaling",
+      "title": "BCG & Consumer Goods Forum Report: 75% of CPGs Still in Pilot Mode, Agentic AI Could Deliver Up to 350bps EBIT",
+      "body": "A BCG and Consumer Goods Forum survey of 39 senior CPG and retail executives worldwide ('AI in CPG and Retail: How Winners Are Pulling Ahead') finds roughly 75% of CPG companies remain in pilot or exploration mode, with only 18% achieving scaled impact. More than half of surveyed companies do not formally measure the ROI of their AI investments. BCG calculates that scaling AI initiatives across the demand value chain could deliver 220–350 basis points of cumulative EBIT for CPGs and 180–360 bps for retailers, with agentic capabilities potentially expanding that opportunity up to 1.7x over the next two to three years.",
+      "why": "The 'pilot purgatory' finding is a direct conversation-opener: if 75% of CPG prospects are stuck in pilots, the question is what's blocking them — and the answer is almost always fragmented data and lack of a governed context layer before agents are deployed. The 350bps EBIT opportunity gives sellers a defensible ROI anchor for the architecture investment conversation.",
+      "source_label": "BCG / Quality Assurance Magazine",
+      "source_url": "https://www.qualityassurancemag.com/news/bcg-and-cgf-release-new-report-on-ai-usage-by-cpg-and-retail-companies/"
     },
     {
-      "tag": "US - analyst research / adoption gap",
-      "title": "McKinsey & Gartner 2026 Data: Only 23% of Orgs Have Scaled Agents; 40%+ of Projects Face Cancellation by 2027",
-      "body": "A February 2026 roundup of analyst forecasts finds that agentic AI spending is projected to reach $201.9 billion in 2026 (Gartner), yet only 23% of organizations have scaled agent deployments according to McKinsey, and Gartner warns that more than 40% of agentic AI projects will be canceled by end of 2027. McKinsey's 'Merchants Unleashed' retail report finds that 71% of merchants surveyed say AI merchandising tools have had limited to no effect on their business so far, despite early adopters reporting significant revenue and margin lifts. Gartner's 2026 CIO Survey shows 17% of enterprises have deployed AI agents to date while 60%+ intend to within two years — a classic pilot-to-production stall pattern.",
-      "why": "The 71% 'no effect' statistic from McKinsey is a direct, citable answer to the objection 'we tried AI and it didn't work' — sellers can pivot to diagnosing why (data silos, no context layer) rather than defending the category. The 40% cancellation forecast from Gartner is an urgency tool: pilots that don't get the data foundation right now are statistically likely to be cut.",
-      "source_label": "Software Strategies Blog (citing Gartner, McKinsey) / Agxntsix (citing McKinsey 'Merchants Unleashed')",
-      "source_url": "https://softwarestrategiesblog.com/2026/02/26/roundup-of-agentic-ai-forecasts-and-market-estimates-2026/"
+      "tag": "US - enterprise AI architecture / context layer",
+      "title": "Forrester: 'Build Meaning Before Machines' — Ontologies and Knowledge Graphs Are Now Core Agentic AI Infrastructure",
+      "body": "A Forrester blog post argues that when agents lack semantic grounding they misinterpret metrics, get joins wrong, and act on flawed assumptions — making ontologies, semantic layers, and knowledge graphs 'rapidly becoming core architectural components.' Forrester proposes a layered approach in which ontologies define knowledge, semantics enforce consistency, and knowledge graphs connect these elements into a model that supports reasoning; it positions the semantic layer as the right starting point for most organizations, with the knowledge graph as the long-term destination and 'a form of digital twin that enables agentic AI to reason and act across the enterprise.' Independent 2026 benchmarks on retail analytics data show adding explicit business semantics raises LLM accuracy by 17–23 percentage points across frontier models.",
+      "why": "Forrester naming semantics + ontology + knowledge graph as the prerequisite infrastructure for agentic AI is analyst cover for every Graas 'context layer first' pitch. Sellers can cite this directly to CIOs who are skeptical of spending on data foundations before deploying agents — especially when paired with the 17–23 point accuracy lift from retail-specific benchmark data.",
+      "source_label": "Forrester",
+      "source_url": "https://www.forrester.com/blogs/build-meaning-before-machines-why-semantics-ontologies-and-knowledge-graphs-matter-for-agentic-ai/"
     },
     {
-      "tag": "US - CPG enterprise deployment / outcomes",
-      "title": "BCG: Agentic AI in CPG–Retail Supply Chains Delivers +2–4% In-Stock Improvement and 60%+ Planning Productivity Gain",
-      "body": "A BCG Executive Perspectives report on supply chain published in May 2026 finds that agentic AI can boost in-stocks by 2–4% and planning productivity by more than 60% for CPGs and retailers by enabling synchronized, constraint-aware replenishment decisions between trading partners. BCG describes a CPG client that rebuilt replenishment using a modular agent backend, shifting from weekly batch cycles to continuous overnight evaluation of supply alternatives and service-level trade-offs. The report also flags that AI-related incidents rose 21% from 2024 to 2025, and that 69% of executives say agentic AI requires new governance structures.",
-      "why": "BCG's named outcome numbers (2–4% in-stock, 60%+ productivity) are boardroom-ready proof points a seller can drop directly into an ROI conversation with a supply chain or merchandising leader. The governance caveat — 69% of execs say agents need new controls — is a natural setup for why a governed context layer is prerequisite, not optional.",
-      "source_label": "BCG (Executive Perspectives: Supply Chain, May 2026)",
-      "source_url": "https://media-publications.bcg.com/assets/2026/bcg-ep-future-of-functions-supply-chain.pdf"
+      "tag": "US - agent vendor / M&A consolidation",
+      "title": "Sierra Hits $400M ARR and $15.8B Valuation; Salesforce Acquires Fin (Intercom) for $3.6B; Zendesk Absorbs Forethought",
+      "body": "Sierra raised a $950 million Series E in May 2026 at a $15.8 billion post-money valuation led by GV and Tiger Global, and announced in October 2026 it had surpassed $400 million in ARR — adding more than $150 million in Q3 alone. Salesforce completed its acquisition of Fin (formerly Intercom) for approximately $3.6 billion on September 10, 2026, with Fin at roughly $400 million ARR at time of closing; Fin continues to price at $0.99 per outcome inside the Salesforce stack. Zendesk separately completed its acquisition of Forethought in March 2026 and launched a Resolution Platform with outcome-based pricing, ending Forethought's run as an independent vendor.",
+      "why": "Three major consolidation moves in one quarter reshapes the competitive landscape: Fin is now a Salesforce-bundled product (changing the enterprise buying motion), Forethought is gone as a standalone option, and Sierra's $400M ARR at a ~40x multiple signals investors believe agentic CX is winner-take-most. Graas sellers need to know which of these vendors they will encounter in a deal and how the new ownership structures affect procurement, pricing, and lock-in risk.",
+      "source_label": "Sacra / GetMacha",
+      "source_url": "https://sacra.com/c/sierra/"
     },
     {
-      "tag": "US - agent vendor / M&A / pricing",
-      "title": "Salesforce Acquires Intercom Fin; Decagon Hits $4.5B Valuation — Competitive Landscape Consolidates Around Outcome-Based Pricing",
-      "body": "Salesforce completed its acquisition of Intercom's Fin AI agent on September 10, 2026; Fin now operates inside Salesforce AI Labs while continuing to charge $0.99 per resolved outcome. Competitor Decagon, which serves Chime, Duolingo, Hertz, and Deutsche Telekom, reached a $4.5B valuation after a $250M Series D in January 2026 and was tracking approximately $100M in annualized revenue as of July 2026. Sierra, now valued at $15.8B and serving nearly half the Fortune 50, is priced at roughly $150K–$350K+ per year on an outcome basis — with no vendor in the category publishing a simple comparable enterprise price.",
-      "why": "Fin's move into the Salesforce orbit changes the competitive dynamic for any retailer already on Salesforce Service Cloud — sellers need to know whether Fin's $0.99 per-outcome model is a threat or a co-sell opportunity. The Decagon and Sierra valuation milestones signal that the enterprise market is validating outcome-based pricing, which is a useful anchor when discussing Graas's own commercial model.",
-      "source_label": "AI Magazine / getmacha.com (citing Salesforce acquisition data)",
-      "source_url": "https://aimagazine.com/news/decagon-how-ai-service-agents-firm-hit-us-4-5bn-valuation"
+      "tag": "US - named deployment / CPG supply chain agents",
+      "title": "BCG: Agentic AI Boosts In-Stocks 2–4% and Planning Productivity Over 60% in CPG–Retailer Supply Chain Pilots",
+      "body": "BCG published a detailed playbook ('Breaking Friction Silos') documenting that in pilots with large CPG manufacturers and retailers, agentic AI unlocked 2–4% improvements in in-stock rates and more than 60% gains in planning productivity by replacing asynchronous, fragmented decision-making across retailer buyers, replenishment planners, and CPG sales analysts. BCG's supply chain agent architecture is built around a curated action ontology for supply chain processes and an agentic harness design for reliability — both prerequisites to deploying multi-agent replenishment workflows. A separate BCG Executive Perspectives paper (May 2026) documents a global CPG leader that redesigned replenishment from reactive to proactive using an agentic platform, shifting to a live collaboration workflow with retailers.",
+      "why": "This is the closest thing to a named enterprise deployment with hard outcome numbers available from a credible source this month — and BCG explicitly calls out a 'curated action ontology' as the design foundation, which is the same architecture argument Graas makes. The 60%+ planning productivity lift is a quotable outcome for supply chain or merchandising conversations with retail and CPG accounts.",
+      "source_label": "BCG",
+      "source_url": "https://www.bcg.com/x/the-multiplier/how-agentic-ai-improves-cpg-retailer-collaboration"
     }
   ]
 }
