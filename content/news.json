@@ -1,46 +1,46 @@
 {
-  "generated_utc": "2026-11-18T22:51:37Z",
+  "generated_utc": "2026-11-19T22:55:00Z",
   "window_days": 30,
   "stories": [
     {
-      "tag": "US - context layer / agent infrastructure",
-      "title": "Dell Launches Unified Semantic Layer, Enterprise Knowledge Graph, and Knowledge Agents for Agentic AI",
-      "body": "Dell is adding three new capabilities to its enterprise AI stack: a Unified Semantic Layer that establishes a common business vocabulary across structured and unstructured data, an Enterprise Knowledge Graph that maps relationships including metadata and lineage, and Knowledge Agents. Dell plans to incorporate NVIDIA's open-source Auto-Ontology technology to help construct knowledge graphs from enterprise data. The architecture is designed to operate within the customer's own environment to address data sovereignty and security, and to avoid locking customers into a specific AI model, data platform, or storage provider.",
-      "why": "This is a named vendor making a full architecture commitment — semantic layer, knowledge graph, and agents as a bundled on-premises stack — which is exactly the data foundation argument Graas must win before agents can operate reliably. Use it on calls to show that hyperscalers now validate the context-layer-first thesis, and that enterprises without this foundation will buy it from someone.",
-      "source_label": "Network World",
-      "source_url": "https://www.networkworld.com/article/4232072/dell-gives-ai-agents-a-broader-view-of-enterprise-data.html"
+      "tag": "US - agent vendor / Sierra",
+      "title": "Sierra in Talks to Raise $1.5B at $30B Valuation as ARR Hits $400M+",
+      "body": "Sierra, the enterprise AI customer-service agent company co-founded by Bret Taylor and Clay Bavor, is in early-stage talks to raise approximately $1.5 billion at a valuation of roughly $30 billion — nearly double its $15.8 billion May 2026 round — with Lightspeed, Greenoaks and Benchmark among prospective investors, per The Information (Nov 18). Sierra disclosed in October that it had surpassed $400 million in annualized revenue, adding more than $150 million in Q3 alone, doubling from $200M to $400M in just five months. The company claims it serves almost half of the Fortune 50.",
+      "why": "Sierra is Graas's most direct named competitor in enterprise agentic CX; its $400M ARR and near-$30B valuation signal that buyers are willing to pay premium prices for outcome-based agents, raising the bar for every competing pitch. Knowing Sierra's outcome-based pricing model ($0 platform fee, per-resolution billing) and that it took only 2 years to reach this scale lets a Graas seller reframe the build-vs-buy conversation and position Graas's data-foundation advantage as the differentiator Sierra lacks.",
+      "source_label": "The Information / PYMNTS / CX Today",
+      "source_url": "https://www.pymnts.com/startups/2026/ai-customer-support-startup-sierra-eyes-30-billion-valuation/"
     },
     {
-      "tag": "US/Global - analyst research",
-      "title": "McKinsey Survey: 71% of Retail Merchants Say AI Tools Have Had Limited or No Effect — the Problem Is Integration, Not Technology",
-      "body": "McKinsey's January 2026 report 'Merchants Unleashed: How Agentic AI Transforms Retail Merchandising' found that while most retail merchandising teams have invested in automation tools and experimented with AI, 71 percent of merchants surveyed said AI merchandising tools have had limited to no effect on their business so far. McKinsey attributes this not to the technology but to how it is integrated and used. The report argues agentic AI changes the dynamic by shifting decision-making from static weekly cycles to continuous, autonomous tuning of assortments, prices, and promotions.",
-      "why": "This is the single most powerful stat for a Graas salesperson to put in front of a merchant or category management leader — the majority of retail AI investments are stalling, and McKinsey names poor integration, not model quality, as the root cause. It directly validates the argument that a governed context and data layer must come before agents can deliver value.",
+      "tag": "Global - analyst / McKinsey",
+      "title": "McKinsey State of AI 2026: 88% Deploy AI, Only 37% See Any EBIT Impact — Pilots Are Stalling",
+      "body": "McKinsey's 2026 State of AI survey (1,719 respondents, 97 countries) finds that while 88% of organizations now deploy AI in at least one function — up from 72% in 2024 — only 37% report any EBIT impact, a figure flat year-on-year. In the US, just 1% of C-suite leaders describe their gen AI rollouts as mature, and only 19% report AI-accelerated revenue increases above 5%. McKinsey's separate State of Organizations 2026 report found 86% of leaders say their organizations are not prepared to adopt AI in day-to-day operations, with only about half of required AI talent available globally.",
+      "why": "This is the single most credible data point for opening a sales call: nearly every retailer has an AI pilot but almost none are seeing P&L impact — the exact gap Graas's context and data-foundation layer is designed to close. Citing McKinsey's finding that high performers 'fundamentally redesigned workflows around AI' (vs. bolting agents onto broken data) gives sellers a proof-backed narrative for why the data foundation must come before the agent.",
       "source_label": "McKinsey & Company",
-      "source_url": "https://www.mckinsey.com/industries/retail/our-insights/merchants-unleashed-how-agentic-ai-transforms-retail-merchandising"
+      "source_url": "https://www.mckinsey.com/industries/retail/our-insights/rewiring-retail-in-europe-the-ai-imperative"
     },
     {
-      "tag": "Global - analyst research / CPG-retail supply chain",
-      "title": "BCG Publishes Outcome Numbers for Agentic AI in CPG–Retail Supply Chains: +2–4% In-Stocks, 60%+ Planning Productivity Gains",
-      "body": "A BCG analysis published in 2026 finds that agentic AI can boost in-stocks by 2–4% and planning productivity by over 60% for CPG companies and retailers by enabling synchronized, always-on supply chains. BCG describes agents that continuously monitor store- and DC-level inventory signals against sell-through velocity and proactively generate replenishment recommendations before a retailer's own replenishment cycle would catch the gap. A separate BCG Executive Perspectives paper on supply chains notes that an agentic-enabled supply chain can optimize inventory daily at the most granular level, simultaneously improving effectiveness and efficiency in ways traditional AI tools could not.",
-      "why": "These are named outcome numbers from a tier-one consultancy covering exactly the CPG-retailer replenishment workflow that retail agents target — not forecasts but reported field results. A seller can cite the 2–4% in-stocks improvement and 60%+ productivity figure to justify an ROI case and to frame Graas as the execution layer that makes these outcomes possible.",
-      "source_label": "Boston Consulting Group",
-      "source_url": "https://www.bcg.com/x/the-multiplier/how-agentic-ai-improves-cpg-retailer-collaboration"
+      "tag": "US - enterprise architecture / Neo4j",
+      "title": "Neo4j Publishes Architecture Manifesto for the 'Knowledge Layer' — The Non-Buyable Foundation Every Enterprise Agent Needs",
+      "body": "Neo4j published a detailed architecture post (July 2026) defining the 'Knowledge Layer for Enterprise AI' as a shared, governed substrate comprising an ontology-based semantic layer, enterprise data grounding, and a decision-trace memory so each successive agent inherits what prior agents learned. The post argues the knowledge layer cannot be purchased off-the-shelf because it encodes a company's specific business model, processes, and policies. A data.world benchmark cited in related analysis found GPT-4 answered only 16% of enterprise questions correctly over raw SQL but 54% over a knowledge graph of the same data — a 37.5-percentage-point lift.",
+      "why": "This is vendor-published architecture proof that agents grounded in a knowledge graph dramatically outperform agents running on raw data — a direct validation of Graas's context-layer positioning. When a prospect asks 'why can't we just wire GPT to our ERP?', the 16%-vs-54% accuracy benchmark is a concrete, citable answer that elevates the conversation from feature comparison to infrastructure strategy.",
+      "source_label": "Neo4j Blog",
+      "source_url": "https://neo4j.com/blog/agentic-ai/enterprise-knowledge-layer/"
     },
     {
-      "tag": "US - agent vendor competitive intelligence",
-      "title": "Sierra Raises $950M at $15.8B Valuation; Passes $200M ARR — Decagon Launches Voice 3 and Personal Agent Gateway in October 2026",
-      "body": "Sierra raised $950 million at a $15.8 billion valuation in May 2026, led by Tiger Global and GV, and by August 2026 had reportedly surpassed $200 million in annualized recurring revenue. Decagon, Sierra's closest specialist challenger in customer-service AI, raised $250 million at a $4.5 billion valuation in January 2026 and in October 2026 launched Voice 3 — shipping its first proprietary speech model, Chord, from Decagon Labs — along with a Personal Agent Gateway, becoming a launch partner on OpenAI's B2B marketplace. Decagon's June 2026 product roundup cited a named customer outcome: Hunter Douglas generated $1 million in AI-attributed revenue through Decagon, with an 85% higher average order value.",
-      "why": "Sierra and Decagon are the two agent vendors Graas is most likely to encounter in a retail or CPG enterprise bake-off; knowing Sierra's $150K annual floor, Decagon's lower-floor per-conversation model, and both companies' October 2026 product moves lets a seller anchor commercial and product comparisons precisely. The Hunter Douglas outcome number is the kind of concrete proof point a buyer will table — Graas needs a sharper counter-example ready.",
-      "source_label": "okara.ai / The CODEW / getmacha.com",
-      "source_url": "https://okara.ai/blog/decagon-revenue-growth"
+      "tag": "Global - analyst / BCG + McKinsey",
+      "title": "BCG & McKinsey Converge: Agentic AI Requires 'Standardized Data and Definitions' Before Retail Merchandising Agents Can Deliver Value",
+      "body": "BCG's April 2026 report 'Always-On Merchandising' argues that for agentic AI to perform core merchandising tasks — demand-supply balancing, inventory allocation, promotional planning — retailers must first implement 'standardized data and definitions' and redesign their operating models around agent outputs rather than siloed processes. McKinsey's 'Rewiring Retail in Europe' (June 2026, n=36 retailers) corroborates this: while more than a quarter of executives prioritize 50+ AI use cases, fewer than 15% have been scaled, citing fragmentation that dilutes effort. McKinsey's analysis of 20 retailers that did rewire found average EBITDA increases of 20% and a threefold return on every dollar invested.",
+      "why": "Two of the most-cited consulting brands are now explicitly saying the data and definitions layer must precede the agent layer — this is Graas's sales thesis delivered by analysts, not vendors. A seller can drop these reports in a pre-call email and walk into the discovery meeting with the prospect already primed to ask 'so what does our data foundation look like?'.",
+      "source_label": "BCG / McKinsey",
+      "source_url": "https://www.bcg.com/publications/2026/how-agentic-ai-is-transforming-retail-merchandising"
     },
     {
-      "tag": "US/Global - CIO economics / build-vs-buy",
-      "title": "Gartner: 40%+ of Agentic AI Projects to Be Canceled by 2027; CIOs Shift AI Buying Authority to Finance as 'Blank-Check Era' Ends",
-      "body": "Gartner's 2026 forecasts, cited across multiple enterprise IT analyses, project that more than 40% of agentic AI projects will be canceled by the end of 2027 due to governance gaps, and describe 2026 as a 'trough of disillusionment' year in which ROI must be proven before anything scales. Gartner also expects AI to reach enterprises primarily as embedded features from incumbent software providers rather than as new greenfield builds, putting pressure on pure point-solution vendors. McKinsey's 2026 survey separately found that 32% of enterprise respondents decided against buying at least one software product because they believed they could build it in-house with agentic coding tools — a trend concentrated in technology and healthcare sectors.",
-      "why": "Every enterprise retail prospect will be under pressure to justify AI spend before year-end; the 40%-cancellation forecast arms a seller with urgency and a governance argument — pilots stall not because agents fail technically but because the data and context foundation was never put in place. The build-vs-buy tension is a live procurement objection: Gartner's data showing vendor-led projects succeed twice as often as pure in-house builds (67% vs 33%) closes the conversation.",
-      "source_label": "The SaaS CFO / articlesLedge",
-      "source_url": "https://www.thesaascfo.com/the-ai-budget-reallocation-is-coming/"
+      "tag": "US/Global - named deployment / CPG",
+      "title": "CPG Agentic Deduction-Management Deployment Recovers $6.5M from $40M Addressable Spend Across 30+ Systems",
+      "body": "Tredence published details of a production deployment where its agentic AI deduction-management solution was integrated across 30+ systems — including SAP, EDI, retailer portals, and email — for an enterprise CPG client. The agent evaluates each trade deduction, assigns reason codes, and recommends next-best actions autonomously, recovering $6.5 million from roughly $40 million in addressable deduction spend. A separate Google Cloud / NVIDIA retail survey (2026) found 51% of retail and CPG organizations already run AI agents in production, with 38% using them specifically for supply chain and logistics workflows.",
+      "why": "This is a named, outcome-quantified CPG deployment in a workflow (trade deductions / vendor management) that directly parallels the ordering and back-office automation use cases Graas targets — it gives sellers a cross-industry proof point with a hard dollar number ($6.5M recovered). The 30+ system integration requirement also illustrates exactly why a governed context layer — not a point agent — is the prerequisite for multi-system agentic workflows.",
+      "source_label": "Tredence / Google Cloud",
+      "source_url": "https://www.tredence.com/eu/blog/ai-agents-in-retail-realworld-use-cases-for-2026"
     }
   ]
 }
