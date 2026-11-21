@@ -1,46 +1,46 @@
 {
-  "generated_utc": "2026-11-20T22:30:50Z",
+  "generated_utc": "2026-11-21T21:27:42Z",
   "window_days": 30,
   "stories": [
     {
-      "tag": "US - agent vendor consolidation",
-      "title": "Salesforce Acquires Cresta for a Reported $2.7B; Ada Merges with Dialpad — Three Agent Vendors Exit Independence in One Week",
-      "body": "On November 2, 2026, Salesforce signed a definitive agreement to acquire Cresta, a voice-first AI platform for contact centers whose customers include Marriott, Comcast, and Alaska Airlines; the reported price is $2.7 billion. Two days later, Dialpad and Ada announced they are merging to build what they call an 'agentic operating system for customer work,' combining voice, customer intelligence, and AI agents. Enterprise communications analyst Dave Michels described the moment as 'The Big Blender,' with both deals signalling that enterprise communications, CX, and AI are converging into larger platform stacks.",
-      "why": "Three named competitors — Cresta, Ada, and Intercom Fin (already acquired by Salesforce in June 2026 for ~$3.6B) — are now inside or beside Salesforce's Service Cloud, making Salesforce the dominant consolidated incumbent a Graas seller will be measured against on nearly every enterprise CX deal. The consolidation redraws the shortlist retailers will bring to vendor reviews: independent best-of-breed agents are disappearing, which is both a threat (Salesforce bundle) and an opening (Salesforce lock-in concerns create room for a focused alternative).",
-      "source_label": "Salesforce Newsroom / CX Today / Yahoo Finance",
-      "source_url": "https://www.salesforce.com/news/stories/salesforce-signs-definitive-agreement-to-acquire-cresta/"
+      "tag": "US - context layer / agent infrastructure",
+      "title": "Neo4j Context Engine Launches to Create AI Knowledge Layer and Enhance Agent Performance",
+      "body": "On October 20, 2026, Neo4j announced its Context Engine — a reusable, shared knowledge substrate that lets AI agents consistently reason over enterprise data across systems. The product includes a six-layer Business Ontology, MCP server integration, and a graph-native memory layer that gives agents short-term, long-term, and reasoning memory from past decisions. The launch reflects the August 2026 Gartner Market Overview for AI Context Platforms, which defines this category as software that constructs, governs, and delivers semantically organized knowledge to AI agents at enterprise scale.",
+      "why": "This is the architecture commitment a retail-AI seller can point to as proof: agents without a shared context layer hallucinate or contradict each other across merchandising, inventory, and service workflows. Neo4j's ontology-grounded approach mirrors exactly the 'context-before-agents' argument Graas makes — use this to show prospects why a data foundation must precede any agent rollout.",
+      "source_label": "Neo4j Press Release / BigDATAwire",
+      "source_url": "https://www.hpcwire.com/bigdatawire/this-just-in/neo4j-context-engine-launches-to-create-ai-knowledge-layer-and-enhance-agent-performance/"
     },
     {
-      "tag": "US - analyst research",
-      "title": "McKinsey 'State of AI 2026': 32% of Enterprises Cancelled a Software Purchase to Build With Agents — But Profit Impact Stuck at 37%",
-      "body": "McKinsey's State of AI 2026 report, published August 25 and drawn from 1,719 respondents across 97 countries, found that 32% of organizations decided against buying at least one software product or feature because they could build it in-house with agentic coding tools. Among large enterprises (revenue >$1B), 40% are now scaling AI agents in at least one function, up from 27% the year before. Despite the activity surge, the share of organizations reporting any EBIT impact from AI stayed flat at 37%, and only 6% qualify as high performers attributing at least 5% of EBIT to AI.",
-      "why": "The build-vs-buy flip is the objection a Graas seller will hear in every discovery call with a CIO — 'we can just build this.' McKinsey's own data provides the counter: building is rising but ROI is not, which means the gap lies in data infrastructure and context, not code — exactly what Graas addresses. Use the 40%-scaling / 37%-profit-impact tension to reframe the conversation from 'should we build agents' to 'what do agents need to actually work.'",
+      "tag": "US - analyst research / agentic retail",
+      "title": "McKinsey: 'Who Wins When AI Does the Shopping?' — Global Survey Shows 70% US Purchase-Completion Jump, Retailer AI Assistants Trail Stand-Alone Tools 2:1",
+      "body": "McKinsey's June 2026 Agentic Commerce Consumer Survey of ~21,000 consumers across 11 markets found the rate at which US AI users completed a purchase via AI jumped 70% year-over-year. Retailer-owned AI assistants trail stand-alone AI tools by as much as 2x throughout the shopping journey, closing the gap only at checkout. McKinsey also finds that for AI users, AI search is three times more influential than traditional search — a direct signal that brands not investing in agent-ready data infrastructure are already losing discovery-layer share.",
+      "why": "The 2:1 performance gap between retailer-built assistants and third-party agents is a live objection-handler: enterprises that try to build agent experiences on fragmented data lose to those grounded in governed context. Use this McKinsey finding to show CIOs that poor context — not model quality — explains why their own AI assistants underperform.",
       "source_label": "McKinsey & Company",
-      "source_url": "https://www.mckinsey.com/capabilities/quantumblack/our-insights/the-state-of-ai"
+      "source_url": "https://www.mckinsey.com/capabilities/growth-marketing-and-sales/our-insights/who-wins-when-ai-does-the-shopping-new-evidence-on-agentic-commerce"
     },
     {
-      "tag": "US - enterprise AI architecture",
-      "title": "Gartner Predicts Over 40% of Agentic AI Projects Will Be Cancelled by End of 2027; 70% of Vendor-Built Agents Abandoned by 2028",
-      "body": "Gartner issued two enterprise AI predictions that have circulated widely in Q4 2026: first, that more than 40% of agentic AI projects will be cancelled by the end of 2027, aligning with observed enterprise abandonment patterns; second, that 70% of enterprises will abandon agentic AI built by vendor forward-deployed engineering by 2028. Separately, Forrester's mid-2026 assessment found that most 'agentic' experiences deployed today are still conversational, with humans still driving decisions and checkout in the vast majority of cases. Both firms point to missing data foundations — not weak models — as the primary reason pilots stall.",
-      "why": "Gartner's cancellation rate gives a Graas seller a credible, named-analyst number to anchor the 'why pilots fail' narrative: enterprises are launching agents without the governed context layer underneath them. The Forrester finding that most deployments are still just chatbots reinforces that the gap between demo and production is a data-architecture problem, not a model problem — which is exactly the gap Graas closes.",
-      "source_label": "Gartner / Forrester (via firstpagesage.com / commercetools.com)",
-      "source_url": "https://firstpagesage.com/reports/agentic-ai-adoption-statistics/"
+      "tag": "US - agent vendor / M&A",
+      "title": "Salesforce Acquires Cresta for Reported $2.7 Billion, Adding Voice Agents and Real-Time Conversation Intelligence to Service Cloud",
+      "body": "On November 2, 2026, Salesforce signed a definitive agreement to acquire Cresta — the voice-first operating system for customer experience whose customers include Marriott, Comcast, and Alaska Airlines — for a reported $2.7 billion. Cresta had passed $100 million in ARR as of April 2026 and its platform combines end-to-end voice agents, real-time human-rep coaching, and conversation analytics on a single system. The deal is expected to close in Q1 of Salesforce's FY2028, and Cresta will continue supporting existing contact-center and telephony platforms post-close.",
+      "why": "Salesforce now bundles Fin (bought for ~$3.6B in June 2026) and Cresta (~$2.7B) into Agentforce and Service Cloud — meaning any enterprise on Salesforce CRM faces a default agent offering from the same vendor. Graas salespeople need to know this consolidation story cold: it reshapes the competitive map and raises the question of whether bundled-in agents grounded in CRM data alone can match the performance of a purpose-built, context-layer-first architecture.",
+      "source_label": "Salesforce Newsroom / Salesforce Ben",
+      "source_url": "https://www.salesforceben.com/salesforce-acquires-cresta-buying-spree-continues-with-voice-agent-company/"
     },
     {
-      "tag": "US/Global - named enterprise deployment",
-      "title": "BCG: CPG Leader Shifts Replenishment to Agentic Planning, Cuts Out-of-Stocks; Walmart Running Multi-Agent Supply Chain in Production",
-      "body": "BCG's May 2026 Executive Perspectives paper 'From Copilots to Enterprise' documents a global CPG company that redesigned replenishment using agentic AI — shifting from periodic planning to daily, SKU-level inventory optimization through a multi-agent architecture. Separately, a Deloitte Insights research piece published in March 2026 confirmed that Walmart is already running a unified multi-agent supply chain architecture in production. BCG frames the shift as moving from functional optimization to enterprise decision orchestration, with agents simultaneously improving effectiveness and efficiency in ways no prior planning tool could.",
-      "why": "A named CPG replenishment deployment with BCG's fingerprints, plus a Walmart production confirmation, gives sellers two proof points that retail and CPG agents in ordering and supply chain are real and in production — not lab experiments. When a prospect says 'agents aren't ready for our supply chain workflows,' these are the reference cases to anchor the counter.",
-      "source_label": "BCG Executive Perspectives / Deloitte Insights (via evolvancemarketresearch.com)",
-      "source_url": "https://media-publications.bcg.com/assets/2026/bcg-ep-future-of-functions-supply-chain.pdf"
+      "tag": "US - analyst research / pilot failure rate",
+      "title": "McKinsey & Deloitte: 88% of Enterprises Use AI, But Fewer Than 10% Have Deployed Agentic AI at Functional Scale — 71% of Retail Merchants Report No Business Impact",
+      "body": "McKinsey data shows that while 88% of enterprises use AI in at least one function, fewer than 10% have deployed agentic AI at functional scale. Deloitte finds only 14% of organizations have solutions ready for deployment, while 42% are still developing their strategy. A separate McKinsey retail-specific study ('Merchants Unleashed', January 2026) found that 71% of merchants surveyed reported AI merchandising tools had limited to no effect on their business — identifying the gap between technology availability and effective implementation as the central problem.",
+      "why": "The 71% merchant failure rate and the sub-10% functional-scale deployment figure are the two most powerful numbers to open an enterprise discovery call with — they validate that the problem is not willingness to invest in AI but the absence of the data foundation that makes agents work. This is Graas's core positioning: pilots stall because context is missing, not because the model is wrong.",
+      "source_label": "Insentra / McKinsey / Deloitte (via synthesis)",
+      "source_url": "https://www.insentragroup.com/us/insights/not-geek-speak/generative-ai/agentic-ai-takes-the-wheel-a-deep-dive-into-2026/"
     },
     {
-      "tag": "US - agent vendor",
-      "title": "Sierra Reaches $400M+ ARR at $15.8B Valuation, Serves 40%+ of Fortune 50 on Outcome-Based Pricing — and Is in Talks for a $20B Round",
-      "body": "Sierra, the enterprise customer-service agent platform co-founded by Bret Taylor, reported ARR exceeding $400 million by October 2026, up from $150 million in early 2026 and $100 million in late 2025, and is in talks to raise a new round at a $20 billion valuation. The company says it now serves more than 40% of the Fortune 50, charges on outcome-based pricing rather than per seat or per message, and in November 2026 announced that browser-automation specialist Anon is joining the company to extend agents into secure web navigation. Competitor Decagon, which raised $250 million in January 2026 at a $4.5 billion valuation, is estimated at roughly $35 million ARR — placing Sierra at a commanding scale lead among pure-play agent vendors.",
-      "why": "Sierra's ARR trajectory and Fortune 50 penetration make it the most credible benchmark a retail buyer will cite when evaluating agent vendors — sellers need to understand its outcome-pricing model, its Context Engine architecture, and where its gaps are (deep multi-system retail data context) to position Graas alongside or against it. The Anon acquisition signals Sierra is moving toward autonomous browser-based workflows, which could expand its footprint into retail ordering and operations use cases that Graas already owns.",
-      "source_label": "The CODEW / Silicon Valley Invest Club / aissist.io",
-      "source_url": "https://www.thecodew.com/2026/11/the-term-sheet-sierra-funding-ai-agent-economy.html"
+      "tag": "US/Global - named enterprise deployment / CPG supply chain",
+      "title": "BCG Report: Agentic Supply Chain AI Shifts CPG Replenishment from Periodic Planning to Daily Optimization — with Named Case Benchmarks",
+      "body": "BCG's 2026 Executive Perspectives report on supply chain AI documents a global CPG leader that redesigned replenishment using a modular agent back-end, shifting from periodic human-led planning to agent-facilitated daily inventory optimization at the most granular level to reduce out-of-stocks and increase sales. BCG frames this as agentic AI eliminating the historic tradeoff between effectiveness and efficiency — supply chains can now simultaneously optimize across SKUs with agents flagging shortfalls overnight and evaluating all options by 6 AM. The report identifies demand-supply balancing, inventory allocation from DC to store, and constrained-supply SKU allocation as the highest-value agent use cases in retail and CPG.",
+      "why": "This is a named-research proof point that agentic supply-chain outcomes are real and benchmarked — not vaporware. For Graas sellers calling on CPG and grocery, BCG's framing of 'daily granular optimization' maps directly to the ordering and replenishment workflows where a governed data layer is the prerequisite: without unified SKU and inventory context, agents cannot make the allocation decisions BCG describes.",
+      "source_label": "Boston Consulting Group",
+      "source_url": "https://www.bcg.com/assets/2026/executive-perspectives-ais-new-mandate-in-supply-chains.pdf"
     }
   ]
 }
