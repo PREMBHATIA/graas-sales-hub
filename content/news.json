@@ -1,46 +1,46 @@
 {
-  "generated_utc": "2026-11-24T02:45:55Z",
+  "generated_utc": "2026-11-25T00:20:57Z",
   "window_days": 30,
   "stories": [
     {
-      "tag": "US - agent vendor",
-      "title": "Sierra Doubles Valuation to $30B, ARR Passes $400M as Fortune 50 Adoption Accelerates",
-      "body": "Sierra raised $1.75 billion in a Series F led by Greenoaks and Lightspeed on November 23, 2026, nearly doubling its valuation from $15.8B in May to $30B, with annual recurring revenue topping $400M in October—just over two and a half years after launch. The company says it now serves almost 50% of Fortune 50 companies, with clients including HSBC, Wells Fargo, JPMorganChase, and Walmart, and charges only when its agents deliver outcomes. Sierra simultaneously released Personal Agent Protocol (Poppy) v1.0, a new interoperability standard already live with Meta's Muse agent and enabled for every Shopify merchant.",
-      "why": "Sierra is the benchmark competitor your prospects will reference—its outcome-based pricing model and $30B valuation set the expectation ceiling on what enterprise CX AI is worth. Its protocol work with Meta and Walmart signals it is building the agent-to-agent layer that could route around retailer-specific context solutions unless Graas can demonstrate superior grounding in retail data.",
-      "source_label": "TechCrunch",
-      "source_url": "https://techcrunch.com/2026/11/23/sierra-doubles-valuation-to-30b-within-six-months-as-demand-for-ai-in-cx-takes-off"
-    },
-    {
-      "tag": "US - agent vendor",
-      "title": "Salesforce Acquires Cresta for a Reported $2.7B to Add Voice AI to Agentforce",
-      "body": "Salesforce signed a definitive agreement on November 2, 2026 to acquire Cresta, a voice-first contact center AI platform used by Marriott, Comcast, and Alaska Airlines, in a deal reported by The Information at $2.7 billion. Cresta's platform combines autonomous voice agents, real-time human-rep coaching, and full interaction analysis on one stack; Salesforce says Cresta will continue to support existing third-party contact center and telephony platforms after close. The deal is Salesforce's third acquisition announcement in two weeks, following Braze and Rune Technologies, and closes in Salesforce's fiscal Q1 2028.",
-      "why": "Cresta is now off the market as an independent option, consolidating voice AI into the Salesforce/Agentforce orbit—any retail prospect running a non-Salesforce CRM stack faces a forced migration question at renewal. For Graas sellers, this shrinks the independent voice-agent landscape and raises urgency to position a knowledge-layer architecture that is CRM-agnostic before Agentforce lock-in hardens.",
-      "source_label": "Salesforce Newsroom / Futurum Group",
+      "tag": "US - agent vendor / M&A",
+      "title": "Salesforce Acquires Cresta for ~$2.7B, Adding Voice AI Agents to Service Cloud",
+      "body": "On November 2, 2026, Salesforce signed a definitive agreement to acquire Cresta, a voice-first AI platform, for a reported $2.7 billion — its third CX acquisition in two weeks after completing the $3.6B Fin (formerly Intercom) pickup. Cresta's platform runs customer calls end-to-end and provides real-time guidance to human reps; named enterprise customers include Marriott, Comcast, and Alaska Airlines. After closing, Cresta will continue to support the third-party contact center and telephony platforms its customers already use, though analysts warn to watch whether new capabilities land first on Service Cloud Voice.",
+      "why": "Cresta is now a Salesforce asset — any retail or CPG prospect running a Salesforce CRM stack will be steered toward Agentforce + Cresta as a bundled voice-agent suite, shrinking the independent vendor landscape. Sellers should use this consolidation to show prospects why a neutral, composable context layer (not a CRM-locked agent) preserves flexibility as the market folds in on itself.",
+      "source_label": "Salesforce / Futurum Research",
       "source_url": "https://futurumgroup.com/insights/salesforce-moves-to-acquire-cresta/"
     },
     {
-      "tag": "US - analyst research",
-      "title": "McKinsey State of AI 2026: 32% of Enterprises Skipped a Software Buy to Build In-House, Yet Only 6% See Real EBIT Impact",
-      "body": "McKinsey's 'State of AI: On the Road to ROI,' published August 25, 2026, surveyed 1,719 leaders across 97 countries and found that 32% of organizations decided against buying at least one software product or feature because they could build it with agentic coding tools—rising to nearly half among AI high performers. Despite this, the share of organizations reporting any EBIT impact from AI remained flat at 37%, and only 6% qualified as high performers (those attributing 5%+ of EBIT to AI). Among large enterprises (revenue >$1B), 40% now report scaling AI agents in at least one function, up from 27% the prior year.",
-      "why": "The 32% build-vs-buy stat is the objection you will face on every enterprise call—prospects believe they can code their way to a retail agent. The 6% EBIT-impact reality is your counterpoint: building the agent is cheap; building the governed context layer that makes it accurate in retail workflows is not, and that is exactly what Graas provides.",
+      "tag": "US - agent vendor / funding",
+      "title": "Sierra Raises $1.75B at $30B Valuation as Annual Revenue Passes $400M",
+      "body": "On November 23, 2026, Sierra — the enterprise customer-service agent company co-founded by Bret Taylor — announced a $1.75B Series F led by Greenoaks and Lightspeed, nearly doubling its May 2026 valuation of $15.8B. The company reports annual recurring revenue passed $400M in October 2026, roughly two and a half years after launch, and says it now serves close to 50% of Fortune 50 firms. Sierra's outcome-based pricing model — charging only when agents deliver a resolution — is a key differentiator it is using to defend against Salesforce's Agentforce and the newly acquired Fin.",
+      "why": "Sierra's $30B valuation on $400M ARR sets a market-price anchor for outcome-based enterprise AI agents that every retail CIO will reference in vendor negotiations. Retail sellers competing against or alongside Sierra need to understand its 'Ghostwriter' build-and-improve loop and explain where a context/data layer they don't provide is the gap that makes or breaks agent accuracy.",
+      "source_label": "The Next Web / Emergent",
+      "source_url": "https://thenextweb.com/news/sierra-1-75b-series-f-30b-valuation-ai-agents"
+    },
+    {
+      "tag": "US - architecture / knowledge graph",
+      "title": "Neo4j Launches Context Engine to Create a Shared Knowledge Layer for Enterprise AI Agents",
+      "body": "On October 20, 2026, Neo4j announced the Neo4j Context Engine, a product that lets companies rapidly build a reusable, shared knowledge substrate — including a predefined six-layer Business Ontology — that multiple AI agents can consistently reason over. The engine includes graph-native memory so agents learn from past decisions, and decision-tracking logs that create a permanent record of agent reasoning. The launch directly targets the most common enterprise AI failure mode: agents hallucinating or contradicting each other because they draw from siloed, stale data rather than a single governed context.",
+      "why": "This is the architecture story a retail AI seller needs on every discovery call: Neo4j is now a named, shipping product that gives enterprises the shared context layer without which agents in ordering, service, or supply chain will conflict and fail. Use it to frame the question — 'what is your shared knowledge layer?' — before proposing any agent workflow.",
+      "source_label": "Neo4j Press Release",
+      "source_url": "https://neo4j.com/press-releases/neo4j-context-engine/"
+    },
+    {
+      "tag": "US - analyst research / McKinsey",
+      "title": "McKinsey State of AI 2026: 32% of Enterprises Cancelled a Software Purchase to Build With Agents Instead — But ROI Stays Flat",
+      "body": "McKinsey's 'The State of AI in 2026: On the Road to ROI,' published August 25, 2026 from a survey of 1,719 respondents across 97 countries, found that 32% of organizations decided against buying at least one software product or feature because they could build it in-house using agentic coding tools — rising to nearly half among AI high performers. Among large enterprises (revenue >$1B), 40% now report scaling AI agents in at least one function, up from 27% the prior year. Despite this activity surge, the share of respondents reporting any EBIT impact from AI stayed flat at 37%, and McKinsey's own summary states: 'Organizations' conviction in AI is growing faster than the immediate financial returns they can attribute to it.'",
+      "why": "The 32% build-vs-buy signal is the objection retail CIOs will raise on every vendor call in Q1 2027 — sellers must be ready to quantify run-cost, maintenance burden, and the hidden cost of building without a governed data foundation. The flat ROI finding is equally powerful: it explains why pilots stall and positions a pre-built, context-grounded agent layer as the faster path to measurable return.",
       "source_label": "McKinsey & Company",
       "source_url": "https://www.mckinsey.com/capabilities/quantumblack/our-insights/the-state-of-ai"
     },
     {
-      "tag": "US - analyst research",
-      "title": "Gartner 2026 Playbook: 'Context Graphs Ground AI Agents With Enterprise Knowledge' — and 40% of Agentic Projects Will Be Cancelled by 2027",
-      "body": "Gartner's September 2026 research, 'Context Graphs Ground AI Agents With Enterprise Knowledge,' establishes the enterprise context graph as the foundational layer that moves agentic AI from pilot to production, arguing that agents need a shared, trusted context foundation to operate at enterprise scale. A separate Gartner prediction, published June 2025 and cited in a November 2, 2026 adoption analysis, forecasts that over 40% of agentic AI projects will be cancelled by end of 2027, with a further prediction that 70% of enterprises will abandon agentic AI built by vendor forward-deployed engineering by 2028. Gartner also projects that 60% of large enterprises running AI agents in production will face external accountability requirements for autonomous actions by 2030, up from under 10% today.",
-      "why": "Gartner's context-graph framing is the analyst language your economic buyers are reading right now—use it to position Graas as the architecture that closes the gap between pilot and production. The 40% cancellation forecast is the stall-rate number that makes urgency concrete: pilots die not for lack of models but for lack of governed context, which is precisely the problem Graas solves.",
-      "source_label": "Gartner / Skan.ai",
-      "source_url": "https://www.skan.ai/analyst-reports/gartner-playbook-for-establishing-an-enterprise-context-layer"
-    },
-    {
-      "tag": "US/Global - CPG deployment",
-      "title": "CPG Agentic AI in Production: Trade Deduction Agent Recovers $6.5M; McKinsey Finds 71% of CPG Firms Use AI but None Have Truly Scaled",
-      "body": "Tredence's agentic deduction-management solution, integrated across 30+ systems including SAP, EDI, and retailer portals, evaluated trade deductions automatically and recovered $6.5M from roughly $40M in addressable deduction spend for one unnamed enterprise CPG client. NVIDIA's 2026 State of AI in Retail and CPG survey found 51% of retail and CPG leaders already run AI agents in production—38% in supply chain and logistics—yet McKinsey separately found 71% of CPG companies use AI in at least one function but notes no CPG player has truly scaled it, citing the most common barrier as data quality rather than model capability. BCG's May 2026 supply chain report confirms agentic AI can eliminate the historic tradeoff between effectiveness and efficiency in replenishment, but warns that AI-related incidents rose 21% from 2024 to 2025.",
-      "why": "The $6.5M deduction-recovery outcome is proof-point currency for a sales call—it shows agents delivering against a measurable P&L line in a real CPG workflow. The McKinsey 'pilot purgatory' finding and NVIDIA's data-as-the-top-barrier stat explain why: without a governed context layer unifying SKU, retailer portals, and ERP data, agents cannot scale past the pilot, which is the exact entry point for Graas.",
-      "source_label": "Tredence / NVIDIA / McKinsey / BCG",
-      "source_url": "https://www.tredence.com/eu/blog/ai-agents-in-retail-realworld-use-cases-for-2026"
+      "tag": "US - analyst research / Forrester & Gartner",
+      "title": "Forrester Mid-2026: Most 'Agentic' Retail Experiences Are Still Conversational; Gartner Warns 40% of Agent Projects Will Fail by 2027",
+      "body": "Forrester's mid-2026 assessment states bluntly that most so-called agentic commerce experiences today remain conversational — humans still drive decisions and checkout in the vast majority of cases — and advises enterprises to build a 'machine advantage' through structured, AI-readable product data on infrastructure they control. Separately, Gartner predicts that more than 40% of agentic projects will fail by 2027 because legacy systems cannot support modern AI demands, and that 60% of large enterprises running agents in production will face external accountability requirements for autonomous actions by 2030. Gartner also expects 90% of B2B buying to run through AI agents by 2028, pushing over $15 trillion through agent exchanges.",
+      "why": "The Forrester/Gartner one-two punch — agents are mostly still chat today, but legacy data architecture is what kills the projects that try to go further — is the exact narrative that justifies a context-layer investment before scaling agents in ordering or supply chain. Retail sellers can cite these named analyst findings to validate urgency while explaining why the data foundation must come first.",
+      "source_label": "Commercetools / Forrester / Gartner (compiled)",
+      "source_url": "https://commercetools.com/blog/the-agentic-commerce-radar-key-market-shifts-insights"
     }
   ]
 }
