@@ -1,46 +1,46 @@
 {
-  "generated_utc": "2026-11-27T00:18:28Z",
+  "generated_utc": "2026-11-27T23:55:52Z",
   "window_days": 30,
   "stories": [
     {
       "tag": "US - agent vendor consolidation",
-      "title": "Salesforce Acquires Cresta for ~$2.7B; Ada Merges with Dialpad — Agent Category Consolidates in First Week of November 2026",
-      "body": "In the first week of November 2026, three major AI customer-service vendors agreed to new owners: Salesforce signed to acquire Cresta on November 2 for a reported $2.7B, Dialpad and Ada announced an all-share merger on November 4, and Five9 agreed to buy Level AI on November 5. Salesforce had already closed its ~$3.6B acquisition of Fin (formerly Intercom) in September 2026, and Zendesk had closed its purchase of Forethought in March 2026. Sierra — the last major independent — raised a $1.75B Series F at a $30B valuation on November 23, reporting $400M+ ARR, and simultaneously released Personal Agent Protocol (Poppy) v1.0 to enable personal AI agents to interoperate with company agents.",
-      "why": "Every named competitor on our watch list — Fin, Cresta, Forethought, Ada — has either been acquired or announced a merger; only Sierra and Decagon remain independent at scale. A seller can now reframe the vendor-selection conversation: buying from an acquired agent point-solution means betting on a roadmap controlled by Salesforce or Zendesk, whereas a context-layer approach (like Graas) sits above that consolidation and routes work to whichever agent survives.",
-      "source_label": "marketsplash.com / bestaicustomersupport.com / futurumgroup.com",
-      "source_url": "https://marketsplash.com/ai-customer-service-funding-statistics/"
+      "title": "Salesforce Acquires Cresta for ~$2.7B to Add Voice AI to Agentforce",
+      "body": "On November 2, 2026, Salesforce signed a definitive agreement to acquire Cresta, reportedly valued at $2.7 billion, folding Cresta's voice agents and real-time rep-guidance platform into Service Cloud and Agentforce. Cresta's enterprise customers include Marriott, Comcast, and Alaska Airlines; closing is expected in Salesforce's Q1 fiscal 2028. Cresta will continue to support the contact-center and telephony platforms its existing customers already use, though analysts note the deal puts Salesforce in direct competition with contact-center partners and removes one of the larger independent voice-AI specialists from the market.",
+      "why": "Cresta is a named competitor in enterprise CX AI — its absorption into Salesforce's Agentforce stack changes the vendor shortlist overnight, and retail accounts running non-Salesforce CRM now face an uncertain roadmap. A seller can use this to open the 'platform lock-in vs. best-of-breed' conversation and position a neutral, data-layer-first approach that works regardless of which CRM the retailer runs.",
+      "source_label": "Salesforce / Futurum Group",
+      "source_url": "https://futurumgroup.com/insights/salesforce-moves-to-acquire-cresta/"
     },
     {
-      "tag": "US - analyst research / pilot failure",
-      "title": "Gartner 2026 CIO Agenda: 48% of Retailers Plan Agentic AI, But Only 39% Have the Data Foundation to Support It",
-      "body": "Gartner's 2026 CIO Agenda for Retail finds that 48% of retail respondents plan to deploy agentic AI within 12 months, yet only 39% of retailers have both a data strategy and an operating model to support it — leaving 61% structurally unable to extract value from agents. Separately, Gartner's Hype Cycle for Agentic AI predicts over 40% of agentic AI projects will be canceled by end of 2027, with 2026 Gartner Symposium data showing only 13% of CIOs report AI has delivered significant value so far. Gartner's August 2026 research note 'Foundations of AI-Ready Data' concludes that AI-ready data cannot be achieved through one-time preparation and requires a continuous, use-case-driven governance practice throughout the AI lifecycle.",
-      "why": "This is the definitive Gartner data point for why retail AI pilots stall: the data foundation is missing before agents are introduced, not after. A Graas seller can cite these numbers to any retail CIO to validate that the context/semantic layer must come first — and that without it, the retailer is statistically in the 61% who cannot scale.",
-      "source_label": "Gartner / kore.ai synthesis",
+      "tag": "US - agent vendor funding",
+      "title": "Sierra Closes $1.75B Series F at $30B Valuation as ARR Tops $400M",
+      "body": "Sierra Technologies raised $1.75 billion led by Greenoaks and Lightspeed Venture Partners on November 23, 2026, nearly doubling its $15.8 billion May valuation to $30 billion — its third raise in 14 months. Annual recurring revenue has passed $400 million, up from $100 million in November 2025, and Sierra charges only when its agents deliver outcomes. The same week saw Decagon ($4.5B valuation, January 2026) and Parloa ($3B valuation, January 2026) also active, confirming that the customer-service agent category is consolidating around a small set of well-capitalised pure-plays.",
+      "why": "Sierra is the benchmark competitor in outcome-based enterprise AI agents; its pricing model ('pay only when agents deliver') is increasingly the expectation buyers bring to every agent-vendor conversation. A Graas seller must be ready to articulate what differentiates a retail-domain context layer from Sierra's general-purpose agent infrastructure — Sierra's agents still depend on whatever data foundation the retailer has built.",
+      "source_label": "The Next Web / SiliconAngle",
+      "source_url": "https://thenextweb.com/news/sierra-1-75b-series-f-30b-valuation-ai-agents"
+    },
+    {
+      "tag": "US - analyst research",
+      "title": "Gartner 2026 CIO Agenda for Retail: 48% Plan Agentic AI Deployment, Only 39% Have the Data Foundation to Support It",
+      "body": "Gartner's 2026 CIO Agenda for Retail finds that 48% of retail respondents plan to deploy agentic AI within 12 months, yet only 39% of retailers have both a data strategy and an operating model to support it — leaving 61% structurally unready. Gartner separately predicts that 40% of agentic AI projects enterprise-wide will be canceled by 2027 due to governance failures and unclear ROI, and quotes the barrier plainly: 'Without accurate and timely data, particularly from the store, AI initiatives stall.' Retail CIOs nonetheless plan to raise AI spending by 36% and generative AI spending by 38% in 2026.",
+      "why": "This is the single most quotable analyst finding for a retail-AI sales call: the ambition-to-readiness gap (48% want agents, only 39% have the data layer) is the exact problem a context-layer or data-foundation sale solves. The 40% cancellation forecast gives urgency — buyers need to get their data infrastructure right before they scale agents, not after.",
+      "source_label": "Gartner / Kore.ai analysis",
       "source_url": "https://www.kore.ai/blog/agentic-ai-in-retail"
     },
     {
-      "tag": "US - named enterprise deployment / analyst report",
-      "title": "BCG (November 23, 2026): US Retailer Proactively Resolved 70% of Availability Issues in One Quarter Using Agentic AI",
-      "body": "A BCG article published November 23, 2026 reports that a US retailer proactively addressed 70% of on-shelf availability issues in a single quarter by deploying agentic AI that connects fragmented inventory, sales, supplier, logistics, and shelf-data signals to identify root causes and assign action to accountable owners before a sale is lost. BCG argues the bottleneck is no longer detecting empty shelves but connecting fragmented signals and diagnosing causes across the end-to-end supply chain — exactly the data-integration problem that stops simpler AI tools from working. A companion BCG report on CPG–retail collaboration finds agentic AI can boost in-stocks by 2–4% and planning productivity by over 60%, and prescribes a 'curated action ontology' and 'catalogued data architecture' as prerequisites.",
-      "why": "This is a named outcome (70% issue resolution rate) from a live retail deployment published this week — the kind of proof point a seller can drop into a discovery call with a supply-chain or category-management buyer. The BCG prescription — action ontology plus catalogued data architecture — mirrors exactly what a context/knowledge-graph layer provides, making this a direct architectural validation for Graas's approach.",
-      "source_label": "BCG",
-      "source_url": "https://www.bcg.com/publications/2026/agentic-ai-retail-on-shelf-availability"
+      "tag": "US/Global - analyst research",
+      "title": "McKinsey State of AI 2026: Only 37% of Companies See EBIT Impact Despite 80% Reporting Productivity Gains",
+      "body": "McKinsey's 2026 State of AI report finds that 40% of large enterprises are now scaling AI agents in at least one function, up from 27% a year ago, but only 37% of respondents report any impact on company EBIT — roughly the same share as in 2025. The report identifies AI high performers (just 6% of respondents) as 3.3x more likely to plan fundamental transformation, and nearly three-quarters of those high performers have redesigned workflows around AI versus one-quarter of other companies. Separately, 32% of organizations say they have decided against buying at least one software product because they believe they can build it in-house using agentic coding tools.",
+      "why": "The productivity-to-profit gap ('80% say productive, only 37% see EBIT impact') is a powerful conversation-opener for why agents without a governed data foundation produce noise, not margin. The build-vs-buy finding — 32% choosing internal builds — is a direct challenge for every enterprise AI vendor, including Graas: sellers must be prepared to show why a purpose-built retail context layer beats a homegrown LLM wrapper.",
+      "source_label": "McKinsey & Company",
+      "source_url": "https://www.mckinsey.com/capabilities/growth-marketing-and-sales/our-insights/who-wins-when-ai-does-the-shopping-new-evidence-on-agentic-commerce"
     },
     {
-      "tag": "US - enterprise AI architecture",
-      "title": "Gartner (2026): Universal Semantic Layers Will Be Treated as Critical Infrastructure by 2030 — Needed to Align Multi-Agent Systems",
-      "body": "Gartner's 2026 prediction states that by 2030, universal semantic layers will be treated as critical infrastructure and are needed to align multi-agent systems and stop costly inconsistencies before they spread across the enterprise. A 2026 benchmark of 100 retail analytics questions found that adding a structured semantic context document to a warehouse schema dramatically improved frontier-model accuracy, illustrating why agents grounded only in raw schemas hallucinate on business-critical queries. Gartner's Symposium 2026 reinforced this: the gain in AI ROI comes from data work, not model choice, arguing for an AI-ready data foundation and semantic layer before the next wave of agents.",
-      "why": "Gartner explicitly names the semantic/context layer as the prerequisite infrastructure for multi-agent retail systems — this is analyst cover for every conversation where a buyer questions whether they need a knowledge layer before deploying agents. Sellers can cite the Gartner prediction and the retail benchmark together to show that skipping the context layer is the documented reason agents fail at scale.",
-      "source_label": "Atlan / Gartner (via atlan.com) / Gartner Symposium 2026",
-      "source_url": "https://atlan.com/know/ai-agent/ontology/ontology-ai-grounding/"
-    },
-    {
-      "tag": "US - analyst research / build-vs-buy economics",
-      "title": "BCG Report: More Than Half of CPG and Retail Leaders Don't Formally Measure AI ROI — Scaling Pilot Economics Is the #1 Challenge",
-      "body": "BCG's report 'AI in CPG and Retail: How Winners Are Pulling Ahead' (published within the last 30 days) identifies the biggest challenge to agentic AI adoption as expanding pilot economics into full-scale ROI, with more than half of respondents admitting they don't formally measure the ROI of their consumer AI investments. BCG analysis finds that scaling the full set of AI initiatives across the demand value chain can deliver 220–350 basis points of EBITDA for CPGs and 180–360 bps for retailers — but only leaders who build data assets in parallel with deployment and maintain consistent agentic ecosystem choices capture that upside. BCG advises CEOs to target two or three strategic workflows, redesign roles and processes, and apply guardrails for output quality, cost, and human oversight rather than spreading resources across many pilots.",
-      "why": "Half of retail and CPG buyers a Graas seller speaks to have no formal AI ROI measurement — this opens the door to positioning Graas as the layer that makes agent outcomes measurable and attributable. The BCG finding that data assets must be built in parallel with deployment directly supports leading with the context-layer conversation before any agent vendor discussion.",
-      "source_label": "BCG",
-      "source_url": "https://www.bcg.com/publications/2026/how-cpg-retail-leaders-maximize-ai-roi"
+      "tag": "US - architecture",
+      "title": "Gartner Names Context Graphs the Essential Backbone for Agentic AI; Atlan Publishes Implementation Guide",
+      "body": "In a November 17, 2026 implementation guide, Atlan documents that Gartner now formally recognises context graphs as the essential backbone for agentic AI and names Atlan among the exemplar vendors defining the category. The guide argues that 95% of enterprise AI pilots fail to deliver measurable P&L impact, and that the fix is not a better model but a governed Enterprise Data Graph — a metadata lakehouse plus graph engine — exposed to agents via MCP servers, semantic search, or RAG pipelines. Siemens/RapidMiner published a parallel architecture piece positioning an enterprise-scale knowledge graph (not a point-solution graph database) as the universal context layer, noting that agents need context spanning the entire enterprise, not a single department.",
+      "why": "Gartner's formal category recognition of 'context graphs' gives a Graas seller third-party validation for the exact architecture argument — that agents fail without a shared, governed knowledge layer, not a model problem. The MCP-exposure pattern described here is exactly how a retail context layer (SKU, inventory, identity) must be surfaced to any agent vendor, including Sierra or Agentforce, making this a foundation story that complements, not competes with, the agent vendors above.",
+      "source_label": "Atlan / Gartner",
+      "source_url": "https://atlan.com/know/how-to-build-context-graph-enterprise-ai/"
     }
   ]
 }
